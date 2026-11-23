@@ -24,28 +24,39 @@ export const CONIC_WEDGES = 24;
 /** The gradient rect is this wide compared with the box, so there is room to drift. */
 const DRIFT_WIDTH = 2.2;
 
-/** How long a swirl moves after it mounts. Then it rests (WCAG 2.2.2: no motion that never ends). */
-export const SETTLE_MS = 5000;
+/**
+ * How long a swirl moves after it mounts. Then it rests. WCAG 2.2.2 allows motion up to 5 seconds
+ * without a pause control; 4500 ms leaves headroom for the time before the first frame.
+ */
+export const SETTLE_MS = 4500;
 
 /**
- * Runs one pass of motion when the swirl mounts, then leaves it at rest where it ended. With
- * Reduce Motion on nothing runs, and turning it on mid-pass stops the pass where it is. Once a
- * pass has started it never runs again for this mount, so a change of settings stays calm.
+ * Runs one pass of motion when the swirl mounts and is `ready`, then leaves it at rest where it
+ * ended. `makePass` returns null for "no motion". With Reduce Motion on nothing runs, and turning
+ * it on mid-pass stops the pass where it is. Once a pass has started it never runs again for this
+ * mount, so a change of settings stays calm.
  */
-function useSettle(makePass: () => Animated.CompositeAnimation) {
+function useSettle(
+  ready: boolean,
+  makePass: () => Animated.CompositeAnimation | null,
+) {
   const reduceMotion = useReduceMotion();
   const makeRef = useRef(makePass);
   makeRef.current = makePass;
+  // Under StrictMode's double effect the swirl would not move in dev; the app does not use StrictMode.
   const started = useRef(false);
   useEffect(() => {
-    if (reduceMotion || started.current) {
+    if (reduceMotion || !ready || started.current) {
+      return undefined;
+    }
+    const pass = makeRef.current();
+    if (!pass) {
       return undefined;
     }
     started.current = true;
-    const pass = makeRef.current();
     pass.start();
     return () => pass.stop();
-  }, [reduceMotion]);
+  }, [reduceMotion, ready]);
 }
 
 type LinearSwirlProps = {
@@ -68,7 +79,7 @@ function gradientLine(angle: number) {
 }
 
 /**
- * A colour gradient that slides behind (for about 5 seconds, then rests) its children. The children stay
+ * A colour gradient that slides behind its children for about 5 seconds, then rests. The children stay
  * readable: only the decoration layer is hidden from screen readers.
  */
 export function LinearSwirl({
@@ -81,14 +92,17 @@ export function LinearSwirl({
   const id = useId();
   const [width, setWidth] = useState(0);
   const slide = useRef(new Animated.Value(0)).current;
-  // driftMs is the time for one full slide, so a 5 s pass covers 5000 / driftMs of it (at most all).
-  useSettle(() =>
-    Animated.timing(slide, {
-      toValue: Math.min(1, SETTLE_MS / driftMs),
-      duration: SETTLE_MS,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    }),
+  // driftMs is the time for one full slide, so one pass covers SETTLE_MS / driftMs of it (at most all).
+  // It waits for the real width, so the native interpolation has its true range.
+  useSettle(width > 0, () =>
+    driftMs > 0
+      ? Animated.timing(slide, {
+          toValue: Math.min(1, SETTLE_MS / driftMs),
+          duration: SETTLE_MS,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        })
+      : null,
   );
   const onLayout = (event: LayoutChangeEvent) =>
     setWidth(event.nativeEvent.layout.width);
@@ -216,14 +230,17 @@ type ConicSwirlProps = {
  */
 export function ConicSwirl({ stops, size, spinMs, testID }: ConicSwirlProps) {
   const turn = useRef(new Animated.Value(0)).current;
-  // spinMs is the time for one full turn, so a 5 s pass turns 5000 / spinMs of a turn.
-  useSettle(() =>
-    Animated.timing(turn, {
-      toValue: SETTLE_MS / spinMs,
-      duration: SETTLE_MS,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }),
+  // spinMs is the time for one full turn. One pass turns SETTLE_MS / spinMs of a turn, at most one
+  // whole turn (a faster speed would only spin past where it can be followed).
+  useSettle(true, () =>
+    spinMs > 0
+      ? Animated.timing(turn, {
+          toValue: SETTLE_MS / Math.max(spinMs, SETTLE_MS),
+          duration: SETTLE_MS,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        })
+      : null,
   );
   const wedges = useMemo(
     () => (stops.length === 0 ? [] : conicWedges(stops, size)),

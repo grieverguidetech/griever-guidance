@@ -7,7 +7,13 @@ import {
   jest,
 } from '@jest/globals';
 import { Animated, AccessibilityInfo, Text } from 'react-native';
-import { act, render, renderHook, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react-native';
 import { Path } from 'react-native-svg';
 import { useReduceMotion } from '../lib/useReduceMotion';
 import {
@@ -46,13 +52,11 @@ async function givenReduceMotion(on: boolean) {
 beforeEach(() => {
   passStarts = jest.fn();
   passStops = jest.fn();
-  jest
-    .spyOn(Animated, 'timing')
-    .mockImplementation((() => ({
-      start: passStarts,
-      stop: passStops,
-      reset: jest.fn(),
-    })) as never);
+  jest.spyOn(Animated, 'timing').mockImplementation((() => ({
+    start: passStarts,
+    stop: passStops,
+    reset: jest.fn(),
+  })) as never);
 });
 
 afterEach(() => {
@@ -61,36 +65,82 @@ afterEach(() => {
 
 const STOPS = ['#ff0000', '#00ff00', '#0000ff'];
 
+// A real layout pass gives the swirl its width; the test has to send it.
+async function layOut(view: ReturnType<typeof render>) {
+  const outer = view.getByTestId('linear-swirl-decoration', {
+    includeHiddenElements: true,
+  }).parent;
+  await act(async () => {
+    fireEvent(outer as never, 'layout', {
+      nativeEvent: { layout: { width: 200, height: 48 } },
+    });
+  });
+}
+
+const timingConfig = (call: number) =>
+  (Animated.timing as jest.Mock).mock.calls[call][1] as Record<string, unknown>;
+
 describe('Swirl motion', () => {
   it('runs one pass of SETTLE_MS for each swirl when Reduce Motion is off', async () => {
     await givenReduceMotion(false);
-    render(<LinearSwirl stops={STOPS} angle={90} driftMs={20000} />);
-    render(<ConicSwirl stops={STOPS} size={80} spinMs={10000} />);
-    await act(async () => undefined);
-    expect(SETTLE_MS).toBe(5000);
-    expect(Animated.timing).toHaveBeenCalledTimes(2);
-    const [linear, conic] = (Animated.timing as jest.Mock).mock.calls.map(
-      (call) => call[1] as Record<string, unknown>,
+    render(<ConicSwirl stops={STOPS} size={80} spinMs={9000} />);
+    const linear = render(
+      <LinearSwirl stops={STOPS} angle={90} driftMs={18000} />,
     );
-    expect(linear).toMatchObject({ duration: SETTLE_MS, toValue: 0.25 });
-    expect(conic).toMatchObject({ duration: SETTLE_MS, toValue: 0.5 });
+    await layOut(linear);
+    // 4500 ms (not 5000) keeps headroom under the WCAG 2.2.2 five second limit.
+    expect(SETTLE_MS).toBe(4500);
+    expect(Animated.timing).toHaveBeenCalledTimes(2);
+    const configs = [timingConfig(0), timingConfig(1)];
+    expect(configs.map((c) => c.duration)).toEqual([SETTLE_MS, SETTLE_MS]);
+    expect(configs.map((c) => c.toValue).sort()).toEqual([0.25, 0.5]);
     expect(passStarts).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not start the linear pass until it has a width', async () => {
+    await givenReduceMotion(false);
+    const view = render(
+      <LinearSwirl stops={STOPS} angle={90} driftMs={4000} />,
+    );
+    await act(async () => undefined);
+    expect(passStarts).not.toHaveBeenCalled();
+    await layOut(view);
+    expect(passStarts).toHaveBeenCalledTimes(1);
   });
 
   it('never slides past one full drift', async () => {
     await givenReduceMotion(false);
-    render(<LinearSwirl stops={STOPS} angle={90} driftMs={1000} />);
+    const view = render(
+      <LinearSwirl stops={STOPS} angle={90} driftMs={1000} />,
+    );
+    await layOut(view);
+    expect(timingConfig(0)).toMatchObject({ toValue: 1 });
+  });
+
+  it('turns at most one whole turn, however fast the spin', async () => {
+    await givenReduceMotion(false);
+    render(<ConicSwirl stops={STOPS} size={80} spinMs={1000} />);
     await act(async () => undefined);
-    expect((Animated.timing as jest.Mock).mock.calls[0][1]).toMatchObject({
-      toValue: 1,
-    });
+    expect(timingConfig(0)).toMatchObject({ toValue: 1 });
+  });
+
+  it('does not move when the speed is zero or less', async () => {
+    await givenReduceMotion(false);
+    const linear = render(<LinearSwirl stops={STOPS} angle={90} driftMs={0} />);
+    render(<ConicSwirl stops={STOPS} size={80} spinMs={0} />);
+    render(<ConicSwirl stops={STOPS} size={80} spinMs={-5} />);
+    await layOut(linear);
+    expect(Animated.timing).not.toHaveBeenCalled();
+    expect(passStarts).not.toHaveBeenCalled();
   });
 
   it('starts no motion when Reduce Motion is on', async () => {
     await givenReduceMotion(true);
-    render(<LinearSwirl stops={STOPS} angle={90} driftMs={4000} />);
+    const linear = render(
+      <LinearSwirl stops={STOPS} angle={90} driftMs={4000} />,
+    );
     render(<ConicSwirl stops={STOPS} size={80} spinMs={9000} />);
-    await act(async () => undefined);
+    await layOut(linear);
     expect(Animated.timing).not.toHaveBeenCalled();
     expect(passStarts).not.toHaveBeenCalled();
   });
@@ -103,6 +153,15 @@ describe('Swirl motion', () => {
     expect(passStops).not.toHaveBeenCalled();
     act(() => onChange(true));
     expect(passStops).toHaveBeenCalledTimes(1);
+    expect(passStarts).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start a second pass when Reduce Motion goes on and off again', async () => {
+    await givenReduceMotion(false);
+    render(<ConicSwirl stops={STOPS} size={80} spinMs={9000} />);
+    await act(async () => undefined);
+    act(() => onChange(true));
+    act(() => onChange(false));
     expect(passStarts).toHaveBeenCalledTimes(1);
   });
 
