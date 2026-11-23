@@ -23,64 +23,72 @@ function shell(props: { aside?: boolean; title?: string } = {}) {
   );
 }
 
+/** The one toggle in the header. */
+function headerToggle() {
+  return within(screen.getByRole('banner')).getByRole('button', { name: "What you'll need" });
+}
+
+/** The phone button in the page; jsdom ignores lg:hidden, so it is found by its marker, not its name. */
+function phoneButton() {
+  return screen.getByRole('main').querySelector('[data-checklist-opener]') as HTMLElement;
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
 });
 
 describe('CmsShell checklist panel', () => {
-  it('always keeps the phone opener, the sheet and the Hide toggle', () => {
+  it('always keeps the phone opener and the header toggle', () => {
     render(shell());
-    expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Hide checklist' })).toBeInTheDocument();
+    expect(phoneButton()).toBeInTheDocument();
+    expect(headerToggle()).toBeInTheDocument();
   });
 
   it('shows the panel by default, as a named aside with an expanded toggle', () => {
     render(shell());
     expect(within(screen.getByRole('complementary', { name: "What you'll need" })).getByText('Panel words')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: "What you'll need" })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Hide checklist' })).not.toHaveAttribute('aria-expanded');
+    const toggle = headerToggle();
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveAttribute('aria-controls', screen.getByRole('complementary').id);
   });
 
-  it('puts Hide in the aside header as a ghost button, and Show at the top of main when hidden', async () => {
+  it('has no Hide or Show checklist button anywhere, and the panel has no button of its own', () => {
     render(shell());
-    const aside = screen.getByRole('complementary');
-    const hide = within(aside).getByRole('button', { name: 'Hide checklist' });
-    expect(hide).toHaveClass('gg-btn-ghost'); expect(hide).not.toHaveClass('gg-btn-ghost-plain');
-    expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toContainElement(hide);
-    await userEvent.click(hide);
-    const show = screen.getByRole('button', { name: 'Show checklist' });
-    expect(show).toHaveClass('gg-btn-primary');
-    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Show checklist' })).toBe(show);
-    expect(within(screen.getByRole('banner')).getByTestId('wordmark-name')).toBeInTheDocument();
-    expect(screen.getByRole('main')).not.toContainElement(show);
+    expect(screen.queryByRole('button', { name: /checklist/i })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('complementary')).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('Show checklist in the header has the aria attributes and opens the panel', async () => {
+  it('the one header toggle flips aria-expanded and the caret, keeps focus on itself, and closes and opens the panel', async () => {
     render(shell());
-    await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
-    const show = screen.getByRole('button', { name: 'Show checklist' });
-    expect(show).toHaveAttribute('aria-expanded', 'false');
-    expect(show).toHaveFocus();
-    const panelId = show.getAttribute('aria-controls') ?? '';
+    const toggle = headerToggle();
+    expect(within(toggle).getByTestId('checklist-caret')).toHaveAttribute('data-caret', 'down');
+    const panelId = toggle.getAttribute('aria-controls') ?? '';
     expect(panelId).not.toBe('');
-    await userEvent.click(show);
-    const aside = screen.getByRole('complementary', { name: "What you'll need" });
-    expect(aside).toHaveAttribute('id', panelId);
-    expect(within(aside).getByRole('button', { name: 'Hide checklist' })).toHaveFocus();
-    expect(screen.queryByRole('button', { name: 'Show checklist' })).not.toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(headerToggle()).toBe(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', panelId);
+    expect(toggle).toHaveFocus();
+    expect(within(toggle).getByTestId('checklist-caret')).toHaveAttribute('data-caret', 'up');
+    await userEvent.click(toggle);
+    expect(screen.getByRole('complementary', { name: "What you'll need" })).toHaveAttribute('id', panelId);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(toggle).toHaveFocus();
+    expect(within(toggle).getByTestId('checklist-caret')).toHaveAttribute('data-caret', 'down');
   });
 
-  it('draws no Show checklist button when there is no panel', () => {
+  it('draws no header toggle when there is no panel', () => {
     render(shell({ aside: false }));
-    expect(screen.queryByRole('button', { name: 'Show checklist' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('makes the aside sticky and scrollable, with a focusable first child', () => {
     render(shell());
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     expect(aside).not.toHaveAttribute('tabindex');
-    expect(within(aside).getByRole('button', { name: 'Hide checklist' })).toBeInTheDocument();
     expect(aside.className).toContain('lg:sticky');
     expect(aside.className).toContain('lg:overflow-y-auto');
     expect(aside.className).toContain('lg:max-h-[calc(100dvh-2rem)]');
@@ -104,14 +112,14 @@ describe('CmsShell checklist panel', () => {
 
   it('hides, saves the choice, and is still hidden after a remount', async () => {
     const { unmount } = render(shell());
-    await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
+    await userEvent.click(headerToggle());
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show checklist' })).toBeInTheDocument();
+    expect(headerToggle()).toHaveAttribute('aria-expanded', 'false');
     expect(window.localStorage.getItem(KEY)).toBe('hidden');
     unmount();
     render(shell());
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Show checklist' }));
+    await userEvent.click(headerToggle());
     expect(window.localStorage.getItem(KEY)).toBe('shown');
     expect(screen.getByRole('complementary')).toBeInTheDocument();
   });
@@ -125,13 +133,13 @@ describe('CmsShell checklist panel', () => {
     });
     render(shell());
     expect(screen.getByRole('complementary')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
+    await userEvent.click(headerToggle());
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
 
   it('opens the sheet from the phone button, and Close returns focus to it', async () => {
     render(shell());
-    const open = screen.getByRole('button', { name: "What you'll need" });
+    const open = phoneButton();
     await userEvent.click(open);
     const dialog = screen.getByRole('dialog', { name: "What you'll need" });
     expect(screen.getAllByText('Panel words')).toHaveLength(1);
@@ -144,7 +152,7 @@ describe('CmsShell checklist panel', () => {
 
   it('Escape closes the sheet and returns focus to the button', async () => {
     render(shell());
-    const open = screen.getByRole('button', { name: "What you'll need" });
+    const open = phoneButton();
     await userEvent.click(open);
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -161,7 +169,7 @@ describe('CmsShell checklist panel', () => {
       removeEventListener: vi.fn(),
     }));
     render(shell());
-    await userEvent.click(screen.getByRole('button', { name: "What you'll need" }));
+    await userEvent.click(phoneButton());
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     act(() => listener?.({ matches: true }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -188,7 +196,7 @@ describe('CmsShell checklist panel', () => {
       </CmsShell>,
     );
     expect(screen.getByRole('button', { name: 'In panel' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: "What you'll need" }));
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'In sheet' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

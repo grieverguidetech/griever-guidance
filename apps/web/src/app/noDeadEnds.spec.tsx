@@ -124,7 +124,7 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
     expect(aside.querySelector('[data-checklist-item]')).not.toBeNull();
     expect(within(aside).getByText(kind === 'owner' ? PREVIEW_LINE : MEMBER_PREVIEW_LINE)).toBeInTheDocument();
     expect(within(aside).queryByRole('button', { name: /Done/ })).toBeNull();
-    expect(screen.getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).getByRole('button', { name: "What you'll need" })).toBeInTheDocument();
   });
 
   it.each(['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous'])(

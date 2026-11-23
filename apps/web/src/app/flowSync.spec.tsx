@@ -344,7 +344,7 @@ describe('background sync in the app (#520)', () => {
     await screen.findByText('Loading…');
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     const heading = await screen.findByRole('heading', { level: 1, name: 'Obituary' });
-    const other = screen.getByRole('button', { name: "What you'll need" });
+    const other = within(screen.getByRole('main')).getByRole('button', { name: "What you'll need" });
     other.focus();
     await act(async () => {
       answer(new Response(JSON.stringify([record]), { status: 200, headers: { 'Content-Type': 'application/json' } }));

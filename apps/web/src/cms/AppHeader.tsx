@@ -1,22 +1,21 @@
-import type { Ref } from 'react';
+import { CaretDown } from '@phosphor-icons/react/CaretDown';
+import { CaretUp } from '@phosphor-icons/react/CaretUp';
 import { PRODUCT_NAME } from '@griever/shared';
 import { screenCopy } from '@griever/copy';
 
 const copy = screenCopy('cmsChecklist');
 
 export interface HeaderChecklistToggle {
-  /** Whether the checklist panel is open. The button is only drawn while it is closed. */
+  /** Whether the checklist panel is open. The one button is always drawn; the caret and aria-expanded follow this. */
   open: boolean;
   onToggle: () => void;
-  /** The id of the panel the button opens. */
+  /** The id of the panel the button opens and closes. */
   panelId: string;
-  /** Lets the shell move focus here when the panel closes. */
-  buttonRef?: Ref<HTMLButtonElement>;
 }
 
 /**
- * The bar across the top of the editor: the product wordmark and, from `lg`, a primary button that opens
- * the checklist panel while it is closed (below `lg` the phone button in the page opens the sheet). The wordmark is a
+ * The bar across the top of the editor: the product wordmark and, from `lg`, one "What you'll need" button that
+ * opens and closes the checklist panel (below `lg` the phone button in the page opens the sheet). The wordmark is a
  * SAMPLE (issue 583). It is inline, not an <img>, so the name is real text in the page font (Nunito Sans): an
  * SVG loaded as an image cannot use the page's fonts. The mark is decorative; the text is the name.
  */
@@ -45,16 +44,20 @@ export function AppHeader({ checklist }: { checklist?: HeaderChecklistToggle } =
           {PRODUCT_NAME}
         </span>
       </span>
-      {checklist && !checklist.open ? (
+      {checklist ? (
         <button
-          ref={checklist.buttonRef}
           type="button"
-          className="gg-btn gg-btn-primary hidden lg:inline-flex"
-          aria-expanded={false}
+          className="gg-btn gg-btn-secondary hidden lg:inline-flex"
+          aria-expanded={checklist.open}
           aria-controls={checklist.panelId}
           onClick={checklist.onToggle}
         >
-          {copy.show}
+          {copy.phoneButton}
+          {checklist.open ? (
+            <CaretDown data-testid="checklist-caret" data-caret="down" aria-hidden="true" />
+          ) : (
+            <CaretUp data-testid="checklist-caret" data-caret="up" aria-hidden="true" />
+          )}
         </button>
       ) : null}
     </header>
