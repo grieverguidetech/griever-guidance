@@ -270,14 +270,15 @@ describe('HubScreen', () => {
     expect(onAccount).toHaveBeenCalledTimes(1);
   });
 
-  it('puts the Your account link after the last step, as plain text with no outline', () => {
+  it('puts the Your account link after the last step, as a secondary outline button', () => {
     setup(anna, false, { onAccount: jest.fn() });
     const tree = JSON.stringify(screen.toJSON());
     expect(tree.indexOf('Send thank-yous')).toBeLessThan(tree.indexOf('Your account'));
     const link = screen.getByRole('button', { name: 'Your account' });
     const flat = StyleSheet.flatten(typeof link.props.style === 'function' ? link.props.style({ pressed: false }) : link.props.style);
     expect(flat.backgroundColor).toBeUndefined();
-    expect(flat.borderColor).toBe('transparent');
+    expect(flat.borderColor).toBe(v2.recipes.button.outline.border.color);
+    expect(flat.borderWidth).toBe(v2.recipes.button.outline.border.width);
   });
 
   it('after the checklist sheet closes on iOS, screen-reader focus goes back to What you will need (onDismiss)', () => {

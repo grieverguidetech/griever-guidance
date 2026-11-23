@@ -103,6 +103,24 @@ describe('Button (mobile)', () => {
       expect(StyleSheet.flatten(screen.getByText('Skip').props.style).color).toBe(v2.roles.muted);
       expect(flatStyle(screen.getByRole('button', { name: 'Skip' })).borderStyle).toBeUndefined();
     });
+
+    it('an available tertiary is underlined; an unavailable one is not (muted only)', () => {
+      const { rerender } = render(<Button label="Skip" variant="tertiary" onPress={jest.fn()} />);
+      expect(StyleSheet.flatten(screen.getByText('Skip').props.style).textDecorationLine).toBe('underline');
+      rerender(<Button label="Skip" variant="tertiary" onPress={jest.fn()} ariaDisabled />);
+      expect(StyleSheet.flatten(screen.getByText('Skip').props.style).textDecorationLine).toBeUndefined();
+    });
+
+    it('a secondary toggle that is on shows the wash; off shows none; selected is still set', () => {
+      const { rerender } = render(<Button label="Softer" variant="secondary" pressed onPress={jest.fn()} />);
+      const on = flatStyle(screen.getByRole('button', { name: 'Softer' }));
+      expect(on.backgroundColor).toBe(v2.roles.wash);
+      expect(screen.getByRole('button', { name: 'Softer' }).props.accessibilityState).toMatchObject({ selected: true });
+      rerender(<Button label="Softer" variant="secondary" pressed={false} onPress={jest.fn()} />);
+      const off = flatStyle(screen.getByRole('button', { name: 'Softer' }));
+      expect(off.backgroundColor).toBeUndefined();
+      expect(screen.getByRole('button', { name: 'Softer' }).props.accessibilityState).toMatchObject({ selected: false });
+    });
   });
 
   describe('primary and shared behaviour', () => {

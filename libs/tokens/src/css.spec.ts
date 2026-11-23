@@ -111,6 +111,8 @@ describe('toMarketingCss', () => {
     expect(vars['--gg-secondary-bg']).toBeUndefined();
     expect(vars['--gg-outline-border']).toBe(`1px solid ${v2.roles.link}`);
     expect(vars['--gg-outline-text']).toBe(v2.roles.link);
+    expect(vars['--gg-wash']).toBe(v2.roles.wash);
+    expect(vars['--gg-outline-radius']).toBeUndefined();
     expect(vars['--gg-primary-text']).toBe(c.primaryText);
     expect(vars['--gg-primary-border']).toBe(`1px solid ${c.primaryBorder}`);
     expect(vars['--gg-primary-shadow']).toBe(

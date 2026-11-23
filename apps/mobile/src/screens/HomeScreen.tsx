@@ -86,7 +86,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
         </View>
       ) : null}
       {onAccount ? (
-        // Outline, page showing through: the shared `header` variant (web's top bar look).
+        // Outline, page showing through: the secondary variant (navigation).
         <View style={styles.account} testID="home-account-row">
           <Button label="Your account" variant="secondary" onPress={onAccount} />
         </View>

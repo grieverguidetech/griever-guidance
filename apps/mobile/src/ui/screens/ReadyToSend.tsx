@@ -190,7 +190,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
     <View style={styles.share}>
       <Button
         label={share.label}
-        variant="tertiary"
+        variant="secondary"
         buttonRef={share.buttonRef}
         ariaDisabled={shareReason !== undefined}
         announceDisabled
@@ -253,7 +253,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
             <>
               <Button
                 label={copy.softer}
-                variant="tertiary"
+                variant="secondary"
                 pressed={tone === 'softer'}
                 ariaDisabled={edited}
                 announceDisabled
