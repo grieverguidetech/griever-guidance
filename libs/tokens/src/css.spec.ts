@@ -198,6 +198,18 @@ describe('toMarketingCss', () => {
   });
 });
 
+/** The raw `--name` of every declaration in the block at `opener`, repeats included. */
+function rawNames(css: string, opener: string): string[] {
+  const start = css.indexOf(opener);
+  const end = css.indexOf('\n}', start);
+  return [...css.slice(start, end).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]);
+}
+
+/** The names that appear more than once in the list. */
+function repeated(names: readonly string[]): string[] {
+  return names.filter((n, i) => names.indexOf(n) !== i);
+}
+
 describe('toWebThemeCss with v2', () => {
   const css = toWebThemeCss({ ...input, v2 });
   const theme = declarations(css, '@theme {');
@@ -241,6 +253,34 @@ describe('toWebThemeCss with v2', () => {
     expect(all.length - added.length).toBe(Object.keys(v1).length);
   });
 
+  it('declares no name twice, within a block or across both', () => {
+    const themeNames = rawNames(css, '@theme {');
+    const rootNames = rawNames(css, ':root {');
+    expect(themeNames.length).toBeGreaterThan(40);
+    expect(repeated(themeNames)).toEqual([]);
+    expect(repeated(rootNames)).toEqual([]);
+    expect(repeated([...themeNames, ...rootNames])).toEqual([]);
+  });
+
+  it('the duplicate check reports a repeated line (negative control)', () => {
+    const doubled = css.replace('  --v2-radius: 8px;\n', '  --v2-radius: 8px;\n  --v2-radius: 9px;\n');
+    expect(repeated(rawNames(doubled, ':root {'))).toEqual(['--v2-radius']);
+    const crossed = css.replace('  --v2-radius: 8px;\n', '  --v2-radius: 8px;\n  --color-v2-link: red;\n');
+    expect(repeated([...rawNames(crossed, '@theme {'), ...rawNames(crossed, ':root {')])).toEqual(['--color-v2-link']);
+  });
+
+  it('writes the type vars the page ticket reads', () => {
+    expect(theme['--color-v2-heading']).toBe(v2.roles.heading.color);
+    expect(theme['--color-v2-eyebrow']).toBe(v2.roles.eyebrow.color);
+    expect(root['--v2-body-size']).toBe(`${v2.roles.body.size}px`);
+    expect(root['--v2-eyebrow-size']).toBe(`${v2.roles.eyebrow.size}px`);
+    expect(root['--v2-eyebrow-tracking']).toBe(`${v2.roles.eyebrow.tracking}em`);
+    expect(root['--v2-heading-weight']).toBe('300');
+    expect(root['--v2-weight-light']).toBe('300');
+    expect(root['--v2-weight-regular']).toBe('400');
+    expect(root['--v2-weight-medium']).toBe('500');
+  });
+
   it('is deterministic', () => {
     expect(toWebThemeCss({ ...input, v2 })).toBe(css);
   });
@@ -254,6 +294,11 @@ describe('toWebThemeCss with v2', () => {
     p.radius = 3;
     p.motion.settleMs = 3000;
     p.font.family = 'Fixture';
+    p.shadows.sunset.color = 'rgba(1,2,3,0.5)';
+    p.border.medium = 2.5;
+    p.border.thin = 0.5;
+    p.motion.spinMs = 7000;
+    p.font.weights.medium = 600;
     const roles = buildRoles(p);
     const changed = toWebThemeCss({ ...input, v2: { primitives: p, roles, recipes: buildRecipes(roles, p) } });
     const t = declarations(changed, '@theme {');
@@ -266,6 +311,11 @@ describe('toWebThemeCss with v2', () => {
     expect(r['--v2-primary-bg']).toBe('linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)');
     expect(r['--v2-radius']).toBe('3px');
     expect(r['--v2-settle-ms']).toBe('3000ms');
+    expect(r['--v2-primary-shadow']).toContain('rgba(1,2,3,0.5)');
+    expect(r['--v2-border-medium']).toBe('2.5px');
+    expect(r['--v2-border-thin']).toBe('0.5px');
+    expect(r['--v2-spin-ms']).toBe('7000ms');
+    expect(r['--v2-weight-medium']).toBe('600');
   });
 });
 

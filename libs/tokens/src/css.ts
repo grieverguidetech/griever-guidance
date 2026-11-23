@@ -14,7 +14,7 @@ export interface WebThemeInput {
 
 /** The parts of v2 the web theme reads. */
 export interface WebV2Input {
-  primitives: Pick<Primitives, 'font'>;
+  primitives: Pick<Primitives, 'font' | 'border'>;
   roles: ReturnType<typeof buildRoles>;
   recipes: ReturnType<typeof buildRecipes>;
 }
@@ -153,6 +153,8 @@ export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): str
   const { card, nudge, field } = recipes;
   const lines: Array<[string, string]> = [
     ['font-v2', webFontStack(primitives)],
+    ['color-v2-heading', roles.heading.color],
+    ['color-v2-eyebrow', roles.eyebrow.color],
     ['color-v2-link', roles.link],
     ['color-v2-wash', roles.wash],
     ['color-v2-muted', roles.muted],
@@ -178,7 +180,7 @@ export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): str
 }
 
 /** The v2 gradients, shadows, radius, border widths and motion times, as plain custom properties. */
-export function webV2RootLines({ roles, recipes }: WebV2Input): string[] {
+export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): string[] {
   const { primary, secondary } = recipes.button;
   const { card, nudge } = recipes;
   const lines: Array<[string, string]> = [
@@ -190,8 +192,16 @@ export function webV2RootLines({ roles, recipes }: WebV2Input): string[] {
     ['card-shadow', shadowCss(card.shadow)],
     ['nudge-shadow', shadowCss(nudge.shadow)],
     ['radius', `${card.radius}px`],
-    ['border-thin', `${card.border.width}px`],
-    ['border-medium', `${secondary.border.width}px`],
+    ['border-thin', `${primitives.border.thin}px`],
+    ['border-medium', `${primitives.border.medium}px`],
+    ['body-size', `${roles.body.size}px`],
+    ['eyebrow-size', `${roles.eyebrow.size}px`],
+    ['eyebrow-tracking', `${roles.eyebrow.tracking}em`],
+    ['heading-weight', String(roles.heading.weight)],
+    ['weight-light', String(primitives.font.weights.light)],
+    ['weight-regular', String(primitives.font.weights.regular)],
+    ['weight-medium', String(primitives.font.weights.medium)],
+    // JS should read these times from @griever/tokens: the minifier rewrites 4500ms to 4.5s.
     ['drift-ms', `${primary.driftMs}ms`],
     ['settle-ms', `${primary.settleMs}ms`],
     ['spin-ms', `${roles.doneMark.spinMs}ms`],

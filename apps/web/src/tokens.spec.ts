@@ -12,12 +12,6 @@ describe('tokens match the web theme', () => {
     expect(generated).toBe(toGeneratedFile({ colors, fontSerifStack, spacing, radius, v2 }));
   });
 
-  it('a hand edit of one generated value makes the file differ from the source', () => {
-    const edited = generated.replace('--v2-radius: 8px;', '--v2-radius: 9px;');
-    expect(edited).not.toBe(generated);
-    expect(edited).not.toBe(toGeneratedFile({ colors, fontSerifStack, spacing, radius, v2 }));
-  });
-
   it('styles.css imports the generated file and declares no token of its own', () => {
     const css = read('styles.css');
     expect(css).toContain("@import './theme.generated.css';");

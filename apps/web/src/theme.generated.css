@@ -44,6 +44,8 @@
   --color-success-700: #2a7048;
 
   --font-v2: 'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --color-v2-heading: #114465;
+  --color-v2-eyebrow: #67625a;
   --color-v2-link: #006786;
   --color-v2-wash: #e9f8ff;
   --color-v2-muted: #605d5d;
@@ -88,6 +90,13 @@
   --v2-radius: 8px;
   --v2-border-thin: 1px;
   --v2-border-medium: 1.5px;
+  --v2-body-size: 15px;
+  --v2-eyebrow-size: 13px;
+  --v2-eyebrow-tracking: 0.08em;
+  --v2-heading-weight: 300;
+  --v2-weight-light: 300;
+  --v2-weight-regular: 400;
+  --v2-weight-medium: 500;
   --v2-drift-ms: 9000ms;
   --v2-settle-ms: 4500ms;
   --v2-spin-ms: 12000ms;

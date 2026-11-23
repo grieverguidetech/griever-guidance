@@ -83,8 +83,6 @@ export {
   toMarketingFile,
   toWebThemeCss,
   webFontStack,
-  webV2RootLines,
-  webV2ThemeLines,
   type MarketingInput,
   type WebThemeInput,
   type WebV2Input,
