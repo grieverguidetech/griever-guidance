@@ -31,6 +31,7 @@
     "comingLater",
     "markReady",
     "readyHint",
+    "readyHintPerson",
     "phoneNudgeAnnouncementHeading",
     "phoneNudgeAnnouncement",
     "phoneNudgeServiceHeading",
@@ -182,6 +183,9 @@
       "$ref": "#/$defs/text"
     },
     "readyHint": {
+      "$ref": "#/$defs/text"
+    },
+    "readyHintPerson": {
       "$ref": "#/$defs/text"
     },
     "peopleTitle": {

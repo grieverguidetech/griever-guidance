@@ -14,7 +14,7 @@ interface Props {
   nextSection?: SectionKey | null;
   /** Without it no continue button shows. */
   onNext?: () => void;
-  /** Opt in to the phone nudge (WEB-13) for this section. Without it nothing extra renders. */
+  /** Opt in to the phone nudge (WEB-13) for this section. Without it nothing extra renders, and the person hint (readyHintPerson) shows instead of the send hint. */
   phoneNudge?: PhoneNudgeSection;
   /** Refuses to turn Ready on and says why. Ignored once ready, so the family can always take Ready back. */
   blockedMessage?: string;
@@ -106,7 +106,7 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
           {copy.markReady}
         </button>
         <p id={hintId} className="gg-hint">
-          {copy.readyHint}
+          {phoneNudge !== undefined ? copy.readyHint : copy.readyHintPerson}
         </p>
       </div>
       {blocked ? (

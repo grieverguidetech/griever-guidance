@@ -42,7 +42,7 @@ describe('ServiceSection', () => {
     const { rerender } = render(
       <ServiceSection values={{}} onChange={vi.fn()} onReadyChange={vi.fn()} nextSection={null} onNext={onNext} />,
     );
-    expect(screen.getByText(/Mark as ready when these details are settled/)).toBeInTheDocument();
+    expect(screen.getByText('Mark as ready when you want to send this from your phone.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Back to Overview' })).toBeNull();
     rerender(
       <ServiceSection
