@@ -51,7 +51,28 @@ jobs:
 
       - run: pnpm nx affected -t typecheck --base=$NX_BASE --head=$NX_HEAD --parallel=3
 
-      - run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --parallel=3
+      # --outputStyle=stream: Nx's default in CI buffers a task's output and prints it in one
+      # write when the task fails, then calls process.exit(). On a piped stdout that write is
+      # cut at the pipe buffer, so a big failed run lost its Vitest summary (#1049).
+      # Streaming writes the output while the task runs.
+      - run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --parallel=3 --outputStyle=stream
+
+      # Belt and braces for #1049: vitest.base.mts writes a JUnit file per Vitest project in CI.
+      # Mobile (jest) has no JUnit file; its failures reach the run as github-actions annotations
+      # (apps/mobile/jest.config.cjs). This step only reads files and runs on failure, and
+      # continue-on-error stops it from ever changing the job result.
+      - name: Print unit test failures
+        if: failure()
+        continue-on-error: true
+        run: |
+          for f in $(find apps libs -path '*/node_modules' -prune -o -name junit.xml -path '*test-output/vitest*' -print); do
+            if grep -q '<failure' "$f"; then
+              echo "::group::Failures in $f"
+              grep -B1 -A12 '<failure' "$f" | head -300
+              echo "::endgroup::"
+            fi
+          done
+          exit 0
 
       # mobile:build shells out to the EAS CLI, which isn't available (or
       # configured) in CI. Web/gateway/marketing builds are what gate deploys.

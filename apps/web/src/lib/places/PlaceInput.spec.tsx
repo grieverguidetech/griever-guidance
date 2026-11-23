@@ -49,6 +49,9 @@ function setup(opts: { onPick?: Props['onPick']; wantsDetails?: Props['wantsDeta
   return { unmount, values, input: () => screen.getByRole('combobox', { name: 'Place' }) as HTMLInputElement };
 }
 
+/** A real wait for the debounce and slow-search timers. Inside act, so the state updates they cause are flushed, not reported as outside act (#1049). */
+const pause = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
+
 /** Types, then waits out the debounce. */
 async function typeAndWait(text: string) {
   await userEvent.type(screen.getByLabelText('Place'), text);
@@ -61,7 +64,7 @@ describe('PlaceInput', () => {
     const { client, suggest } = fakeClient();
     setup({ load: () => Promise.resolve(client) });
     await userEvent.type(screen.getByLabelText('Place'), 'oa');
-    await new Promise((r) => setTimeout(r, 450));
+    await pause(450);
     expect(suggest).not.toHaveBeenCalled();
     await userEvent.type(screen.getByLabelText('Place'), 'k');
     expect(suggest).not.toHaveBeenCalled();
@@ -199,7 +202,7 @@ describe('PlaceInput', () => {
     };
     const { input } = setup({ load: () => Promise.resolve(failing) });
     await userEvent.type(input(), 'oak');
-    await new Promise((r) => setTimeout(r, 1800));
+    await pause(1800);
     expect(document.body.textContent).not.toContain('Searching…');
   });
 
@@ -346,7 +349,7 @@ describe('PlaceInput', () => {
     };
     const { input } = setup({ load: () => Promise.resolve(slow) });
     await userEvent.type(input(), 'oak');
-    await new Promise((r) => setTimeout(r, 450));
+    await pause(450);
     await userEvent.type(input(), 'x');
     await act(async () => release([funeralHome]));
     expect(screen.queryByRole('option', { name: /Oak Funeral Home/ })).toBeNull();
@@ -357,7 +360,7 @@ describe('PlaceInput', () => {
     setup({ enabled: false, load });
     const field = screen.getByRole('textbox', { name: 'Place' });
     await userEvent.type(field, 'oak hall');
-    await new Promise((r) => setTimeout(r, 450));
+    await pause(450);
     expect(field).toHaveValue('oak hall');
     expect(field).not.toHaveAttribute('aria-expanded');
     expect(screen.queryByRole('listbox')).toBeNull();
@@ -385,7 +388,7 @@ describe('PlaceInput', () => {
     const failing: PlacesClient = { suggest: () => Promise.reject(new Error('quota')), newToken: () => ({}), details: vi.fn() };
     const { input } = setup({ load: () => Promise.resolve(failing) });
     await userEvent.type(input(), 'oak hall');
-    await new Promise((r) => setTimeout(r, 450));
+    await pause(450);
     expect(input().value).toBe('oak hall');
     expect(screen.queryByRole('option')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
