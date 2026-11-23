@@ -13,8 +13,7 @@ import { obituaryTextFor } from '../lib/obituaryText';
 import * as MailComposer from 'expo-mail-composer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { publisherEmailKey } from '../lib/mailCompose';
-import { onFlowPullRequest } from '../lib/requestFlowPull';
-import { registerManualPull } from '../lib/requestFlowPull';
+import { onFlowPullRequest, registerManualPull } from '../lib/requestFlowPull';
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
@@ -1060,7 +1059,7 @@ describe('ShareObituaryScreen when the web has not marked the step Ready (#824, 
 });
 
 describe('pull to refresh on the obituary screen (#959)', () => {
-  const failed = screenCopy('phoneHub').refreshFailed;
+  const failed = screenCopy('phoneRefresh').failed;
   const control = () => screen.UNSAFE_getAllByType(ScrollView)[0].props.refreshControl as { props: { refreshing: boolean; onRefresh: () => void } } | undefined;
 
   it('offers no pull when sync is not allowed', () => {

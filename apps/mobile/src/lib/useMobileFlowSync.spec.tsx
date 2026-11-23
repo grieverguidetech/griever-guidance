@@ -4,11 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import type { SyncAuth } from './AccountProvider';
 import { announceLeftFamily } from './leftFamily';
-import { canPullNow, pullNow, requestFlowPull } from './requestFlowPull';
+import { canPullNow, onPullSucceeded, pullNow, requestFlowPull } from './requestFlowPull';
 import { useMobileFlowSync } from './useMobileFlowSync';
 
+const mockPullCount = { value: 0 };
 const mockPullNow = jest.fn(async () => true);
-const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null, pulled: false, pullNow: mockPullNow }));
+const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null, pulled: false, pullNow: mockPullNow, pullCount: mockPullCount.value }));
 jest.mock('@griever/hooks', () => ({
   FLOW_QUEUE_STORAGE_KEY: 'gg.flowQueue.v1',
   flowQueueKey: (id: string) => `gg.flowQueue.v1:${id}`,
@@ -60,6 +61,37 @@ beforeEach(() => {
 });
 
 describe('useMobileFlowSync', () => {
+  it('offers no pull until the account queue has been read (hydrate gap)', async () => {
+    mockAuth = signedIn;
+    mockFlags.auth = true;
+    mockFlags.sync = true;
+    let release: (value: string | null) => void = () => undefined;
+    const spy = jest.spyOn(AsyncStorage, 'getItem').mockImplementation(() => new Promise<string | null>((resolve) => (release = resolve)));
+    const view = renderHook(() => useMobileFlowSync({ sessions: [], applyRemoteFlows: jest.fn() as never, moveFlowId: jest.fn() as never, storage }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(lastOptions().enabled).toBe(false);
+    expect(canPullNow()).toBe(false);
+    await act(async () => release(null));
+    view.rerender({});
+    expect(lastOptions().enabled).toBe(true);
+    expect(canPullNow()).toBe(true);
+    view.unmount();
+    spy.mockRestore();
+  });
+
+  it('tells screens when a pull has been applied', async () => {
+    const heard = jest.fn();
+    const stop = onPullSucceeded(heard);
+    mockPullCount.value = 0;
+    const view = await mount({ auth: true, sync: true }, signedIn);
+    expect(heard).not.toHaveBeenCalled();
+    mockPullCount.value = 1;
+    view.rerender({});
+    expect(heard).toHaveBeenCalledTimes(1);
+    mockPullCount.value = 0;
+    stop();
+  });
+
   it('registers a pull a screen can wait for only while sync is allowed (#959)', async () => {
     const view = await mount({ auth: true, sync: true }, signedIn);
     expect(canPullNow()).toBe(true);

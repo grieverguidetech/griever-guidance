@@ -14,8 +14,7 @@
     "stateNotStarted",
     "summarySentOne",
     "summarySentMany",
-    "summaryEmailed",
-    "refreshFailed"
+    "summaryEmailed"
   ],
   "properties": {
     "heading": {
@@ -49,9 +48,6 @@
       "$ref": "#/$defs/text"
     },
     "summaryEmailed": {
-      "$ref": "#/$defs/text"
-    },
-    "refreshFailed": {
       "$ref": "#/$defs/text"
     }
   },

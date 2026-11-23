@@ -17,6 +17,7 @@ import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { NEW_OBITUARY_KEYS } from '../lib/obituaryText';
 import type { SentNoteText } from '../lib/sendNote';
 import { barMoment, nextMoment } from '../lib/nextMoment';
+import { requestFlowPull } from '../lib/requestFlowPull';
 import { usePullToRefresh } from '../lib/usePullToRefresh';
 
 const copy = screenCopy('pathLanding');
@@ -176,6 +177,10 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
   // The account name counts as the sender name for the card status only. It is never saved to the person (DS-7).
   const statusSession = useSessionWithAccountName(session);
   const refresh = usePullToRefresh('hub-refresh-status');
+  // Pull when the hub opens, like the send screens, so the cards are current. Silent; a no-op when sync is off.
+  useEffect(() => {
+    requestFlowPull();
+  }, []);
   const moments = usePathMoments(statusSession);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);

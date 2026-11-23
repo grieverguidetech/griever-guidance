@@ -62,3 +62,17 @@ export async function pullNow(): Promise<boolean> {
     return false;
   }
 }
+
+/** Told when any pull (automatic or manual) has been applied, so a "could not load" line can go. */
+const successListeners = new Set<Listener>();
+
+export function onPullSucceeded(listener: Listener): () => void {
+  successListeners.add(listener);
+  return () => {
+    successListeners.delete(listener);
+  };
+}
+
+export function announcePullSucceeded(): void {
+  successListeners.forEach((listener) => listener());
+}

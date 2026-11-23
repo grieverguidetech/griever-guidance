@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { ScrollView } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 import { screenCopy } from '@griever/copy';
-import { registerManualPull } from './requestFlowPull';
+import { announcePullSucceeded, registerManualPull } from './requestFlowPull';
 import { usePullToRefresh } from './usePullToRefresh';
 
-const failedLine = screenCopy('phoneHub').refreshFailed;
+const failedLine = screenCopy('phoneRefresh').failed;
 
 function Probe() {
   const refresh = usePullToRefresh('probe-status');
@@ -67,5 +67,23 @@ describe('usePullToRefresh', () => {
     pull.mockResolvedValueOnce(true);
     await act(async () => control()?.props.onRefresh());
     expect(screen.queryByText(failedLine)).toBeNull();
+  });
+
+  it('clears the failure line when any pull works, such as an automatic one', async () => {
+    stop = registerManualPull(async () => false);
+    render(<Probe />);
+    await act(async () => control()?.props.onRefresh());
+    expect(screen.getByText(failedLine)).toBeTruthy();
+    act(() => announcePullSucceeded());
+    expect(screen.queryByText(failedLine)).toBeNull();
+  });
+
+  it('keeps the live-region node mounted but out of the layout while empty, and in the layout when it fails', async () => {
+    stop = registerManualPull(async () => false);
+    render(<Probe />);
+    const holder = () => screen.getByTestId('probe-status-holder').props.style;
+    expect(JSON.stringify(StyleSheet.flatten(holder()))).toContain('"position":"absolute"');
+    await act(async () => control()?.props.onRefresh());
+    expect(JSON.stringify(StyleSheet.flatten(holder()) ?? null)).not.toContain('absolute');
   });
 });

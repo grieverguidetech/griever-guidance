@@ -7,8 +7,7 @@ import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SectionFields, SessionDetails } from '@griever/shared';
 import { ReadyToSendScreen } from './ReadyToSendScreen';
 import { SendingScreen } from './SendingScreen';
-import { onFlowPullRequest } from '../lib/requestFlowPull';
-import { registerManualPull } from '../lib/requestFlowPull';
+import { onFlowPullRequest, registerManualPull } from '../lib/requestFlowPull';
 
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '',
   // The family has marked every step Ready on the web (without it the phone shows the nudge, #824, #949).
@@ -534,7 +533,7 @@ describe('Ready to send with nothing written on the web (#824)', () => {
 });
 
 describe('pull to refresh on the send screen (#959)', () => {
-  const failed = screenCopy('phoneHub').refreshFailed;
+  const failed = screenCopy('phoneRefresh').failed;
   const control = () => screen.UNSAFE_getAllByType(ScrollView)[0].props.refreshControl as { props: { refreshing: boolean; onRefresh: () => void } } | undefined;
 
   it('offers no pull when sync is not allowed', () => {
@@ -561,6 +560,16 @@ describe('pull to refresh on the send screen (#959)', () => {
     await act(async () => control()?.props.onRefresh());
     expect(control()?.props.refreshing).toBe(false);
     expect(screen.getByText(failed).props.accessibilityLiveRegion).toBe('polite');
+    stop();
+  });
+});
+
+describe('pull to refresh on the send screen when the web has nothing yet (#959)', () => {
+  it('puts the refresh control on the nudge view too', () => {
+    const stop = registerManualPull(async () => true);
+    render(<Harness web={{ sectionStatus: {} }} />);
+    expect(screen.queryByLabelText('Your message')).toBeNull();
+    expect(screen.UNSAFE_getAllByType(ScrollView)[0].props.refreshControl).toBeDefined();
     stop();
   });
 });

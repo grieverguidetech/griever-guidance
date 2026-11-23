@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactElement } from 'react';
-import { RefreshControl } from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import type { RefreshControlProps } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Status } from '../ui/Status';
-import { canPullNow, pullNow, subscribeCanPullNow } from './requestFlowPull';
+import { canPullNow, onPullSucceeded, pullNow, subscribeCanPullNow } from './requestFlowPull';
 
-const copy = screenCopy('phoneHub');
+const copy = screenCopy('phoneRefresh');
 
 export interface PullToRefresh {
   /** For the ScrollView's `refreshControl`. Undefined when sync is not allowed, so no pull is offered. */
@@ -27,6 +27,8 @@ export function usePullToRefresh(id: string): PullToRefresh {
       live.current = false;
     };
   }, []);
+  // Any pull that works, automatic or manual, makes the line out of date.
+  useEffect(() => onPullSucceeded(() => setFailed(false)), []);
 
   const onRefresh = useCallback(async () => {
     setFailed(false);
@@ -43,6 +45,15 @@ export function usePullToRefresh(id: string): PullToRefresh {
   }
   return {
     refreshControl: <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />,
-    notice: <Status id={id} message={failed ? copy.refreshFailed : undefined} />,
+    // The live-region node stays mounted so a change is announced. While empty it is out of the layout, so it adds no gap.
+    notice: (
+      <View testID={`${id}-holder`} style={failed ? undefined : styles.hidden}>
+        <Status id={id} message={failed ? copy.failed : undefined} queue />
+      </View>
+    ),
   };
 }
+
+const styles = StyleSheet.create({
+  hidden: { position: 'absolute', width: 0, height: 0, overflow: 'hidden' },
+});
