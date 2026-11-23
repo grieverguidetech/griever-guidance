@@ -59,7 +59,7 @@ export const primitives = {
   },
   size: {
     body: 15,
-    eyebrow: 11,
+    eyebrow: 13,
     /** Letter-spacing of the eyebrow, in em. */
     eyebrowTracking: 0.08,
     orb: 22,

@@ -55,12 +55,12 @@ describe('Heading weight on native', () => {
 });
 
 describe('Eyebrow on native', () => {
-  it('is 11px, uppercase, 0.08em tracking, in the eyebrow role colour', () => {
+  it('is 13px, uppercase, 0.08em tracking, in the eyebrow role colour', () => {
     render(<Eyebrow>For Margaret</Eyebrow>);
     const style = StyleSheet.flatten(screen.getByText('For Margaret').props.style);
-    expect(style.fontSize).toBe(11);
+    expect(style.fontSize).toBe(13);
     expect(style.textTransform).toBe('uppercase');
-    expect(style.letterSpacing).toBeCloseTo(0.88);
+    expect(style.letterSpacing).toBeCloseTo(1.04);
     expect(style.color).toBe(v2.roles.eyebrow.color);
   });
 });
