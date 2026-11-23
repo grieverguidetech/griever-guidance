@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactElement, ReactNode, Ref } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import type { RefreshControlProps, Text as RNText } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@griever/tokens';
@@ -128,6 +128,17 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   const shareErrorId = useId();
   const shareReason = blank ? copy.shareBlank : blockedReason;
   const reason = hasRecipients ? (blank ? copy.blank : blockedReason) : undefined;
+
+  // The status line below is redrawn when the bar comes back, and a redrawn line is not read out, so say the reason once.
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (wasEditing.current && !messageEditing && reason) {
+      AccessibilityInfo.announceForAccessibility(reason);
+    }
+    wasEditing.current = messageEditing;
+    // Only when editing changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageEditing]);
 
   // Opening Change details moves the screen reader to the row, so the new inputs are found.
   useEffect(() => {

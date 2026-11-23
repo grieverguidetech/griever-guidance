@@ -1,14 +1,18 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
 import type { ComponentRef, Ref } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { AccessibilityInfo, Keyboard, Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Text } from 'react-native';
 import { MessageBox } from '../MessageBox';
+import { spacing } from '@griever/tokens';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BAR_TEST_ID, ReadyToSend } from './ReadyToSend';
 import { typeMessage } from '../../testing/messageBox';
 import type { ReadyToSendProps } from './ReadyToSend';
+
+jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: jest.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })) }));
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle per node shows where focus went.
 const mockHandles = new Map<unknown, number>();
@@ -62,7 +66,7 @@ const edit = () => fireEvent.press(screen.getByRole('button', { name: 'Edit mess
 const SUGGESTED = 'Anna has passed away.';
 
 /** Holds the message the way the app does: edited when it differs from the suggested wording. */
-function Harness({ details, lead, onSend = jest.fn() }: { details?: ReadyToSendProps['details']; lead?: string; onSend?: () => void } = {}) {
+function Harness({ details, lead, onSend }: { details?: ReadyToSendProps['details']; lead?: string; onSend?: () => void } = {}) {
   const [override, setOverride] = useState<string | null>(null);
   const message = override ?? SUGGESTED;
   return (
@@ -85,7 +89,7 @@ function Harness({ details, lead, onSend = jest.fn() }: { details?: ReadyToSendP
       hasRecipients
       onChoose={jest.fn()}
       onBack={jest.fn()}
-      onSend={onSend}
+      onSend={onSend ?? (() => undefined)}
     />
   );
 }
@@ -409,5 +413,66 @@ describe('ReadyToSend: the send bar waits while the message is edited (#985)', (
     expect(screen.getByText('My own words.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', sendName));
     expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('brings the bar back when the box loses focus', () => {
+    render(<Harness />);
+    edit();
+    expect(screen.queryByTestId(BAR_TEST_ID)).toBeNull();
+    fireEvent(screen.getByLabelText('Your message'), 'blur');
+    expect(screen.getByRole('button', sendName)).toBeTruthy();
+  });
+
+  it('ends editing and brings the bar back when the keyboard hides (Android back)', () => {
+    let hideKeyboard = () => {};
+    const add = jest.spyOn(Keyboard, 'addListener').mockImplementation(((event: string, handler: () => void) => {
+      if (event === 'keyboardDidHide') {
+        hideKeyboard = handler;
+      }
+      return { remove: jest.fn() };
+    }) as unknown as typeof Keyboard.addListener);
+    render(<Harness />);
+    edit();
+    expect(screen.queryByTestId(BAR_TEST_ID)).toBeNull();
+    act(() => {
+      hideKeyboard();
+    });
+    expect(screen.UNSAFE_queryByType(TextInput)).toBeNull();
+    expect(screen.getByRole('button', sendName)).toBeTruthy();
+    add.mockRestore();
+  });
+
+  it('shows the same note and reason after Done as before Edit', () => {
+    render(<Harness />);
+    expect(screen.getByText('One at a time, from your own number.')).toBeTruthy();
+    edit();
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.getByText('One at a time, from your own number.')).toBeTruthy();
+    expect(screen.getByRole('button', sendName).props.accessibilityState?.disabled).toBeFalsy();
+  });
+
+  it('says the blank-message reason once when Done brings the bar back, and not on first render', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    render(<Harness />);
+    expect(announce).not.toHaveBeenCalledWith(copy.blank);
+    typeMessage('   ');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(announce.mock.calls.filter(([said]) => said === copy.blank)).toHaveLength(1);
+    announce.mockRestore();
+  });
+
+  it('pads the content by the safe-area inset only while the bar is hidden', () => {
+    jest.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 34, left: 0, right: 0 });
+    try {
+      render(<Harness />);
+      const padding = () => StyleSheet.flatten(screen.UNSAFE_getByType(ScrollView).props.contentContainerStyle).paddingBottom;
+      expect(padding()).toBeUndefined();
+      edit();
+      expect(padding()).toBe(spacing[3] + 34);
+      fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+      expect(padding()).toBeUndefined();
+    } finally {
+      jest.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+    }
   });
 });

@@ -54,7 +54,7 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
   const [refocusText, setRefocusText] = useState(false);
   const [editing, setEditing] = useState(toggle === undefined);
   const [focused, setFocused] = useState(false);
-  // Set once, when editing starts, so the cursor lands at the start, a sign the text is now editable. Typing moves it from there.
+  // Set once, when editing starts: the cursor lands at the start. Typing moves it from there.
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   // On web, pressing Done blurs the box first. Without this the blur would end editing and the same click would start it again.
   const donePressed = useRef(false);
@@ -65,6 +65,20 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
     // Only when editing changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
+
+  // On Android the back button closes the keyboard without a blur, so editing would never end.
+  const hasToggle = toggle !== undefined;
+  useEffect(() => {
+    if (!hasToggle || !editing) {
+      return undefined;
+    }
+    const sub = Keyboard.addListener('keyboardDidHide', () => {
+      setEditing(false);
+      setSelection(undefined);
+      setRefocusText(Platform.OS !== 'web');
+    });
+    return () => sub.remove();
+  }, [hasToggle, editing]);
 
   useEffect(() => {
     if (refocusText && !editing) {
