@@ -1,11 +1,12 @@
 import { createContext, useContext } from 'react';
 import { Platform } from 'react-native';
-import { fonts } from '@griever/tokens';
+import { fonts, v2 } from '@griever/tokens';
 
 /** The web family: Sora, from the generated --font-v2 var (apps/web/src/theme.generated.css). */
 export const webFontFamily = 'var(--font-v2)';
 
-export type SerifWeight = 'light' | 'regular' | 'semibold';
+/** `heading` is the h1 weight (v2.roles.heading). `semibold` is the medium step on web. */
+export type SerifWeight = 'heading' | 'regular' | 'semibold';
 
 /**
  * The serif family for a weight. Web uses the CSS stack (the font loads from index.html). Native
@@ -27,10 +28,11 @@ export function serifWeight(weight: SerifWeight): '300' | '400' | '500' | undefi
   if (Platform.OS !== 'web') {
     return undefined;
   }
-  if (weight === 'light') {
-    return '300';
+  const weights = v2.primitives.font.weights;
+  if (weight === 'heading') {
+    return String(v2.roles.heading.weight) as '300';
   }
-  return weight === 'semibold' ? '500' : '400';
+  return String(weight === 'semibold' ? weights.medium : weights.regular) as '400';
 }
 
 /**

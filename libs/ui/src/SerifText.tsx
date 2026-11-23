@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { Platform, StyleSheet, Text, TextInput } from 'react-native';
 import { useSerifStyle } from './typography';
 
-// Sora is loaded at 300, 400 and 500 only, so every weight of 500 or more maps to the one medium step.
+// Sora loads only up to 500, so 500 and heavier map to medium.
 const SEMIBOLD = new Set(['500', '600', '700', '800', '900', 'bold']);
 
 /**
