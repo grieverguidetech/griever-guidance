@@ -280,6 +280,11 @@ describe('MarkReady', () => {
       expect(onChange).not.toHaveBeenCalled();
     });
 
+    it('describes the toggle with the phone hint, then the message, when a phone nudge is set', () => {
+      render(<MarkReady ready={false} onChange={() => undefined} phoneNudge="obituary" blockedMessage={reason} />);
+      expect(toggle()).toHaveAccessibleDescription(`Mark as ready when you want to send this from your phone. ${reason}`);
+    });
+
     it('lists the message id after the hint in aria-describedby', () => {
       render(<MarkReady ready={false} onChange={() => undefined} blockedMessage={reason} />);
       const ids = (toggle().getAttribute('aria-describedby') ?? '').split(' ');

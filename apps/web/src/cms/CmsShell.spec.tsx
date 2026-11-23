@@ -35,7 +35,7 @@ describe('CmsShell people view', () => {
 });
 
 describe('CmsShell save line', () => {
-  it('says the details also wait on the phone when sync is on', () => {
+  it('shows the short saved line, with no phone or send wording, when sync is on', () => {
     render(
       <CmsShell syncOn personName="Ann" section="service" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={vi.fn()}>
         <p>Body</p>
