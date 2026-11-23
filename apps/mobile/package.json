@@ -37,7 +37,7 @@
           "{projectRoot}/coverage"
         ],
         "options": {
-          "command": "jest --config jest.config.cjs",
+          "command": "jest --config jest.config.cjs --maxWorkers=2",
           "cwd": "apps/mobile"
         }
       }
