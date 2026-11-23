@@ -8,6 +8,7 @@ import { CHECKLIST_PHASES, templates } from '@griever/shared';
 import { v2 } from '@griever/tokens';
 import { Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
+import { LinearSwirl } from '../ui/Swirl';
 import { PRESSED_OPACITY } from '../ui/screens/Hub';
 import { HubScreen } from './HubScreen';
 import type { HubScreenProps } from './HubScreen';
@@ -200,11 +201,35 @@ describe('HubScreen', () => {
     expect(screen.queryByRole('button', { name: 'Edit person' })).toBeNull();
   });
 
-  it('draws What you will need as the quiet text-only button: no outline, no background', () => {
+  it('draws What you will need as the secondary (soft ocean) swirl button, with the recipe text colour and a 44 pt target', () => {
     setup();
     const flat = StyleSheet.flatten(typeof checklistButton().props.style === 'function' ? checklistButton().props.style({ pressed: false }) : checklistButton().props.style);
-    expect(flat.backgroundColor).toBeUndefined();
-    expect(flat.borderColor).toBe('transparent');
+    const recipe = v2.recipes.button.secondary;
+    expect(flat.borderColor).toBe(recipe.border.color);
+    expect(flat.minHeight).toBeGreaterThanOrEqual(44);
+    expect(flat.minWidth).toBeGreaterThanOrEqual(44);
+    expect(within(checklistButton()).UNSAFE_getAllByType(LinearSwirl)).toHaveLength(1);
+    expect(StyleSheet.flatten(within(checklistButton()).getByText("What you'll need").props.style).color).toBe(recipe.text.color);
+  });
+
+  it('has exactly one primary swirl button, the bottom action bar, so the gold swirl stays for the next step', () => {
+    setup();
+    const primary = screen.UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]));
+    expect(primary).toHaveLength(1);
+    expect(within(screen.getByTestId('hub-action-bar')).UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]))).toHaveLength(1);
+  });
+
+  it('puts the button on the title row beside the person name, above the heading, and lets the row wrap', () => {
+    setup();
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('Anna')).toBeLessThan(tree.indexOf("What you'll need"));
+    expect(tree.indexOf("What you'll need")).toBeLessThan(tree.indexOf('Ready to send'));
+    const slot = screen.getByTestId('hub-checklist-slot');
+    const bar = screen.getByTestId('hub-top-bar');
+    expect(within(bar).getByTestId('hub-checklist-slot')).toBeTruthy();
+    expect(StyleSheet.flatten(bar.props.style).flexWrap).toBe('wrap');
+    expect(StyleSheet.flatten(slot.props.style).marginLeft).toBe('auto');
+    expect(screen.queryByText(/^Now:/)).toBeNull();
   });
 
   it('gives the button a hint on native', () => {
