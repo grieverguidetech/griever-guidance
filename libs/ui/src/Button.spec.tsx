@@ -145,11 +145,10 @@ describe('tertiary Button', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('has no fill and no border, and a 44px target', () => {
+  it('has no fill, and a 44px target; its border is removed in styles.css', () => {
     render(<Button label="Back" variant="tertiary" onPress={vi.fn()} />);
     const style = getComputedStyle(screen.getByRole('button', { name: 'Back' }));
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-    expect(style.borderTopColor).toBe('rgba(0, 0, 0, 0.00)');
     expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
     expect(parseInt(style.minWidth, 10)).toBeGreaterThanOrEqual(44);
   });

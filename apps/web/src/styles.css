@@ -226,6 +226,8 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
   .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):active,
   [data-gg-btn='secondary']:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):active {
+    /* Heading colour while pressed: the link colour falls under 4.5:1 on the 18% tint over the sun glow. */
+    color: var(--color-v2-heading);
     background-color: color-mix(in srgb, var(--color-v2-focus) 18%, transparent);
   }
   /* A secondary used as a toggle (ItemStateToggles): the pressed state is a flat accent wash. */

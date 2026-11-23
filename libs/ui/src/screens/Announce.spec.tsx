@@ -86,11 +86,10 @@ describe('Announce', () => {
     expect(getComputedStyle(screen.getByText('For Margaret')).color).toBe('rgb(17, 68, 101)');
   });
 
-  it('draws Edit as an outline with no fill', () => {
+  it('draws Edit as the secondary outline with no fill (the edge comes from styles.css)', () => {
     setup();
-    const style = getComputedStyle(screen.getByRole('button', { name: 'Edit' }));
-    expect(style.borderTopWidth).toBe('1px');
-    expect(style.borderTopColor).not.toBe('rgba(0, 0, 0, 0)');
-    expect(['rgba(0, 0, 0, 0)', 'transparent', '']).toContain(style.backgroundColor);
+    const button = screen.getByRole('button', { name: 'Edit' });
+    expect(button).toHaveAttribute('data-gg-btn', 'secondary');
+    expect(['rgba(0, 0, 0, 0)', 'transparent', '']).toContain(getComputedStyle(button).backgroundColor);
   });
 });

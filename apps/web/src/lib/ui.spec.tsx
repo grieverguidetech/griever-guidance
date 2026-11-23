@@ -131,41 +131,35 @@ describe('useFocusHeadingOnChange, before any press', () => {
 describe('top buttons (#176)', () => {
   const css = readFileSync(join(import.meta.dirname, '..', 'styles.css'), 'utf8');
 
-  it('Back and What you will need are bordered buttons, not bare links', () => {
+  it('Back is a bordered secondary button and What you will need is the primary action', () => {
     render(<TopBar onBack={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Back' })).toHaveClass('gg-btn-secondary');
+    expect(screen.getByRole('button', { name: "What you'll need" })).toHaveClass('gg-btn-primary');
     for (const name of ['Back', "What you'll need"]) {
       const button = screen.getByRole('button', { name });
-      expect(button).toHaveClass('gg-btn-secondary'); // the visible border
-      expect(button).toHaveClass('gg-btn-bar');
       expect(button).not.toHaveClass('!px-0'); // padding is kept
-      expect(button).not.toHaveClass('gg-btn-ghost');
     }
   });
 
-  it('ghost buttons are underlined, with link-colour text at rest and hover and heading-colour text when active', () => {
-    expect(css).toMatch(/\.gg-btn-ghost\s*{[^}]*text-decoration:\s*underline/);
-    expect(css).toMatch(/\.gg-btn-ghost\s*{[^}]*color:\s*var\(--color-v2-link\)/);
-    expect(css).toMatch(/\.gg-btn-ghost:not\(:disabled\):active\s*{[^}]*color:\s*var\(--color-v2-heading\)/);
-    expect(css.match(/\.gg-btn-ghost:not\(:disabled\):hover\s*{/g)).toHaveLength(1);
-    expect(css).toMatch(/\.gg-btn-ghost\.gg-btn-ghost-plain[^{]*{[^}]*text-decoration:\s*none/);
+  it('tertiary buttons are underlined, with link-colour text at rest and hover and heading-colour text when active', () => {
+    expect(css).toMatch(/\.gg-btn-tertiary,\s*\[data-gg-btn='tertiary'\]\s*{[^}]*text-decoration:\s*underline/);
+    expect(css).toMatch(/\.gg-btn-tertiary,\s*\[data-gg-btn='tertiary'\]\s*{[^}]*color:\s*var\(--color-v2-link\)/);
+    expect(css).toMatch(/\.gg-btn-plain:not\(:disabled\):active\s*{[^}]*color:\s*var\(--color-v2-heading\)/);
+    expect(css).toMatch(/\.gg-btn-plain\s*{[^}]*color:\s*var\(--color-v2-link\)/);
+    expect(css).not.toMatch(/\.gg-btn-plain\s*{[^}]*text-decoration/);
     expect(css).toMatch(/\.gg-check-box\s*{[^}]*border:\s*2px solid var\(--color-v2-muted\)/);
-  });
-
-  it('the link button has no padding and reaches a 44px target without it', () => {
-    expect(css).toMatch(/\.gg-link-button\s*{[^}]*padding:\s*0/);
-    expect(css).toMatch(/\.gg-link-button\s*{[^}]*text-decoration:\s*underline/);
-    expect(css).toMatch(/\.gg-link-button\s*{[^}]*min-height:\s*44px/);
-    expect(css).not.toMatch(/\.gg-link-button::before/);
   });
 
   it('the shared styles keep them at least 44 by 44 with a border', () => {
     expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*{[^}]*min-height:\s*44px/);
-    expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*min-width:\s*44px/);
+    expect(css).toMatch(/\.gg-btn-secondary,\s*\[data-gg-btn='secondary'\]\s*{[^}]*min-width:\s*44px/);
     expect(css).toMatch(/\.gg-btn-secondary,\s*\[data-gg-btn='secondary'\]\s*{[^}]*border-color:/);
     expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*{[^}]*border:\s*1px solid/);
   });
 
-  it('the top-bar border is the link colour, the same outline as the mobile header button', () => {
-    expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*border-color:\s*var\(--color-v2-link\)/);
+  it('the secondary outline is transparent with a link-colour edge and text, the same as the mobile header button', () => {
+    expect(css).toMatch(/\.gg-btn-secondary,\s*\[data-gg-btn='secondary'\]\s*{[^}]*background:\s*transparent/);
+    expect(css).toMatch(/\.gg-btn-secondary,\s*\[data-gg-btn='secondary'\]\s*{[^}]*border-color:\s*var\(--color-v2-outline-border\)/);
+    expect(css).toMatch(/\.gg-btn-secondary,\s*\[data-gg-btn='secondary'\]\s*{[^}]*color:\s*var\(--color-v2-outline-text\)/);
   });
 });

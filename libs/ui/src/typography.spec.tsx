@@ -41,9 +41,9 @@ describe('one font for all text', () => {
         <Button label="Go" onPress={vi.fn()} variant="secondary" />
       </>,
     );
-    for (const text of ['Body text', 'Go']) {
-      expect(family(text)).toContain('var(--font-v2-body)');
-    }
+    expect(family('Body text')).toContain('var(--font-v2-body)');
+    // On web the button label inherits the family from the button, and styles.css sets [data-gg-btn] to --font-v2-body.
+    expect(family('Go')).toBe('inherit');
   });
 
   it('the Eyebrow reads the eyebrow role: the --font-v2-eyebrow var, and the role names the body family', () => {

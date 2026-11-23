@@ -55,14 +55,14 @@ describe('Account', () => {
     expect(props.onPrimary).toHaveBeenCalledTimes(2);
   });
 
-  it('Sign out fires and is the outline (header) style, not a filled button', async () => {
+  it('Sign out fires and is the secondary (outline) tier, while Save is primary', async () => {
     const props = setup();
     const button = screen.getByRole('button', { name: 'Sign out' });
     await userEvent.click(button);
     expect(props.onSignOut).toHaveBeenCalledTimes(1);
-    // The header look has no fill and no swirl hook; the primary Save is the swirl button on web.
+    // The outline look (no fill, link edge) is drawn by styles.css from the hook; the primary Save is the swirl button on web.
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(getComputedStyle(button).backgroundColor);
-    expect(button).not.toHaveAttribute('data-gg-btn');
+    expect(button).toHaveAttribute('data-gg-btn', 'secondary');
     expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('data-gg-btn', 'primary');
   });
 
