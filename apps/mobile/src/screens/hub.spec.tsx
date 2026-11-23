@@ -201,15 +201,22 @@ describe('HubScreen', () => {
     expect(screen.queryByRole('button', { name: 'Edit person' })).toBeNull();
   });
 
-  it('draws What you will need as the primary swirl button, with the recipe text colour and a 44 pt target', () => {
+  it('draws What you will need as the secondary (soft ocean) swirl button, with the recipe text colour and a 44 pt target', () => {
     setup();
     const flat = StyleSheet.flatten(typeof checklistButton().props.style === 'function' ? checklistButton().props.style({ pressed: false }) : checklistButton().props.style);
-    const recipe = v2.recipes.button.primary;
+    const recipe = v2.recipes.button.secondary;
     expect(flat.borderColor).toBe(recipe.border.color);
     expect(flat.minHeight).toBeGreaterThanOrEqual(44);
     expect(flat.minWidth).toBeGreaterThanOrEqual(44);
     expect(within(checklistButton()).UNSAFE_getAllByType(LinearSwirl)).toHaveLength(1);
     expect(StyleSheet.flatten(within(checklistButton()).getByText("What you'll need").props.style).color).toBe(recipe.text.color);
+  });
+
+  it('has exactly one primary swirl button, the bottom action bar, so the gold swirl stays for the next step', () => {
+    setup();
+    const primary = screen.UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]));
+    expect(primary).toHaveLength(1);
+    expect(within(screen.getByTestId('hub-action-bar')).UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]))).toHaveLength(1);
   });
 
   it('puts the button on the title row beside the person name, above the heading, and lets the row wrap', () => {
