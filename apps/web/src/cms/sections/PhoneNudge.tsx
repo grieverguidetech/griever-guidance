@@ -90,14 +90,16 @@ export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
           <span key={n} />
         ))}
       </span>
-      <span aria-hidden="true" className="gg-phone-nudge-orb" />
-      <div className="flex min-w-0 basis-56 flex-1 flex-col gap-1">
-        <h2 id={headingId} className="text-base font-semibold">
-          {HEADINGS[section]}
-        </h2>
-        <p id={lineId}>{LINES[section]}</p>
+      <div className="gg-phone-nudge-row flex min-w-0 flex-1 basis-56 items-start gap-2">
+        <span aria-hidden="true" className="gg-phone-nudge-orb" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h2 id={headingId} className="text-base font-semibold">
+            {HEADINGS[section]}
+          </h2>
+          <p id={lineId}>{LINES[section]}</p>
+        </div>
       </div>
-      <button type="button" className="gg-btn gg-btn-primary ml-auto min-h-[44px]" onClick={onDismiss}>
+      <button type="button" className="gg-btn gg-btn-primary relative z-[1] ml-auto min-h-[44px]" onClick={onDismiss}>
         {copy.phoneNudgeDismiss}
       </button>
     </div>

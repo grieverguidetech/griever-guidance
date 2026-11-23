@@ -97,6 +97,8 @@
   --v2-nudge-shadow: 0px 3px 6px rgba(15,47,74,0.28), 0px 1px 2px rgba(15,47,74,0.13);
   --v2-nudge-speckle-alpha: 0.28;
   --v2-nudge-orb: conic-gradient(#1e7bb8, #279084, #7b6fd0, #f6c56b, #1e7bb8);
+  --v2-nudge-orb-size: 22px;
+  --v2-nudge-orb-turn: 135deg;
   --v2-radius: 8px;
   --v2-border-thin: 1px;
   --v2-border-medium: 1.5px;

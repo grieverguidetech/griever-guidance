@@ -203,6 +203,9 @@ export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): stri
     ['nudge-shadow', shadowCss(nudge.shadow)],
     ['nudge-speckle-alpha', String(nudge.speckles.alpha)],
     ['nudge-orb', conicCss(nudge.orb.conic)],
+    ['nudge-orb-size', `${nudge.orb.size}px`],
+    // One pass of the orb: settle time of a full turn, never more than one turn (the cap mobile's ConicSwirl uses).
+    ['nudge-orb-turn', `${(360 * primary.settleMs) / Math.max(roles.doneMark.spinMs, primary.settleMs)}deg`],
     ['radius', `${card.radius}px`],
     ['border-thin', `${primitives.border.thin}px`],
     ['border-medium', `${primitives.border.medium}px`],

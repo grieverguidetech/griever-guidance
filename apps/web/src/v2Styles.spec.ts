@@ -574,6 +574,7 @@ describe('styles.css phone nudge (#1003)', () => {
   const nudgeRules = [
     '.gg-phone-nudge',
     '.gg-phone-nudge-orb',
+    '.gg-phone-nudge-row',
     '.gg-phone-nudge-speckles',
     '.gg-phone-nudge-speckles > span',
     ...[1, 2, 3, 4, 5, 6, 7].map((n) => `.gg-phone-nudge-speckles > span:nth-child(${n})`),
@@ -605,10 +606,29 @@ describe('styles.css phone nudge (#1003)', () => {
     }
   });
 
-  it('turns the orb by settle / spin of a full turn (the fixed 135deg angle matches the token values)', () => {
+  it('turns the orb by settle / spin of a full turn, capped at one turn, from the generated turn var', () => {
     const ms = (name: string) => parseInt(themeVar(name), 10);
-    const degrees = (ms('--v2-settle-ms') / ms('--v2-spin-ms')) * 360;
-    expect(noPref).toContain(`rotate(${degrees}deg)`);
+    const expected = (360 * ms('--v2-settle-ms')) / Math.max(ms('--v2-spin-ms'), ms('--v2-settle-ms'));
+    expect(themeVar('--v2-nudge-orb-turn')).toBe(`${expected}deg`);
+    expect(noPref).toContain('rotate(var(--v2-nudge-orb-turn))');
+    expect(decls('.gg-phone-nudge-orb', outside)).toContain('width: var(--v2-nudge-orb-size)');
+    expect(themeVar('--v2-nudge-orb-size')).toBe(`${v2.recipes.nudge.orb.size}px`);
+  });
+
+  it('keeps the speckles under the words and the button: speckle layer z-index 0, the row and the button z-index 1', () => {
+    expect(decls('.gg-phone-nudge-speckles', outside)).toMatch(/z-index:\s*0\b/);
+    expect(decls('.gg-phone-nudge-row', outside)).toMatch(/position:\s*relative/);
+    expect(decls('.gg-phone-nudge-row', outside)).toMatch(/z-index:\s*1\b/);
+  });
+
+  it('keeps the heading and the line at 4.5:1 or more against every pastel stop and midpoint', () => {
+    const stops = [...themeVar('--v2-nudge-bg').matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+    const mids = stops.slice(1).map((stop, i) => blend({ rgb: toRgb(stop), alpha: 0.5 }, stops[i]));
+    for (const name of ['--color-v2-heading', '--color-v2-nudge-text']) {
+      for (const ground of [...stops, ...mids]) {
+        expect({ name, ground, ok: contrast(themeVar(name), ground) >= 4.5 }).toEqual({ name, ground, ok: true });
+      }
+    }
   });
 
   it('declares every nudge animation only inside a no-preference block, as one pass of the settle var that rests (forwards)', () => {
@@ -618,7 +638,10 @@ describe('styles.css phone nudge (#1003)', () => {
     expect(card).toContain('gg-swirl-drift var(--v2-settle-ms)');
     const orb = /animation:\s*([^;]+);/.exec(decls('.gg-phone-nudge-orb', noPref))?.[1] ?? '';
     expect(orb).toContain('var(--v2-settle-ms)');
-    for (const decl of [card, orb, /animation:\s*([^;]+);/.exec(decls('.gg-phone-nudge.gg-enter', noPref))?.[1] ?? '']) {
+    const combo = /animation:\s*([^;]+);/.exec(decls('.gg-phone-nudge.gg-enter', noPref))?.[1] ?? '';
+    expect(combo).toMatch(/\bgg-enter\b/);
+    expect(combo).toMatch(/\bgg-swirl-drift\b/);
+    for (const decl of [card, orb, combo]) {
       expect(decl).toMatch(/\bforwards\b/);
       expect(decl).not.toMatch(/infinite|alternate/);
     }
