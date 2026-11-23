@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode } from 'react';
 import { Keyboard, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { StyleProp, TextStyle } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from './Button';
 import type { ButtonNode } from './Button';
 import { focusNode } from './focusNode';
@@ -171,7 +171,7 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
           textAlignVertical="top"
           autoCapitalize="sentences"
           placeholder={placeholder}
-          placeholderTextColor={colors['neutral-700']}
+          placeholderTextColor={v2.roles.muted}
           autoFocus={toggle !== undefined}
           selection={selection}
           onSelectionChange={() => setSelection(undefined)}
@@ -198,13 +198,13 @@ const styles = StyleSheet.create({
   box: {
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     textAlignVertical: 'top',
   },
-  placeholder: { color: colors['neutral-700'] },
+  placeholder: { color: v2.roles.muted },
   // Native focus cue (web draws its own ring through data-gg-field).
-  boxFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
+  boxFocused: { borderColor: v2.roles.link, borderWidth: 2 },
 });

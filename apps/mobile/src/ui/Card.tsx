@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colors, spacing, v2 } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 
 export interface CardProps {
   children: ReactNode;
@@ -34,5 +34,5 @@ const styles = StyleSheet.create({
     gap: spacing[2],
     padding: spacing[3],
   },
-  selected: { borderWidth: 2, borderColor: colors.accent },
+  selected: { borderWidth: 2, borderColor: v2.roles.link },
 });

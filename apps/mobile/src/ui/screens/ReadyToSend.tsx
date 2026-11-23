@@ -3,7 +3,7 @@ import type { ComponentRef, ReactElement, ReactNode, Ref } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import type { RefreshControlProps, Text as RNText } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -277,7 +277,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
               accessibilityState={{ checked: greeting.value }}
             >
               <Body hidden>{greeting.label}</Body>
-              <Switch value={greeting.value} onValueChange={greeting.onChange} trackColor={{ true: colors['accent-700'] }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden />
+              <Switch value={greeting.value} onValueChange={greeting.onChange} trackColor={{ true: v2.roles.link }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden />
             </Pressable>
           ) : null}
           {edited ? <Button label={copy.useSuggested} variant="ghost" buttonRef={useSuggestedRef} onPress={useSuggestedWording} /> : null}

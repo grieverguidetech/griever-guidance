@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, minTouchTarget, spacing, v2 } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
 import { Phrasing } from './phrasing';
 import { LinearSwirl } from './Swirl';
@@ -16,7 +16,7 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
  * text and shadow from `v2.recipes.button`. The other variants keep the 2026-10-25 look (decision by Peter): rounded 10px corners, and a tinted outlined "link" button
  * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: an
  * accent-700 label with an underline, no fill and no border, and a pale accent wash while pressed.
- * `header` is Back and What you'll need (#362): the page shows through, a thin accent-600 outline,
+ * `header` is Back and What you'll need (#362): the page shows through, a thin v2 focus-colour outline,
  * no underline, same as web's top bar. No icons. Palette and serif still follow web.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
@@ -185,7 +185,7 @@ export function Button({
       </Text>
     </Phrasing>
   );
-  const spinnerColor = labelColor ?? colors['accent-700'];
+  const spinnerColor = labelColor ?? v2.roles.link;
   const body = working ? (
     <View style={styles.content}>
       <ActivityIndicator
@@ -270,16 +270,16 @@ const styles = StyleSheet.create({
   // Primary and secondary get their fill, border and shadow from the v2 recipes (recipeFrame).
   primary: { paddingVertical: 14 },
   secondary: { paddingVertical: 14 },
-  tinted: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
+  tinted: { borderColor: v2.roles.link, backgroundColor: v2.roles.wash },
   ghost: {},
   // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
   tertiary: {},
-  // accent-600 on the page is 3.74:1, above the 3:1 non-text minimum.
-  header: { borderColor: colors['accent-600'] },
+  // The v2 focus colour holds 3:1 on every ground (v2.spec).
+  header: { borderColor: v2.roles.focus },
   pressed: { opacity: 0.7 },
   pressedSwirl: { opacity: SWIRL_PRESSED_OPACITY },
   // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
-  pressedWash: { backgroundColor: colors['accent-100'] },
+  pressedWash: { backgroundColor: v2.roles.wash },
   // Unavailable is a solid look, not a fade: opacity would drop the label below 4.5:1.
   // Primary: page-coloured text on ink. Secondary: flat page, dashed border, recipe text. The rest: neutral-700 text.
   unavailableFill: { backgroundColor: UNAVAILABLE_FILL },
@@ -294,6 +294,6 @@ const styles = StyleSheet.create({
   labelLink: { fontSize: 15 },
   labelOnFill: { color: PAGE },
   labelTertiary: { textDecorationLine: 'underline' },
-  labelAccent: { color: colors['accent-700'] },
-  labelUnavailable: { color: colors['neutral-700'] },
+  labelAccent: { color: v2.roles.link },
+  labelUnavailable: { color: v2.roles.muted },
 });

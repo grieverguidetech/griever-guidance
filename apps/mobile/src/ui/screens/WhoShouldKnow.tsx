@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import { SerifText } from '../SerifText';
 import type { ButtonNode } from '../Button';
@@ -472,7 +472,7 @@ export function WhoShouldKnow({
 
 const RowGap = () => <View style={styles.rowGap} />;
 
-const DANGER = '#b91c1c';
+const DANGER = v2.roles.error;
 
 /** "Add another person": a button that opens a small form. Holds only what is typed. */
 function AddByHand({
@@ -688,7 +688,7 @@ function Field({
         aria-labelledby={labelId}
         accessibilityLabel={label}
         placeholder={placeholder}
-        placeholderTextColor={colors['neutral-700']}
+        placeholderTextColor={v2.roles.muted}
         value={value}
         onChangeText={onChangeText}
         keyboardType={phone ? 'phone-pad' : 'default'}
@@ -796,10 +796,10 @@ const styles = StyleSheet.create({
     minHeight: minTouchTarget,
     paddingHorizontal: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 15,
   },
   error: { fontSize: 15, color: DANGER },
@@ -811,13 +811,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     paddingLeft: spacing[3],
     paddingRight: spacing[8],
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    backgroundColor: v2.recipes.field.fill,
+    borderRadius: v2.recipes.field.radius,
     borderWidth: 2,
-    borderColor: colors['neutral-600'],
+    borderColor: v2.recipes.field.edge,
   },
   // Selected: accent-700 edge and a pale accent fill, so it differs from an unselected row by more than a thin line (see colors.spec).
-  rowSelected: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
+  rowSelected: { borderColor: v2.roles.link, backgroundColor: v2.roles.wash },
   box: {
     position: 'absolute',
     right: spacing[3],
@@ -827,15 +827,15 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
+    borderColor: v2.recipes.field.edge,
     alignItems: 'center',
     justifyContent: 'center',
   },
   boxSelected: {
-    backgroundColor: colors['accent-700'],
-    borderColor: colors['accent-700'],
+    backgroundColor: v2.roles.link,
+    borderColor: v2.roles.link,
   },
-  tick: { color: colors.white, fontSize: 12, fontWeight: '700' },
+  tick: { color: v2.roles.page.color, fontSize: 12, fontWeight: '700' },
   screen: { gap: spacing[3] },
   fill: { flex: 1 },
   scrollContent: { padding: spacing[3], paddingTop: spacing[4] },

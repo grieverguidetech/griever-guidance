@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ComponentRef, RefObject } from 'react';
 import { AccessibilityInfo, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -260,22 +260,22 @@ const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'space-between', alignItems: 'center' },
   track: { flexDirection: 'row', gap: spacing[1] },
-  segment: { flex: 1, height: 6, borderRadius: radius.sm, backgroundColor: colors['neutral-200'] },
-  segmentDone: { backgroundColor: colors['accent-700'] },
-  segmentCurrent: { backgroundColor: colors['accent-500'] },
+  segment: { flex: 1, height: 6, borderRadius: v2.recipes.field.radius, backgroundColor: v2.primitives.colors.fieldFill },
+  segmentDone: { backgroundColor: v2.roles.link },
+  segmentCurrent: { backgroundColor: v2.primitives.colors.ocean },
   who: { gap: spacing[1] },
-  name: { fontSize: NAME_FONT_SIZE, color: colors.ink },
+  name: { fontSize: NAME_FONT_SIZE, color: v2.roles.ink },
   input: {
     minHeight: 48,
     paddingHorizontal: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
   },
   field: { gap: spacing[1] },
-  optional: { color: colors['neutral-700'], fontWeight: '400' },
+  optional: { color: v2.roles.muted, fontWeight: '400' },
   list: { gap: spacing[2] },
   person: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
 });
