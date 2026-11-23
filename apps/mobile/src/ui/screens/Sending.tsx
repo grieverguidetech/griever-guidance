@@ -192,7 +192,7 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
       <ScrollView style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.screen}>
           <View style={styles.topBar}>
-            {current && stop ? <Button label={stop.label} hint={stop.note} variant="header" onPress={stop.onPress} /> : <View />}
+            {current && stop ? <Button label={stop.label} hint={stop.note} variant="secondary" onPress={stop.onPress} /> : <View />}
             {current ? <Body tone="muted">{current.position}</Body> : null}
           </View>
           {current && stop ? (

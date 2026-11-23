@@ -3,10 +3,11 @@ import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
 import { v2 } from '@griever/tokens';
+import { LinearSwirl } from '../ui/Swirl';
 import { HomeScreen } from './HomeScreen';
 
-// ui/Button.tsx draws the header button border from the v2 focus role (#1008).
-const HEADER_BORDER = v2.roles.focus;
+// ui/Button.tsx draws the secondary (navigation) button border from the v2 outline recipe: the thin link-colour edge (#1065).
+const HEADER_BORDER = v2.recipes.button.outline.border.color;
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
@@ -45,7 +46,14 @@ describe('HomeScreen layout (#363)', () => {
     expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
   });
 
-  it('draws "Your account" as the header outline with no fill', () => {
+  it('draws What you will need as the primary swirl button, not an outline', () => {
+    render(<HomeScreen {...props} onWhatYoullNeed={jest.fn()} />);
+    const button = screen.getByRole('button', { name: "What you'll need" });
+    expect(flat(button).borderColor).toBe(v2.recipes.button.primary.border.color);
+    expect(within(button).UNSAFE_getAllByType(LinearSwirl)).toHaveLength(1);
+  });
+
+  it('draws "Your account" as the secondary outline with no fill', () => {
     render(<HomeScreen {...props} />);
     const style = flat(screen.getByRole('button', { name: 'Your account' }));
     expect(style.borderWidth).toBeGreaterThan(0);

@@ -149,7 +149,7 @@ function AccountBody({
 function BackRow({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.backRow}>
-      <Button label={copy.back} variant="header" onPress={onBack} />
+      <Button label={copy.back} variant="secondary" onPress={onBack} />
     </View>
   );
 }

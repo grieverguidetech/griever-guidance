@@ -250,11 +250,11 @@ export function WhoShouldKnow({
 
   const topBar = (
     <View style={styles.topBar}>
-      <Button label={scrollList ? (closeLabel ?? copy.back) : copy.back} variant="header" onPress={onBack} />
+      <Button label={scrollList ? (closeLabel ?? copy.back) : copy.back} variant="secondary" onPress={onBack} />
       {onWhatYoullNeed && !scrollList ? (
         <Button
           label={copy.checklist}
-          variant="header"
+          variant="primary"
           opensDialog
           onPress={onWhatYoullNeed}
           buttonRef={checklistRef}
@@ -289,7 +289,7 @@ export function WhoShouldKnow({
             key={shortcut.label}
             label={shortcut.label}
             accessibilityName={shortcut.accessibilityName}
-            variant="secondary"
+            variant="tertiary"
             onPress={shortcut.onPress}
           />
         ))}

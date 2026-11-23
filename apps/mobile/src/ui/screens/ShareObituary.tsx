@@ -214,8 +214,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
       {refreshNotice}
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={onBack} />
-        <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+        <Button label={copy.back} variant="secondary" onPress={onBack} />
+        <Button label={copy.checklist} variant="primary" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
       </View>
       <View style={styles.head}>
         <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow>
@@ -299,7 +299,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
           <Status id={errorId} message={showError ? copy.invalidLink : undefined} tone="danger" />
           {onPasteLink && copy.pasteButton ? (
             <>
-              <Button label={copy.pasteButton} variant="secondary" onPress={onPasteLink} />
+              <Button label={copy.pasteButton} variant="tertiary" onPress={onPasteLink} />
               <Status id={pasteId} message={pasteMessage} />
             </>
           ) : null}

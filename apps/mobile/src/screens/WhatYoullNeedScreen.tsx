@@ -144,7 +144,7 @@ export function WhatYoullNeedScreen() {
       onTouchStart={() => setTipOpen(null)}
     >
       <View style={styles.backRow}>
-        <Button label="Back" variant="header" onPress={() => navigation.goBack()} />
+        <Button label="Back" variant="secondary" onPress={() => navigation.goBack()} />
       </View>
 
       <ScreenHeader>What you'll need</ScreenHeader>
