@@ -527,7 +527,7 @@ describe('navigation (#566)', () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
-    expect(within(screen.getByRole('banner')).getByRole('img', { name: 'Grievers Guidance' })).toBeInTheDocument();
+    expect(within(screen.getByRole('banner')).getByText('Grievers Guidance')).toBeInTheDocument();
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: PEOPLE }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
