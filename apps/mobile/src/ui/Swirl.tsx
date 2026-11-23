@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import type { LayoutChangeEvent, StyleProp, ViewStyle } from 'react-native';
 import Svg, {
   ClipPath,
@@ -10,6 +10,7 @@ import Svg, {
   Rect,
   Stop,
 } from 'react-native-svg';
+import { useReduceMotion } from '../lib/useReduceMotion';
 
 /** Props that hide a decoration from screen readers. */
 const HIDDEN = {
@@ -39,58 +40,23 @@ function useSettle(
   ready: boolean,
   makePass: () => Animated.CompositeAnimation | null,
 ) {
+  const reduceMotion = useReduceMotion();
   const makeRef = useRef(makePass);
   makeRef.current = makePass;
-  const readyRef = useRef(ready);
-  readyRef.current = ready;
-  // Calm until the phone answers, as useReduceMotion is. Kept in refs, not state: the answer arrives
-  // from a promise, and a state update there lands outside React's act scope (a warning in tests, and a
-  // wasted render in the app). Nothing is drawn from the answer; it only decides whether a pass starts.
-  const reduceRef = useRef(true);
-  const passRef = useRef<Animated.CompositeAnimation | null>(null);
   // Under StrictMode's double effect the swirl would not move in dev; the app does not use StrictMode.
   const started = useRef(false);
-  const tryStart = useRef(() => {
-    if (reduceRef.current || !readyRef.current || started.current) {
-      return;
+  useEffect(() => {
+    if (reduceMotion || !ready || started.current) {
+      return undefined;
     }
     const pass = makeRef.current();
     if (!pass) {
-      return;
+      return undefined;
     }
     started.current = true;
-    passRef.current = pass;
     pass.start();
-  }).current;
-  useEffect(() => {
-    let live = true;
-    const setReduce = (on: boolean) => {
-      if (!live) {
-        return;
-      }
-      reduceRef.current = on;
-      if (on) {
-        passRef.current?.stop();
-      } else {
-        tryStart();
-      }
-    };
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then(setReduce)
-      .catch(() => undefined);
-    const sub = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      setReduce,
-    );
-    return () => {
-      live = false;
-      sub.remove();
-      passRef.current?.stop();
-    };
-  }, [tryStart]);
-  useEffect(() => {
-    tryStart();
-  }, [ready, tryStart]);
+    return () => pass.stop();
+  }, [reduceMotion, ready]);
 }
 
 type LinearSwirlProps = {
