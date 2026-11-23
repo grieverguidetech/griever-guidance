@@ -93,9 +93,9 @@ h1 { font-weight: var(--v2-heading-weight); }
 .gg-phone-nudge:focus,
 .gg-phone-nudge:focus-visible { outline: 2px solid transparent; box-shadow: var(--shadow-md); }
 /* Fields: a 2px accent-700 ring (the 1px border plus a 1px outline right outside it).
-   accent-700 is 5.28:1 on the field (--color-surface), 5.72:1 on the page and 3.87:1 against
-   the unfocused border, so the change of state clears 3:1 too. The base accent (#0088b0) was
-   only 2.47:1 against that border. Unlayered so the global :focus-visible ring can't win. */
+   accent-700 is 5.28:1 on the field (--color-surface) and 5.72:1 on the page. Against the unfocused
+   v2 field edge it is only 1.49:1, so the change of state is the extra width (1px to 2px), which AA
+   allows. Unlayered so the global :focus-visible ring can't win; this also covers panel inputs. */
 .gg-input:focus-visible {
   border-color: var(--color-accent-700);
   outline: 1px solid var(--color-accent-700);
@@ -112,6 +112,11 @@ h1 { font-weight: var(--v2-heading-weight); }
    ring would vanish the instant a card is clicked (clicking focuses it). Keep
    it visible while focused too. */
 .gg-card-selected:focus { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+/* Keyboard focus on a selected card must still change its look (WCAG 2.4.7): the selection ring stays,
+   and a second accent-700 ring sits 2px outside it, on a page-coloured gap (5.26:1 or more on page and glows). */
+.gg-card-selected:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-v2-page), 0 0 0 4px var(--color-accent-700);
+}
 
 /* ──────────────────────────────────────────────────────────────────────
    Component layer — mirrors the Broadsheet design-system classes, scoped
@@ -409,10 +414,6 @@ h1 { font-weight: var(--v2-heading-weight); }
     border-color: var(--color-v2-field-edge);
   }
   .gg-panel .gg-input:hover { border-color: var(--color-neutral-700); }
-  .gg-panel .gg-input:focus-visible {
-    border-color: var(--color-v2-field-focus);
-    outline-color: var(--color-v2-field-focus);
-  }
   .gg-row {
     display: flex;
     align-items: center;

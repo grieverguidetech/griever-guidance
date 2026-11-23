@@ -229,10 +229,25 @@ describe('styles.css glass cards and panels', () => {
     expect(rule('.gg-card-selected')).toContain('outline: 2px solid var(--color-accent)');
   });
 
-  it('gives panel inputs the v2 field fill, edge and focus', () => {
+  it('gives panel inputs the v2 field fill and edge (focus comes from the unlayered .gg-input ring)', () => {
     expect(rule('.gg-panel .gg-input')).toContain('background: var(--color-v2-field-fill)');
     expect(rule('.gg-panel .gg-input')).toContain('border-color: var(--color-v2-field-edge)');
-    expect(rule('.gg-panel .gg-input:focus-visible')).toContain('var(--color-v2-field-focus)');
+  });
+
+  it('shows keyboard focus on a selected card with a second ring outside the selection ring', () => {
+    const focused = rule('.gg-card-selected:focus-visible');
+    expect(focused).toContain('var(--color-accent-700)');
+    expect(focused).toContain('box-shadow');
+    for (const ground of grounds) {
+      expect(contrast(themeVar('--color-accent-700'), themeVar(ground)), ground).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('strips the glass edge and shadow from a card nested in the checklist panel', () => {
+    const panel = readFileSync(join(__dirname, 'cms/checklist/ChecklistPanel.tsx'), 'utf8');
+    for (const cls of ['[&_.gg-card]:bg-transparent', '[&_.gg-card]:border-0', '[&_.gg-card]:shadow-none']) {
+      expect(panel).toContain(cls);
+    }
   });
 
   it.each(grounds)('keeps the field edge at 3:1 or more against glass over %s', (ground) => {
@@ -253,7 +268,7 @@ describe('styles.css glass cards and panels', () => {
   });
 
   it('uses no literal colours in the card and panel rules, and defines every var they use', () => {
-    const rules = ['.gg-card', '.gg-panel', '.gg-panel .gg-input', '.gg-panel .gg-input:focus-visible'].map(rule).join('\n');
+    const rules = ['.gg-card', '.gg-panel', '.gg-panel .gg-input'].map(rule).join('\n');
     expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
     const used = [...rules.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
     expect(used.length).toBeGreaterThan(0);

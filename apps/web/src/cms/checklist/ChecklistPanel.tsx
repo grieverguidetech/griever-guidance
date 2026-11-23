@@ -23,7 +23,7 @@ interface Props {
 export function ChecklistPanel({ checklist, onSetItem, onOpenItem, currentItem, preview = false }: Props) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="gg-panel flex flex-col gap-4 [&_.gg-card]:bg-transparent [&_.gg-card]:p-0">
+      <div className="gg-panel flex flex-col gap-4 [&_.gg-card]:bg-transparent [&_.gg-card]:p-0 [&_.gg-card]:border-0 [&_.gg-card]:shadow-none">
         <p className="m-0">{copy.intro}</p>
         <DeathCertificateCard asHeading />
         {preview ? <p className="gg-hint m-0">{preview === 'member' ? copy.previewLineMember : copy.previewLine}</p> : null}
