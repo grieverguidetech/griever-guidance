@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
 import { Card } from '../Card';
@@ -88,7 +88,7 @@ export function Announce({ copy, eyebrow, eyebrowTone, recap, onBack, onWhatYoul
           multiline
           numberOfLines={3}
           placeholder={copy.placeholder}
-          placeholderTextColor={colors['neutral-700']}
+          placeholderTextColor={v2.roles.muted}
           value={note}
           onChangeText={onNoteChange}
         />
@@ -106,16 +106,16 @@ const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   start: { alignSelf: 'flex-start' },
-  optional: { color: colors['neutral-700'], fontWeight: '400' },
+  optional: { color: v2.roles.muted, fontWeight: '400' },
   field: { gap: spacing[1] },
   input: {
     minHeight: 88,
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 14,
     textAlignVertical: 'top',
   },

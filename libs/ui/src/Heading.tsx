@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { Platform, StyleSheet, Text } from 'react-native';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { useSerifStyle } from './typography';
 
 export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
@@ -17,7 +17,7 @@ const webHeadingColor = 'var(--color-v2-heading)';
 
 /** Web reads the v2 heading var; native keeps ink. (jsdom drops a var() colour, so tests call this.) */
 export function headingColor(): string {
-  return Platform.OS === 'web' ? webHeadingColor : colors.ink;
+  return Platform.OS === 'web' ? webHeadingColor : v2.roles.ink;
 }
 
 const sizeByLevel: Record<HeadingLevel, number> = { 1: 22, 2: 17, 3: 15, 4: 14, 5: 13, 6: 12 };
@@ -45,6 +45,6 @@ export function Heading({ level, children, headingRef }: HeadingProps) {
 
 const styles = StyleSheet.create({
   base: {
-    color: colors.ink,
+    color: v2.roles.ink,
   },
 });

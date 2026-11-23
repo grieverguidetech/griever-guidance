@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from './Button';
 import type { SheetProps } from './sheetProps';
 import { webFontFamily } from './typography';
@@ -146,9 +146,9 @@ function OpenSheet({ title, closeLabel, onClose, returnFocusRef, fallbackFocusRe
           flexDirection: 'column',
           gap: spacing[3],
           padding: spacing[4],
-          background: colors.surface,
+          background: v2.recipes.field.fill,
           borderRadius: '16px 16px 0 0',
-          color: colors.ink,
+          color: v2.roles.ink,
           fontFamily: webFontFamily,
         }}
       >
@@ -163,7 +163,7 @@ function OpenSheet({ title, closeLabel, onClose, returnFocusRef, fallbackFocusRe
               padding: spacing[1],
               // An inset ring: the global focus mark sits off to the left and can leave the screen.
               ...(headingFocused
-                ? { outline: '2px solid transparent', boxShadow: `inset 0 0 0 2px ${colors['accent-700']}` }
+                ? { outline: '2px solid transparent', boxShadow: `inset 0 0 0 2px ${v2.roles.link}` }
                 : undefined),
             }}
             onFocus={() => setHeadingFocused(true)}

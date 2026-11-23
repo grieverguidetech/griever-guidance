@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { StyleSheet } from 'react-native';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { Card, cardStyle, webGlassStyle } from './Card';
 
 describe('Card', () => {
@@ -32,13 +32,13 @@ describe('Card', () => {
     for (const web of [true, false]) {
       const style = StyleSheet.flatten(cardStyle(true, web)) ?? {};
       expect(style.borderWidth).toBe(2);
-      expect(style.borderColor).toBe(colors.accent);
+      expect(style.borderColor).toBe(v2.roles.link);
     }
   });
 
   it('keeps the native look off the glass vars', () => {
     const style = StyleSheet.flatten(cardStyle(false, false)) ?? {};
-    expect(style.backgroundColor).toBe(colors.surface);
-    expect(style.borderColor).toBe(colors['neutral-300']);
+    expect(style.backgroundColor).toBe(v2.recipes.card.fill);
+    expect(style.borderColor).toBe(v2.recipes.card.border.color);
   });
 });

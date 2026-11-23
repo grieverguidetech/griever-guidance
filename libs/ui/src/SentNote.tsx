@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { SerifText } from './SerifText';
 
 export interface SentNoteProps {
@@ -26,7 +26,7 @@ export function SentNote({ lead, rest }: SentNoteProps) {
 }
 
 const styles = StyleSheet.create({
-  text: { fontSize: 14, lineHeight: 21, fontStyle: 'italic', color: colors['neutral-800'] },
+  text: { fontSize: 14, lineHeight: 21, fontStyle: 'italic', color: v2.roles.mutedStrong },
   lead: { fontStyle: 'italic', fontWeight: '600' },
   rest: { fontStyle: 'italic', fontWeight: '400' },
 });

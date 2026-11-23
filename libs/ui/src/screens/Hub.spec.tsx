@@ -162,7 +162,7 @@ describe('Hub', () => {
     for (const name of ['Home', "What you'll need"]) {
       const style = getComputedStyle(screen.getByRole('button', { name }));
       expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-      expect(style.borderTopColor).toBe('rgba(17, 134, 172, 1.00)');
+      expect(style.borderTopColor).toBe('rgba(79, 134, 173, 1.00)');
       expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
       expect(getComputedStyle(screen.getByText(name)).textDecoration).not.toContain('underline');
     }
@@ -173,7 +173,7 @@ describe('Hub', () => {
     const button = screen.getByRole('button', { name: 'Edit person' });
     expect(button).toHaveAttribute('data-gg-btn', 'primary');
     expect(getComputedStyle(button).backgroundColor).not.toBe('rgb(0, 103, 134)');
-    expect(getComputedStyle(screen.getByText('Edit person')).color).not.toBe('rgb(243, 242, 242)');
+    expect(getComputedStyle(screen.getByText('Edit person')).color).not.toBe('rgb(248, 247, 244)');
   });
 
   it('keeps a locked step focusable, aria-disabled and explained, and it asks for the paywall', async () => {

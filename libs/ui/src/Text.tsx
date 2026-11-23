@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { useSerifStyle } from './typography';
 
 export interface EyebrowProps {
@@ -57,16 +57,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 1.1,
     textTransform: 'uppercase',
-    color: colors['accent-700'],
+    color: v2.roles.eyebrow.color,
   },
-  accent2: { color: colors['accent-2-700'] },
+  accent2: { color: v2.roles.heading.color },
   body: {
     fontSize: 13,
     lineHeight: 20,
   },
-  default: { color: colors['neutral-800'] },
-  strong: { color: colors.ink },
-  muted: { color: colors['neutral-700'] },
-  danger: { color: '#b91c1c' },
+  default: { color: v2.roles.mutedStrong },
+  strong: { color: v2.roles.ink },
+  muted: { color: v2.roles.muted },
+  danger: { color: v2.roles.error },
   small: { fontSize: 12, lineHeight: 18 },
 });

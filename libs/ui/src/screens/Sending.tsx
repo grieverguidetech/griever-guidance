@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import type { Ref } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
 import { Card } from '../Card';
@@ -215,21 +215,21 @@ const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', justifyContent: 'flex-end' },
   head: { gap: spacing[1] },
-  track: { height: 6, borderRadius: radius.sm, backgroundColor: colors['neutral-200'], overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors['accent-700'] },
+  track: { height: 6, borderRadius: v2.recipes.field.radius, backgroundColor: v2.recipes.field.fill, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: v2.roles.link },
   who: { gap: spacing[1] },
   actions: { gap: spacing[1] },
   input: {
     minHeight: 48,
     paddingHorizontal: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
   },
   field: { gap: spacing[1] },
-  optional: { color: colors['neutral-700'], fontWeight: '400' },
+  optional: { color: v2.roles.muted, fontWeight: '400' },
   list: { gap: spacing[2] },
   person: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });

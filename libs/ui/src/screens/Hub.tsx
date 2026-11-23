@@ -1,7 +1,7 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
@@ -208,7 +208,7 @@ function LockedStep(props: { title: string; body: string; meta?: string; reason:
       hint={props.reason}
       onPress={() => props.onLocked(row.current)}
       // Decorative: the reason text and hint are what assistive tech reads.
-      trailing={<Icon name="lock" testID="lock-icon" color={colors['neutral-700']} trailing />}
+      trailing={<Icon name="lock" testID="lock-icon" color={v2.roles.muted} trailing />}
     >
       <Body tone="strong">{props.title}</Body>
       <Body>{props.body}</Body>

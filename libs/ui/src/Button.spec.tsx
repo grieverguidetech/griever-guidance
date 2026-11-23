@@ -1,9 +1,11 @@
 import { useRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { Button } from './Button';
 import type { ButtonNode } from './Button';
+
+const page = v2.roles.page.color;
 
 describe('Button', () => {
   it('is a button with its label as the name, and calls onPress', async () => {
@@ -164,7 +166,7 @@ describe('header Button (Back, What you\'ll need)', () => {
     render(<Button label="What you'll need" variant="header" onPress={vi.fn()} />);
     const style = getComputedStyle(screen.getByRole('button', { name: "What you'll need" }));
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-    expect(style.borderTopColor).toBe('rgba(17, 134, 172, 1.00)');
+    expect(style.borderTopColor).toBe('rgba(79, 134, 173, 1.00)');
     expect(style.borderTopWidth).toBe('1px');
     expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
     expect(getComputedStyle(screen.getByText("What you'll need")).textDecoration).not.toContain('underline');
@@ -173,15 +175,15 @@ describe('header Button (Back, What you\'ll need)', () => {
 
 describe('Button colours', () => {
   it.each([
-    ['unavailable primary: page colour on neutral-700', colors.bg, colors['neutral-700']],
-    ['unavailable secondary or ghost: neutral-700 on the page', colors['neutral-700'], colors.bg],
-    ['unavailable secondary or ghost: neutral-700 on a surface', colors['neutral-700'], colors.surface],
-    ['available primary: page colour on accent-700', colors.bg, colors['accent-700']],
-    ['available secondary or ghost: accent-700 on the page', colors['accent-700'], colors.bg],
-    ['header: the accent-600 outline on the page (non-text, 3:1)', colors['accent-600'], colors.bg, 3],
-    ['tertiary: accent-700 on the page', colors['accent-700'], colors.bg],
-    ['tertiary pressed: accent-700 on accent-100', colors['accent-700'], colors['accent-100']],
-    ['tertiary unavailable: neutral-700 on the page', colors['neutral-700'], colors.bg],
+    ['unavailable primary: page colour on muted', page, v2.roles.muted],
+    ['unavailable secondary or ghost: muted on the page', v2.roles.muted, page],
+    ['unavailable secondary or ghost: muted on a field fill', v2.roles.muted, v2.recipes.field.fill],
+    ['available primary: page colour on link', page, v2.roles.link],
+    ['available secondary or ghost: link on the page', v2.roles.link, page],
+    ['header: the focus outline on the page (non-text, 3:1)', v2.roles.focus, page, 3],
+    ['tertiary: link on the page', v2.roles.link, page],
+    ['tertiary pressed: link on wash', v2.roles.link, v2.roles.wash],
+    ['tertiary unavailable: muted on the page', v2.roles.muted, page],
   ])('%s is at least its minimum ratio', (_name, foreground, background, minimum = 4.5) => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(minimum);
   });
@@ -225,7 +227,7 @@ describe('Button swirl hook on web', () => {
     render(<Button label="Go" onPress={vi.fn()} variant="primary" />);
     const label = getComputedStyle(screen.getByText('Go'));
     expect(label.color).toBe(getComputedStyle(screen.getByRole('button', { name: 'Go' })).color);
-    expect(label.color).not.toBe('rgb(243, 242, 242)');
+    expect(label.color).not.toBe('rgb(248, 247, 244)');
     expect(label.color).not.toBe('rgb(0, 103, 134)');
     expect(label.fontFamily).toBe('inherit');
     expect(label.fontWeight).toBe('inherit');

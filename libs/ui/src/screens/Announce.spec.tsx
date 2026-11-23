@@ -83,7 +83,7 @@ describe('Announce', () => {
 
   it('draws the eyebrow in the second accent when asked', () => {
     setup({ eyebrowTone: 'accent2' });
-    expect(getComputedStyle(screen.getByText('For Margaret')).color).toBe('rgb(170, 11, 86)');
+    expect(getComputedStyle(screen.getByText('For Margaret')).color).toBe('rgb(17, 68, 101)');
   });
 
   it('draws Edit as an outline with no fill', () => {
