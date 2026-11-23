@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { accountStore } from '@griever/data-local';
-import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
-import { Circle } from '@phosphor-icons/react/Circle';
+import { DoneMark } from './DoneMark';
 import { screenCopy } from '@griever/copy';
 
 const copy = screenCopy('cmsChecklist');
@@ -78,18 +77,14 @@ function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
         onClick={onToggle}
         className="flex items-start gap-3 text-left min-h-[44px]"
       >
-        {checked ? (
-          <CheckCircle size={22} weight="fill" aria-hidden="true" style={{ color: 'var(--color-accent-700)' }} />
-        ) : (
-          <Circle size={22} weight="regular" aria-hidden="true" style={{ color: 'var(--color-neutral-600)' }} />
-        )}
+        <DoneMark checked={checked} />
         <div>
           <div className={`text-[14px]${checked ? ' line-through' : ''}`}>{item.label}</div>
           {item.meta && <div className="gg-card-meta">{item.meta}</div>}
         </div>
       </button>
       {item.note && (
-        <p id={noteId} className="gg-card-meta m-0 pl-[34px]">
+        <p id={noteId} className="gg-card-meta m-0 pl-7">
           {item.note}
         </p>
       )}

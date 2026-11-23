@@ -206,6 +206,11 @@ export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): stri
     ['nudge-orb-size', `${nudge.orb.size}px`],
     // One pass of the orb: settle time of a full turn, never more than one turn (the cap mobile's ConicSwirl uses).
     ['nudge-orb-turn', `${(360 * primary.settleMs) / Math.max(roles.doneMark.spinMs, primary.settleMs)}deg`],
+    // The done mark on a ticked checklist row: a 16px conic swirl that turns once (same cap as the orb), and the open ring's width.
+    ['done-mark-size', `${roles.doneMark.size}px`],
+    ['done-mark-ring-width', `${roles.doneMark.openWidth}px`],
+    ['done-mark-swirl', conicCss(roles.doneMark.swirl)],
+    ['done-mark-turn', `${(360 * primary.settleMs) / Math.max(roles.doneMark.spinMs, primary.settleMs)}deg`],
     ['radius', `${card.radius}px`],
     ['border-thin', `${primitives.border.thin}px`],
     ['border-medium', `${primitives.border.medium}px`],

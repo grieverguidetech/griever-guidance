@@ -261,6 +261,10 @@ describe('toWebThemeCss with v2', () => {
     expect(root['--v2-nudge-orb-size']).toBe(`${orb.size}px`);
     expect(root['--v2-nudge-orb-turn']).toBe('135deg');
     expect(root['--v2-nudge-orb']).toBe(`conic-gradient(${[...orb.conic, orb.conic[0]].join(', ')})`);
+    expect(root['--v2-done-mark-size']).toBe(`${v2.recipes.doneMark.size}px`);
+    expect(root['--v2-done-mark-ring-width']).toBe(`${v2.recipes.doneMark.openWidth}px`);
+    expect(root['--v2-done-mark-swirl']).toBe(`conic-gradient(${[...v2.recipes.doneMark.swirl, v2.recipes.doneMark.swirl[0]].join(', ')})`);
+    expect(root['--v2-done-mark-turn']).toBe('135deg');
   });
 
   it('maps ink to --color-text and writes the page colour and both glows', () => {
@@ -392,6 +396,11 @@ describe('toWebThemeCss with v2', () => {
     // settle 3000 of a 7000 turn
     expect(r['--v2-nudge-orb-turn']).toBe(`${(360 * 3000) / 7000}deg`);
     expect(r['--v2-nudge-orb']).toBe('conic-gradient(#222222, #279084, #111111, #f6c56b, #222222)');
+    // The done mark: swirl stops are ocean, sea, lavender (ocean fixture-changed to #222222, lavender to #111111).
+    expect(r['--v2-done-mark-size']).toBe('16px');
+    expect(r['--v2-done-mark-ring-width']).toBe('2.5px');
+    expect(r['--v2-done-mark-swirl']).toBe('conic-gradient(#222222, #279084, #111111, #222222)');
+    expect(r['--v2-done-mark-turn']).toBe(`${(360 * 3000) / 7000}deg`);
   });
 });
 

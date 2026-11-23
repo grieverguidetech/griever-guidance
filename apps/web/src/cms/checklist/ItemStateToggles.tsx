@@ -1,7 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { Check } from '@phosphor-icons/react/Check';
-import { CheckCircle } from '@phosphor-icons/react/CheckCircle';
-import { Circle } from '@phosphor-icons/react/Circle';
+import { DoneMark } from '../../lib/DoneMark';
 import { screenCopy } from '@griever/copy';
 import type { ChecklistItemState } from '@griever/shared';
 
@@ -54,11 +53,7 @@ export function ItemStateToggles({ state, onChange, groupLabel, variant = 'detai
             onChange('done');
           }}
         >
-          {finished ? (
-            <CheckCircle size={28} weight="fill" aria-hidden="true" className="text-accent-700" />
-          ) : (
-            <Circle size={28} weight="regular" aria-hidden="true" className="text-neutral-700" />
-          )}
+          <DoneMark checked={finished} />
         </button>
         {state === 'not_applicable' && (
           <span id={naNoteId} className="sr-only">

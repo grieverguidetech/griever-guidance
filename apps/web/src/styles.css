@@ -566,6 +566,34 @@ h1 { font-weight: var(--v2-heading-weight); }
       to { transform: rotate(var(--v2-nudge-orb-turn)); }
     }
   }
+  /* #1004 the tick on a checklist row, the v2 doneMark recipe (same as mobile DoneMark.tsx): open is a ring in the open-ring colour,
+     done is a conic swirl that turns once and rests. Size, ring width, swirl and turn come from the generated vars; the open ring is
+     3:1 or more on the page, both glows and glass (guarded by v2Styles.spec.ts). */
+  .gg-done-mark {
+    display: inline-block;
+    flex: none;
+    width: var(--v2-done-mark-size);
+    height: var(--v2-done-mark-size);
+    pointer-events: none;
+  }
+  .gg-done-mark-swirl,
+  .gg-done-mark-ring {
+    display: block;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border-radius: 50%;
+  }
+  .gg-done-mark-swirl { background: var(--v2-done-mark-swirl); }
+  .gg-done-mark-ring { border: var(--v2-done-mark-ring-width) solid var(--color-v2-open-ring); }
+  /* One pass, then rest, and only when the visitor allows motion (WCAG 2.2.2). */
+  @media (prefers-reduced-motion: no-preference) {
+    .gg-done-mark-swirl { animation: gg-done-mark-turn var(--v2-settle-ms) ease-out forwards; }
+    @keyframes gg-done-mark-turn {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(var(--v2-done-mark-turn)); }
+    }
+  }
   /* #514: an input on a panel needs a visible edge (WCAG 1.4.11, 3:1). It takes the v2 field recipe;
      the edge is 3:1 or more against glass over the page and both glows (guarded by v2Styles.spec.ts). */
   .gg-panel .gg-input {

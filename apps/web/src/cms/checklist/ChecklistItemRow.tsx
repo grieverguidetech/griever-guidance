@@ -16,8 +16,8 @@ interface Props {
 }
 
 /**
- * One line: a check-circle for Done, then the label (opens its guidance). A handled row
- * (done, or saved earlier as not applicable) shows its label muted and the circle checked.
+ * One line: a done mark (swirl when done, ring when open) for Done, then the label (opens its guidance). A handled row
+ * (done, or saved earlier as not applicable) shows its label muted and the mark done.
  * aria-pressed carries the state; the muted colour is only a quiet extra cue.
  */
 export function ChecklistItemRow({ id, state, onOpen, onChange, current, readOnly = false }: Props) {
