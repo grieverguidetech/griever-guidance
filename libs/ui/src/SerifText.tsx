@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { StyleSheet, Text, TextInput } from 'react-native';
 import { useSerifStyle } from './typography';
 
-// Sora loads only up to 500, so 500 and heavier map to medium.
+// Nunito Sans loads 400 and 600 only, so 500 and heavier map to 600.
 const SEMIBOLD = new Set(['500', '600', '700', '800', '900', 'bold']);
 
 /**

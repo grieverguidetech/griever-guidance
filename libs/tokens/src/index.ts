@@ -20,6 +20,7 @@ export {
   toMarketingFile,
   toWebThemeCss,
   webFontStack,
+  webHeadingFontStack,
   type MarketingInput,
   type WebThemeInput,
   type WebV2Input,

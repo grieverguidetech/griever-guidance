@@ -17,7 +17,7 @@ export interface HeaderChecklistToggle {
 /**
  * The bar across the top of the editor: the product wordmark and, from `lg`, a primary button that opens
  * the checklist panel while it is closed (below `lg` the phone button in the page opens the sheet). The wordmark is a
- * SAMPLE (issue 583). It is inline, not an <img>, so the name is real text in the page font (Sora): an
+ * SAMPLE (issue 583). It is inline, not an <img>, so the name is real text in the page font (Nunito Sans): an
  * SVG loaded as an image cannot use the page's fonts. The mark is decorative; the text is the name.
  */
 export function AppHeader({ checklist }: { checklist?: HeaderChecklistToggle } = {}) {

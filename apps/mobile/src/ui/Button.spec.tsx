@@ -65,15 +65,15 @@ describe('Button (mobile)', () => {
       expect(swirl.props.driftMs).toBe(recipe.driftMs);
       const label = StyleSheet.flatten(screen.getByText('Save').props.style);
       expect(label.color).toBe(recipe.text.color);
-      // Native picks the weight by family name: Sora 500 for primary, Sora 400 for secondary.
-      expect(label.fontFamily).toBe(variant === 'secondary' ? 'Sora_400Regular' : 'Sora_500Medium');
+      // Native picks the weight by family name: Nunito Sans 600 for primary, Nunito Sans 400 for secondary.
+      expect(label.fontFamily).toBe(variant === 'secondary' ? 'NunitoSans_400Regular' : 'NunitoSans_600SemiBold');
       expect(label.fontWeight).toBeUndefined();
       const frame = flat(screen.getByRole('button', { name: 'Save' }));
       expect(frame).toMatchObject({ borderWidth: recipe.border.width, borderColor: recipe.border.color, borderRadius: 8 });
     });
 
     it('primary is medium weight with a 1px border, secondary is regular with 1.5px', () => {
-      expect(recipes.primary.text.weight).toBe(500);
+      expect(recipes.primary.text.weight).toBe(600);
       expect(recipes.primary.border.width).toBe(1);
       expect(recipes.secondary.text.weight).toBe(400);
       expect(recipes.secondary.border.width).toBe(1.5);

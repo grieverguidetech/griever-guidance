@@ -508,11 +508,11 @@ describe('the end of a send', () => {
       { queue: true },
     );
     expect(screen.getByLabelText(/Everyone has been told\. We don't keep a copy/)).toBeTruthy();
-    // Lead in Sora 500, rest in Sora 400 (Sora has no italic), and no border (#365).
+    // Lead in Nunito Sans 600, rest in Nunito Sans 400 (no italic is loaded), and no border (#365).
     const lead = StyleSheet.flatten(screen.getByText('Everyone has been told.').props.style);
     const rest = StyleSheet.flatten(screen.getByText(/We don't keep a copy of what was sent/).props.style);
-    expect(lead.fontFamily).toBe('Sora_500Medium');
-    expect(rest.fontFamily).toBe('Sora_400Regular');
+    expect(lead.fontFamily).toBe('NunitoSans_600SemiBold');
+    expect(rest.fontFamily).toBe('NunitoSans_400Regular');
     expect(StyleSheet.flatten(screen.getByLabelText(/Everyone has been told\./).props.style)?.borderWidth ?? 0).toBe(0);
   });
 

@@ -3,9 +3,9 @@ import { v2 } from '@griever/tokens';
 import { SerifText } from './SerifText';
 
 export interface SentNoteProps {
-  /** The first sentence, set in Sora 500. */
+  /** The first sentence, set in Nunito Sans 600. */
   lead: string;
-  /** What follows it, set in Sora 400. Split from the lead in the copy, never parsed here. */
+  /** What follows it, set in Nunito Sans 400. Split from the lead in the copy, never parsed here. */
   rest?: string;
 }
 

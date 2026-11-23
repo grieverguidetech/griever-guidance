@@ -17,14 +17,23 @@ describe('serifWeight', () => {
     expect(serifWeight('semibold')).toBe(String(weights.medium));
   });
 
-  it('uses the --font-v2 var for the family', () => {
-    expect(webFontFamily).toBe('var(--font-v2)');
+  it('uses the 600 emphasis weight for semibold', () => {
+    expect(serifWeight('semibold')).toBe('600');
+  });
+
+  it('uses the --font-v2-body var for body steps and --font-v2-heading for heading steps', () => {
+    expect(webFontFamily).toBe('var(--font-v2-body)');
     expect(serifFamily()).toBe(webFontFamily);
+    expect(serifFamily('regular')).toBe(webFontFamily);
+    expect(serifFamily('semibold')).toBe(webFontFamily);
+    expect(serifFamily('heading')).toBe('var(--font-v2-heading)');
+    expect(serifFamily('headingRegular')).toBe('var(--font-v2-heading)');
+    expect(serifWeight('headingRegular')).toBe('400');
   });
 });
 
 describe('one font for all text', () => {
-  it('Body, Eyebrow and Button labels use the --font-v2 family', () => {
+  it('Body, Eyebrow and Button labels use the --font-v2-body family', () => {
     render(
       <>
         <Eyebrow>Eyebrow text</Eyebrow>
@@ -33,7 +42,7 @@ describe('one font for all text', () => {
       </>,
     );
     for (const text of ['Eyebrow text', 'Body text', 'Go']) {
-      expect(family(text)).toContain('var(--font-v2)');
+      expect(family(text)).toContain('var(--font-v2-body)');
     }
   });
 

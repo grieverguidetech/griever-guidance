@@ -82,6 +82,9 @@ export function marketingLines({ roles, recipes }: MarketingInput): string[] {
     ['glow-sky', roles.page.glows.bottomLeft],
     ['ink', roles.ink],
     ['font', `'${roles.body.family}'`],
+    ['font-heading', `'${roles.heading.family}'`],
+    ['font-body', `'${roles.body.family}'`],
+    ['heading-soft', String(roles.heading.soft)],
     ['heading', roles.heading.color],
     ['heading-weight', String(roles.heading.weight)],
     ['eyebrow', roles.eyebrow.color],
@@ -121,16 +124,23 @@ export function toMarketingFile(v2: MarketingInput): string {
   return generatedHeader + toMarketingCss(v2);
 }
 
-/** The web font stack for the v2 family: the brand font, then system fonts. */
+/** The web font stack for the body family: Nunito Sans, then system fonts. */
 export function webFontStack(p: Pick<Primitives, 'font'>): string {
-  return `'${p.font.family}', system-ui, -apple-system, 'Segoe UI', sans-serif`;
+  return `'${p.font.bodyFamily}', system-ui, -apple-system, 'Segoe UI', sans-serif`;
 }
 
-/** `--font-v2` and the v2 colours (Tailwind reads these). Every name starts `v2`, except ink, which is `--color-text`. */
+/** The web font stack for headings: Fraunces, then system serif fonts. */
+export function webHeadingFontStack(p: Pick<Primitives, 'font'>): string {
+  return `'${p.font.headingFamily}', ui-serif, Georgia, 'Times New Roman', serif`;
+}
+
+/** `--font-v2-heading`, `--font-v2-body`, `--font-v2` (an alias of the body stack, so older uses keep working) and the v2 colours (Tailwind reads these). Every name starts `v2`, except ink, which is `--color-text`. */
 export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): string[] {
   const { primary, secondary } = recipes.button;
   const { card, nudge, field } = recipes;
   const lines: Array<[string, string]> = [
+    ['font-v2-heading', webHeadingFontStack(primitives)],
+    ['font-v2-body', webFontStack(primitives)],
     ['font-v2', webFontStack(primitives)],
     ['color-text', roles.ink],
     ['color-v2-page', roles.page.color],
@@ -192,6 +202,7 @@ export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): stri
     ['eyebrow-size', `${roles.eyebrow.size}px`],
     ['eyebrow-tracking', `${roles.eyebrow.tracking}em`],
     ['heading-weight', String(roles.heading.weight)],
+    ['heading-soft', String(roles.heading.soft)],
     ['weight-light', String(primitives.font.weights.light)],
     ['weight-regular', String(primitives.font.weights.regular)],
     ['weight-medium', String(primitives.font.weights.medium)],

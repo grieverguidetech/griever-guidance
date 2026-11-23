@@ -18,7 +18,7 @@ export function buildRecipes(r: Roles, p: Primitives) {
         driftMs: p.motion.driftMs,
         /** One eased pass, then rest. At most 5 s (WCAG 2.2.2). */
         settleMs: p.motion.settleMs,
-        text: { color: p.colors.primaryText, weight: p.font.weights.medium },
+        text: { color: p.colors.primaryText, weight: p.font.weights.medium, family: p.font.bodyFamily },
         border: { width: p.border.thin, color: p.colors.primaryBorder },
         shadow: [p.shadows.sunset],
         radius: p.radius,
@@ -26,7 +26,7 @@ export function buildRecipes(r: Roles, p: Primitives) {
       secondary: {
         swirl: r.soft,
         driftMs: p.motion.driftMs,
-        text: { color: p.colors.secondaryText, weight: p.font.weights.regular },
+        text: { color: p.colors.secondaryText, weight: p.font.weights.regular, family: p.font.bodyFamily },
         border: { width: p.border.medium, color: p.colors.secondaryBorder },
         shadow: [p.shadows.glass],
         radius: p.radius,
@@ -39,7 +39,7 @@ export function buildRecipes(r: Roles, p: Primitives) {
         colors: [p.colors.lavender, p.colors.sunGold, p.colors.sea, p.colors.ocean],
         alpha: p.speckleAlpha,
       },
-      text: { color: p.colors.nudgeText, size: r.body.size },
+      text: { color: p.colors.nudgeText, size: r.body.size, family: p.font.bodyFamily },
       border: { width: p.border.thin, color: p.colors.nudgeBorder },
       shadow: [p.shadows.nudgeNear, p.shadows.nudgeFar],
       orb: { size: p.size.orb, conic: [p.colors.ocean, p.colors.sea, p.colors.lavender, p.colors.sunGold] },
@@ -48,6 +48,7 @@ export function buildRecipes(r: Roles, p: Primitives) {
     /** Text fields. The edge is a control edge, so it holds 3:1 (v2.spec). */
     field: {
       fill: p.colors.fieldFill,
+      family: p.font.bodyFamily,
       edge: p.colors.fieldEdge,
       focusRing: p.colors.fieldFocus,
       radius: p.radius,

@@ -4,14 +4,20 @@ import { primitives, type Primitives } from './primitives.js';
 export function buildRoles(p: Primitives) {
   return {
     ink: p.colors.ink,
-    heading: { color: p.colors.heading, weight: p.font.weights.light, family: p.font.family },
+    heading: {
+      color: p.colors.heading,
+      weight: p.font.weights.light,
+      family: p.font.headingFamily,
+      soft: p.font.headingSoft,
+    },
     eyebrow: {
+      family: p.font.headingFamily,
       color: p.colors.eyebrow,
       size: p.size.eyebrow,
       tracking: p.size.eyebrowTracking,
       uppercase: true,
     },
-    body: { size: p.size.body, weight: p.font.weights.regular, family: p.font.family },
+    body: { size: p.size.body, weight: p.font.weights.regular, family: p.font.bodyFamily },
     page: { color: p.colors.page, glows: { topRight: p.colors.glowSun, bottomLeft: p.colors.glowSky } },
     /** The focus ring on controls that are not buttons, like hub cards. At least 3:1 on every ground (v2.spec). */
     focus: p.colors.link,

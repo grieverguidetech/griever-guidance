@@ -7,6 +7,7 @@ import {
   toMarketingFile,
   toWebThemeCss,
   webFontStack,
+  webHeadingFontStack,
 } from './css.js';
 import { spacing } from './index.js';
 import { v2 } from './v2/index.js';
@@ -66,7 +67,7 @@ describe('toWebThemeCss', () => {
   });
 
   it('starts @theme with the v2 font and :root with the rootLines', () => {
-    expect(css.startsWith('@theme {\n  --font-v2: ')).toBe(true);
+    expect(css.startsWith('@theme {\n  --font-v2-heading: ')).toBe(true);
     expect(css).toContain(`:root {\n${rootLines(input).join('\n')}\n\n  --v2-`);
     expect(block('.x', ['  a: b;'])).toBe('.x {\n  a: b;\n}\n');
   });
@@ -99,7 +100,10 @@ describe('toMarketingCss', () => {
     expect(vars['--gg-glow-sky']).toBe(c.glowSky);
     expect(vars['--gg-ink']).toBe(c.ink);
     expect(vars['--gg-heading']).toBe(c.heading);
-    expect(vars['--gg-font']).toBe("'Sora'");
+    expect(vars['--gg-font']).toBe("'Nunito Sans'");
+    expect(vars['--gg-font-body']).toBe("'Nunito Sans'");
+    expect(vars['--gg-font-heading']).toBe("'Fraunces'");
+    expect(vars['--gg-heading-soft']).toBe('100');
     expect(vars['--gg-primary-bg']).toBe(
       `linear-gradient(${gradients.sunset.angle}deg, ${gradients.sunset.stops.join(', ')})`,
     );
@@ -173,6 +177,8 @@ describe('toWebThemeCss with v2', () => {
     expect(theme['--color-v2-error']).toBe('#b3261e');
     expect(theme['--color-v2-success']).toBe('#2a7048');
     expect(theme['--font-v2']).toBe(webFontStack(v2.primitives));
+    expect(theme['--font-v2-body']).toBe(webFontStack(v2.primitives));
+    expect(theme['--font-v2-heading']).toBe(webHeadingFontStack(v2.primitives));
     expect(root['--v2-primary-bg']).toMatch(/^linear-gradient\(120deg, /);
     expect(root['--v2-secondary-bg']).toMatch(/^linear-gradient\(120deg, /);
     expect(root['--v2-card-shadow']).toBe(
@@ -214,7 +220,7 @@ describe('toWebThemeCss with v2', () => {
       if (name === '--color-text') {
         continue;
       }
-      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2$|space-\d+$)/);
+      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2(-heading|-body)?$|space-\d+$)/);
     }
   });
 
@@ -257,7 +263,8 @@ describe('toWebThemeCss with v2', () => {
     expect(root['--v2-heading-weight']).toBe('300');
     expect(root['--v2-weight-light']).toBe('300');
     expect(root['--v2-weight-regular']).toBe('400');
-    expect(root['--v2-weight-medium']).toBe('500');
+    expect(root['--v2-weight-medium']).toBe('600');
+    expect(root['--v2-heading-soft']).toBe('100');
   });
 
   it('is deterministic', () => {
@@ -278,7 +285,8 @@ describe('toWebThemeCss with v2', () => {
     p.gradients.sunset.stops = ['#aaaaaa', '#bbbbbb', '#cccccc'];
     p.radius = 3;
     p.motion.settleMs = 3000;
-    p.font.family = 'Fixture';
+    p.font.bodyFamily = 'Fixture';
+    p.font.headingFamily = 'FixtureHead';
     p.shadows.sunset.color = 'rgba(1,2,3,0.5)';
     p.border.medium = 2.5;
     p.border.thin = 0.5;
@@ -287,7 +295,7 @@ describe('toWebThemeCss with v2', () => {
     p.size.orb = 30;
     p.colors.lavender = '#111111';
     p.colors.ocean = '#222222';
-    p.font.weights.medium = 600;
+    p.font.weights.medium = 700;
     const roles = buildRoles(p);
     const changed = toWebThemeCss({
       ...input,
@@ -304,6 +312,8 @@ describe('toWebThemeCss with v2', () => {
     expect(t['--color-v2-focus']).toBe('#010203'); // the focus role follows the link primitive (#1005)
     expect(t['--color-v2-secondary-border']).toBe('#112233');
     expect(t['--font-v2']).toMatch(/^'Fixture', /);
+    expect(t['--font-v2-body']).toMatch(/^'Fixture', /);
+    expect(t['--font-v2-heading']).toMatch(/^'FixtureHead', /);
     expect(r['--v2-primary-bg']).toBe(
       'linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)',
     );
@@ -313,7 +323,7 @@ describe('toWebThemeCss with v2', () => {
     expect(r['--v2-border-medium']).toBe('2.5px');
     expect(r['--v2-border-thin']).toBe('0.5px');
     expect(r['--v2-spin-ms']).toBe('7000ms');
-    expect(r['--v2-weight-medium']).toBe('600');
+    expect(r['--v2-weight-medium']).toBe('700');
     expect(t['--color-v2-nudge-speckle-1']).toBe('#111111');
     expect(t['--color-v2-nudge-speckle-4']).toBe('#222222');
     expect(r['--v2-nudge-speckle-alpha']).toBe('0.5');
@@ -329,13 +339,19 @@ describe('toWebThemeCss with v2', () => {
   });
 });
 
+describe('webHeadingFontStack', () => {
+  it('starts with the heading family and ends in a generic serif', () => {
+    expect(webHeadingFontStack(v2.primitives)).toBe("'Fraunces', ui-serif, Georgia, 'Times New Roman', serif");
+  });
+});
+
 describe('webFontStack', () => {
-  it('starts with the primitive family and ends in a generic family', () => {
+  it('starts with the body family and ends in a generic family', () => {
     expect(webFontStack(v2.primitives)).toBe(
-      "'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif",
+      "'Nunito Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
     );
     expect(
-      webFontStack({ font: { ...v2.primitives.font, family: 'Other' } }),
+      webFontStack({ font: { ...v2.primitives.font, bodyFamily: 'Other' } }),
     ).toMatch(/^'Other', .*sans-serif$/);
   });
 });
