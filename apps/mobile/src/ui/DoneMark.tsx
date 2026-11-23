@@ -3,6 +3,7 @@ import { v2 } from '@griever/tokens';
 import { ConicSwirl } from './Swirl';
 
 const mark = v2.recipes.doneMark;
+const SWIRL_STOPS = [...mark.swirl];
 
 /** Props that hide a decoration from screen readers. */
 const HIDDEN = {
@@ -22,10 +23,15 @@ export interface DoneMarkProps {
  */
 export function DoneMark({ checked }: DoneMarkProps) {
   return (
-    <View {...HIDDEN} pointerEvents="none" style={styles.box}>
+    <View
+      {...HIDDEN}
+      pointerEvents="none"
+      testID="done-mark"
+      style={styles.box}
+    >
       {checked ? (
         <ConicSwirl
-          stops={[...mark.swirl]}
+          stops={SWIRL_STOPS}
           size={mark.size}
           spinMs={mark.spinMs}
           testID="done-mark-swirl"

@@ -61,10 +61,10 @@ describe('DoneMark (#977)', () => {
   it.each([true, false])('is hidden from screen readers and ignores touches (checked %s)', async (checked) => {
     await givenReduceMotion(false);
     render(<DoneMark checked={checked} />);
-    const mark = (swirl() ?? ring())?.parent?.parent;
-    expect(mark?.props.accessibilityElementsHidden).toBe(true);
-    expect(mark?.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(mark?.props.pointerEvents).toBe('none');
+    const mark = screen.getByTestId('done-mark', { includeHiddenElements: true });
+    expect(mark.props.accessibilityElementsHidden).toBe(true);
+    expect(mark.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(mark.props.pointerEvents).toBe('none');
     expect(screen.queryByTestId('done-mark-swirl')).toBeNull();
   });
 
