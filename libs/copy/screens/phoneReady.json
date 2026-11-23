@@ -12,5 +12,9 @@
   "placesUnavailable": "Suggestions are not available right now. You can type the place.",
   "placeFilled": "Place filled in",
   "placesHint": "Suggestions appear below as you type",
-  "messageCaption": "Read it one last time and make any last changes."
+  "messageCaption": "Read it one last time and make any last changes.",
+  "messageEdit": "Edit",
+  "messageEditName": "Edit message",
+  "messageDone": "Done",
+  "messageDoneName": "Done editing"
 }

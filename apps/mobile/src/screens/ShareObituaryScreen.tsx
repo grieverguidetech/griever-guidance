@@ -19,6 +19,7 @@ import { obituaryShareTextFor, obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
 const textCopy = screenCopy('phoneObituary');
+const readyCopy = screenCopy('phoneReady');
 const draftCopy = screenCopy('obituaryDraft');
 const nudgeCopy = screenCopy('phoneNudge');
 const copy = {
@@ -28,6 +29,10 @@ const copy = {
   emailFailed: shareCopy.mobileEmailFailed,
   // Last, so the phone's own words win (emailNoText points at the box above, instead of mobileEmailNoText).
   ...textCopy,
+  messageEdit: readyCopy.messageEdit,
+  messageEditName: readyCopy.messageEditName,
+  messageDone: readyCopy.messageDone,
+  messageDoneName: readyCopy.messageDoneName,
 };
 
 type Props = {

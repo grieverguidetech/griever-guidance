@@ -163,7 +163,7 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
         refreshControl={refresh.refreshControl}
         refreshNotice={refresh.notice}
         nudge={nudge}
-        copy={{ ...copy, messageCaption: ready.messageCaption }}
+        copy={{ ...copy, messageCaption: ready.messageCaption, messageEdit: ready.messageEdit, messageEditName: ready.messageEditName, messageDone: ready.messageDone, messageDoneName: ready.messageDoneName }}
         heading={moments[momentOf(flow.templateCategory)].title}
         headingRef={heading}
         kind={isAnnouncement ? 'announcement' : isService ? 'service' : 'other'}

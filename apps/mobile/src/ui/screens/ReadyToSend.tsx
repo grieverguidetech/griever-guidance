@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactElement, ReactNode, Ref } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import type { RefreshControlProps, Text as RNText } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { colors, spacing } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -12,9 +12,9 @@ import type { WebNudgeProps } from '../WebNudge';
 import { focusNode } from '../focusNode';
 import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
+import { MessageBox } from '../MessageBox';
 import { Body } from '../Text';
 import { Status } from '../Status';
-import { useSerifStyle } from '../typography';
 
 /** The words the screen needs. The keys come from libs/copy/screens/review.json (read by web too) and phoneReady.json. */
 export interface ReadyToSendCopy {
@@ -22,6 +22,11 @@ export interface ReadyToSendCopy {
   messageLabel: string;
   /** The small line under the message box (phoneReady.json). */
   messageCaption: string;
+  /** The Edit and Done toggle on the message box (phoneReady.json): the words, and the names a screen reader says. */
+  messageEdit: string;
+  messageEditName: string;
+  messageDone: string;
+  messageDoneName: string;
   softer: string;
   /** Why the tone button is unavailable once the words are edited. */
   toneKept: string;
@@ -207,7 +212,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={refreshControl}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={refreshControl}>
         {refreshNotice}
         <View style={styles.topBar}>
           <Button label={copy.back} variant="header" onPress={onBack} />
@@ -216,7 +221,16 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           {heading}
         </Heading>
         <Card>
-          <MessageField label={copy.messageLabel} lead={lead} caption={copy.messageCaption} value={message} onChangeText={changeMessage} />
+          <MessageBox
+            label={copy.messageLabel}
+            caption={copy.messageCaption}
+            value={message}
+            onChangeText={changeMessage}
+            boxStyle={styles.messageBox}
+            toggle={{ edit: copy.messageEdit, editName: copy.messageEditName, done: copy.messageDone, doneName: copy.messageDoneName }}
+          >
+            {lead ? <Body tone="strong">{lead}</Body> : null}
+          </MessageBox>
         </Card>
         <View style={styles.actions}>
           {kind === 'announcement' ? (
@@ -288,52 +302,6 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   );
 }
 
-/** Web: lets apps/web/src/styles.css draw its field focus ring (data-gg-field). Ignored on native. */
-const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
-
-interface MessageFieldProps {
-  label: string;
-  /** The first-name line. Read after the label, before the box. */
-  lead?: string;
-  caption: string;
-  value: string;
-  onChangeText: (value: string) => void;
-}
-
-function MessageField({ label, lead, caption, value, onChangeText }: MessageFieldProps) {
-  const input = useRef<ComponentRef<typeof TextInput> | null>(null);
-  const font = useSerifStyle('regular');
-  const labelId = useId();
-  const captionId = useId();
-  const [focused, setFocused] = useState(false);
-  return (
-    <View style={styles.field}>
-      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
-        {label}
-      </Body>
-      {lead ? <Body tone="strong">{lead}</Body> : null}
-      <TextInput
-        ref={input}
-        style={[styles.input, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        {...webFieldHook}
-        // Web names the field from the visible label; native reads the label text directly.
-        aria-labelledby={labelId}
-        accessibilityLabel={label}
-        accessibilityHint={caption}
-        aria-describedby={captionId}
-        multiline
-        value={value}
-        onChangeText={onChangeText}
-      />
-      <Body tone="muted" small id={captionId}>
-        {caption}
-      </Body>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
@@ -345,18 +313,5 @@ const styles = StyleSheet.create({
   together: { alignSelf: 'flex-start', alignItems: 'flex-start', gap: spacing[1] },
   to: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], alignItems: 'center' },
   share: { alignItems: 'flex-start' },
-  field: { gap: spacing[1] },
-  input: {
-    minHeight: 132,
-    padding: spacing[2],
-    borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
-    fontSize: 15,
-    textAlignVertical: 'top',
-  },
-  // Native focus cue (web draws its own ring through data-gg-field).
-  inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
+  messageBox: { minHeight: 132, fontSize: 15 },
 });

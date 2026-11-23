@@ -41,7 +41,7 @@ describe('rows that hold two controls wrap and keep a gap (#654)', () => {
 describe('inputs are at least 15 pt (#654)', () => {
   it.each([
     ['ui/screens/WhoShouldKnow.tsx', 'input'],
-    ['ui/screens/ReadyToSend.tsx', 'input'],
+    ['ui/screens/ReadyToSend.tsx', 'messageBox'],
     ['components/AddressFields.tsx', 'input'],
     ['components/DetailsRow.tsx', 'input'],
     ['components/SavedNote.tsx', 'note'],

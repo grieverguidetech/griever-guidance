@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { TextInput } from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { ShareObituary } from './ShareObituary';
 import type { ShareObituaryCopy, ShareObituaryProps } from './ShareObituary';
 
@@ -180,51 +180,100 @@ describe('ShareObituary (mobile steps, #650)', () => {
   });
 });
 
-describe('ShareObituary text box (#823)', () => {
+describe('ShareObituary text box (#823, #968)', () => {
   const editorCopy = {
     textTitle: 'The obituary text',
     textCaption: 'Read it one last time and make any last changes.',
     editLabel: 'Obituary text',
     editPlaceholder: 'Write the obituary here.',
+    messageEdit: 'Edit',
+    messageEditName: 'Edit message',
+    messageDone: 'Done',
+    messageDoneName: 'Done editing',
   };
   const editor = (over = {}) => ({ value: 'Anna loved the garden.', onValueChange: jest.fn(), ...over });
-  const draw = (e: ReturnType<typeof editor>) =>
-    render(<ShareObituary copy={{ ...copy, ...editorCopy }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
+  const draw = (e: ReturnType<typeof editor>, extra = {}) =>
+    render(<ShareObituary copy={{ ...copy, ...editorCopy, ...extra }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
+  const edit = () => fireEvent.press(screen.getByRole('button', { name: 'Edit message' }));
 
   it('shows no card without textEditor, as the web does', () => {
     setup();
     expect(screen.queryByText('The obituary text')).toBeNull();
   });
 
-  it('always shows one labelled multiline box with the text and the caption under it', () => {
+  it('reads as plain text by default, with the label, an Edit message button and the caption', () => {
     draw(editor());
-    const box = screen.getByLabelText('Obituary text');
-    expect(box.props.multiline).toBe(true);
-    expect(box.props.value).toBe('Anna loved the garden.');
+    expect(screen.UNSAFE_queryAllByType(TextInput).find((i) => i.props.accessibilityLabel === 'Obituary text')).toBeUndefined();
+    const text = screen.getByLabelText('Obituary text');
+    expect(text.props.accessibilityValue).toEqual({ text: 'Anna loved the garden.' });
+    expect(screen.getByText('Anna loved the garden.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit message' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Done editing' })).toBeNull();
     expect(screen.getByText('Read it one last time and make any last changes.')).toBeTruthy();
   });
 
-  it('does not take focus on arrival', () => {
+  it('tapping the text or the label does not open an editor', () => {
     draw(editor());
-    expect(screen.getByLabelText('Obituary text').props.autoFocus).toBeFalsy();
+    fireEvent.press(screen.getByText('Anna loved the garden.'));
+    fireEvent.press(screen.getByText('Obituary text'));
+    expect(screen.UNSAFE_queryAllByType(TextInput).find((i) => i.props.accessibilityLabel === 'Obituary text')).toBeUndefined();
   });
 
-  it('shows the box when there is no text yet, with its placeholder', () => {
+  it('one tap on Edit opens a focused multiline box with the cursor at the end', () => {
+    draw(editor());
+    edit();
+    const box = screen.getByLabelText('Obituary text');
+    expect(box.props.multiline).toBe(true);
+    expect(box.props.autoFocus).toBe(true);
+    expect(box.props.selection).toEqual({ start: 22, end: 22 });
+    expect(box.props.value).toBe('Anna loved the garden.');
+    expect(screen.getByRole('button', { name: 'Done editing' })).toBeTruthy();
+  });
+
+  it('one tap on Done, or leaving the box, returns to reading and closes the keyboard', () => {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
+    draw(editor());
+    edit();
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Edit message' })).toBeTruthy();
+    edit();
+    fireEvent(screen.getByLabelText('Obituary text'), 'blur');
+    expect(screen.getByRole('button', { name: 'Edit message' })).toBeTruthy();
+    dismiss.mockRestore();
+  });
+
+  it('shows the placeholder as text when there is no text yet, and the box when editing', () => {
     draw(editor({ value: '' }));
+    expect(screen.getByText('Write the obituary here.')).toBeTruthy();
+    edit();
     expect(screen.getByLabelText('Obituary text').props.value).toBe('');
     expect(screen.getByPlaceholderText('Write the obituary here.')).toBeTruthy();
   });
 
-  it('passes typing to onValueChange and limits the length', () => {
+  it('passes typing to onValueChange, limits the length, and keeps the words across the toggle', () => {
     const e = editor({ maxLength: 10000 });
     draw(e);
+    edit();
     const box = screen.getByLabelText('Obituary text');
     expect(box.props.maxLength).toBe(10000);
     fireEvent.changeText(box, 'More');
     expect(e.onValueChange).toHaveBeenCalledWith('More');
   });
 
-  it('has no Edit, Write, Save or Cancel button', () => {
+  it('keeps the box size in both modes', () => {
+    draw(editor());
+    expect(StyleSheet.flatten(screen.getByLabelText('Obituary text').props.style)).toMatchObject({ minHeight: 200, fontSize: 16 });
+    edit();
+    expect(StyleSheet.flatten(screen.getByLabelText('Obituary text').props.style)).toMatchObject({ minHeight: 200, fontSize: 16 });
+  });
+
+  it('lets a scroll close the keyboard', () => {
+    draw(editor());
+    expect(screen.UNSAFE_getByType(ScrollView).props.keyboardDismissMode).toBe('on-drag');
+  });
+
+  it('has no Write, Save or Cancel button', () => {
     draw(editor());
     for (const name of ['Edit the text', 'Write the text', 'Save the text', 'Save', 'Cancel']) {
       expect(screen.queryByRole('button', { name })).toBeNull();
@@ -243,15 +292,22 @@ describe('ShareObituary text box (#823)', () => {
     draw(editor());
     expect(screen.getByLabelText('Obituary text').props['aria-describedby']).toBeTruthy();
     screen.unmount();
-    render(<ShareObituary copy={{ ...copy, ...editorCopy, textCaption: undefined }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={editor()} />);
+    draw(editor(), { textCaption: undefined });
     expect(screen.getByLabelText('Obituary text').props['aria-describedby']).toBeUndefined();
   });
 
-  it('tapping the visible label focuses the box', () => {
+  it('tapping the visible label while editing focuses the box', () => {
     draw(editor());
+    edit();
     const focus = jest.fn();
     (screen.UNSAFE_getAllByType(TextInput).find((input) => input.props.accessibilityLabel === 'Obituary text')?.instance as unknown as { focus: () => void }).focus = focus;
     fireEvent.press(screen.getByText('Obituary text'));
     expect(focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays an always-editable box when the toggle words are missing', () => {
+    draw(editor(), { messageEdit: undefined });
+    expect(screen.getByLabelText('Obituary text').props.multiline).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Edit message' })).toBeNull();
   });
 });
