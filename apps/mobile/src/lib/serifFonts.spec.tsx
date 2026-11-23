@@ -1,17 +1,30 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { render, screen } from '@testing-library/react-native';
-import { fonts } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { App } from '../app/App';
 
 // Fonts never finish loading in these tests: the app must not wait for them.
 const mockUseFonts = jest.fn<(map: Record<string, unknown>) => [boolean, Error | null]>(() => [false, null]);
 jest.mock('expo-font', () => ({ useFonts: (map: Record<string, unknown>) => mockUseFonts(map) }));
 
+import { Sora_300Light } from '@expo-google-fonts/sora/300Light';
+import { Sora_400Regular } from '@expo-google-fonts/sora/400Regular';
+import { Sora_500Medium } from '@expo-google-fonts/sora/500Medium';
+import { soraFamilies } from '../ui/typography';
 import { serifFontFiles } from './serifFonts';
 
 describe('serif fonts', () => {
-  it('registers regular and semibold, with italics, under the names in @griever/tokens', () => {
-    expect(Object.keys(serifFontFiles).sort()).toEqual([fonts.serifRegular, fonts.serifSemiBold, fonts.serifItalic, fonts.serifSemiBoldItalic].sort());
+  it('registers Sora 300, 400 and 500 only, for the family in @griever/tokens', () => {
+    expect(v2.primitives.font.family).toBe('Sora');
+    expect(v2.primitives.font.weights).toEqual({ light: 300, regular: 400, medium: 500 });
+    expect(Object.keys(serifFontFiles).sort()).toEqual([soraFamilies.light, soraFamilies.regular, soraFamilies.medium].sort());
+    expect(Object.keys(serifFontFiles).every((name) => name.startsWith('Sora_'))).toBe(true);
+  });
+
+  it('maps each family name to its own weight file', () => {
+    expect(serifFontFiles[soraFamilies.light]).toBe(Sora_300Light);
+    expect(serifFontFiles[soraFamilies.regular]).toBe(Sora_400Regular);
+    expect(serifFontFiles[soraFamilies.medium]).toBe(Sora_500Medium);
   });
 
   it('bundles a font file for each name', () => {

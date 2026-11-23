@@ -324,12 +324,12 @@ const Gap = () => <View style={styles.gap} />;
 
 const styles = StyleSheet.create({
   gap: { height: spacing[2] },
-  flex: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
   content: { padding: spacing[3], paddingTop: spacing[4] },
   review: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
-  sticky: { gap: spacing[1], padding: spacing[3], borderTopWidth: 1, borderTopColor: colors['neutral-300'], backgroundColor: colors.bg },
+  sticky: { gap: spacing[1], padding: spacing[3], borderTopWidth: 1, borderTopColor: colors['neutral-300'] },
   footerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: spacing[2], paddingTop: spacing[1] },
   countBox: { flexShrink: 1 },
 });

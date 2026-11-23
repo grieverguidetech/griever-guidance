@@ -582,15 +582,15 @@ describe('HubScreen', () => {
     expect(screen.UNSAFE_getAllByType(Modal).every((m) => !m.props.visible)).toBe(true);
   });
 
-  it('draws the heading in Source Serif once the app has loaded the font (the provider App.tsx supplies)', () => {
+  it('draws the heading in Sora once the app has loaded the font (the provider App.tsx supplies)', () => {
     render(
       <SerifReadyContext.Provider value>
         <HubScreen session={anna} others={[]} onSwitch={jest.fn()} onStart={jest.fn()} onSetItem={jest.fn()} onEditPerson={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
     const heading = screen.getByRole('heading', { name: 'Ready to send' });
-    expect(StyleSheet.flatten(heading.props.style).fontFamily).toBe('SourceSerif4_600SemiBold');
-    expect(StyleSheet.flatten(screen.getByText("Send when you're ready.").props.style).fontFamily).toBe('SourceSerif4_400Regular');
+    expect(StyleSheet.flatten(heading.props.style).fontFamily).toBe('Sora_300Light');
+    expect(StyleSheet.flatten(screen.getByText("Send when you're ready.").props.style).fontFamily).toBe('Sora_400Regular');
   });
 
   it('keeps the system font until the serif is ready', () => {

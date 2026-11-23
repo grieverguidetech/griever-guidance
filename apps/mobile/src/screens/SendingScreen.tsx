@@ -4,7 +4,6 @@ import { AccessibilityInfo, AppState, findNodeHandle, KeyboardAvoidingView, Link
 import { fill, screenCopy } from '@griever/copy';
 import { buildSmsLink } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
-import { colors } from '@griever/tokens';
 import { Sending } from '../ui';
 import type { FlowProps } from '../app/App';
 
@@ -219,5 +218,5 @@ export function SendingScreen({ flow, contacts }: Props) {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: colors.bg },
+  page: { flex: 1 },
 });

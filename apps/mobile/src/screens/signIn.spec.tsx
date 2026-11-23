@@ -359,7 +359,7 @@ describe('sign in', () => {
     expect(StyleSheet.flatten(alert.props.style).color).toBe('#b91c1c');
     // No polite live region around or inside the alert.
     expect(screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'polite' })).toHaveLength(0);
-    expect(StyleSheet.flatten(screen.getByRole('heading', { name: 'Sign in' }).props.style).fontFamily).toBe('SourceSerif4_600SemiBold');
+    expect(StyleSheet.flatten(screen.getByRole('heading', { name: 'Sign in' }).props.style).fontFamily).toBe('Sora_300Light');
   });
 
   it('has no exclamation marks and touch targets of at least 44', () => {
