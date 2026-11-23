@@ -2,21 +2,14 @@ import { useFonts } from 'expo-font';
 import { Sora_300Light } from '@expo-google-fonts/sora/300Light';
 import { Sora_400Regular } from '@expo-google-fonts/sora/400Regular';
 import { Sora_500Medium } from '@expo-google-fonts/sora/500Medium';
+import { soraFamilies } from '../ui/typography';
 
 /**
- * The native family names for Sora, one per weight. These are platform names (the same as the
- * names expo-font registers), so they live here and not in @griever/tokens. The tokens hold the
- * family ("Sora") and the weights (300, 400, 500) that pick between them.
- * Sora has no italic: italic text shows upright Sora.
+ * Sora, registered under the native family names in ../ui/typography. Sora has no italic: italic
+ * text shows upright Sora.
  * The font files ship inside the app binary (no network at launch, C5), under the SIL Open Font
  * License 1.1; the licence text is committed at apps/mobile/assets/fonts/Sora-OFL.txt.
  */
-export const soraFamilies = {
-  light: 'Sora_300Light',
-  regular: 'Sora_400Regular',
-  medium: 'Sora_500Medium',
-} as const;
-
 export const serifFontFiles = {
   [soraFamilies.light]: Sora_300Light,
   [soraFamilies.regular]: Sora_400Regular,

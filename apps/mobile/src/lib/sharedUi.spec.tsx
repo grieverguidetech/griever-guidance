@@ -47,6 +47,13 @@ describe('mobile UI on native', () => {
   });
 });
 
+describe('Heading weight on native', () => {
+  it.each([[2], [3]] as const)('level %i uses Sora 400, only level 1 is Sora 300', (level) => {
+    render(<Heading level={level}>Title</Heading>);
+    expect(StyleSheet.flatten(screen.getByRole('heading').props.style).fontFamily).toBe('Sora_400Regular');
+  });
+});
+
 describe('Eyebrow on native', () => {
   it('is 11px, uppercase, 0.08em tracking, in the eyebrow role colour', () => {
     render(<Eyebrow>For Margaret</Eyebrow>);

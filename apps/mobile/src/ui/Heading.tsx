@@ -24,7 +24,8 @@ function headingProps(level: HeadingLevel): Record<string, unknown> {
 }
 
 export function Heading({ level, children, headingRef }: HeadingProps) {
-  const font = useSerifStyle('light');
+  // Thin 300 is hard to read below the top heading's 22px, so lower levels use 400.
+  const font = useSerifStyle(level === 1 ? 'light' : 'regular');
   return (
     <Text ref={headingRef} style={[styles.base, font, { fontSize: sizeByLevel[level] }]} {...headingProps(level)}>
       {children}

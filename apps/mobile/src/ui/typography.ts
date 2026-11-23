@@ -1,7 +1,17 @@
 import { createContext, useContext } from 'react';
 import { Platform } from 'react-native';
 import { v2 } from '@griever/tokens';
-import { soraFamilies } from '../lib/serifFonts';
+
+/**
+ * The native family names for Sora, one per weight. These are platform names (the names expo-font
+ * registers in lib/serifFonts), so they live here and not in @griever/tokens, which holds the
+ * family ("Sora") and the weights. Kept free of font imports so the ui layer stays light.
+ */
+export const soraFamilies = {
+  light: 'Sora_300Light',
+  regular: 'Sora_400Regular',
+  medium: 'Sora_500Medium',
+} as const;
 
 export type FontWeightName = 'light' | 'regular' | 'semibold';
 
