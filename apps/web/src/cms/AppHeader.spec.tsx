@@ -55,7 +55,7 @@ describe('AppHeader layout', () => {
     renderApp(<AppHeader />);
     const cls = screen.getByRole('banner').className;
     expect(cls).toContain('border-b');
-    expect(cls).toContain('border-[color:var(--color-divider)]');
+    expect(cls).toContain('border-[color:var(--color-v2-divider)]');
     expect(cls).toContain('py-3');
     expect(cls).toContain('mb-6');
   });

@@ -142,13 +142,13 @@ describe('top buttons (#176)', () => {
     }
   });
 
-  it('ghost buttons are underlined, with accent-700 text at rest and hover and accent-800 when active', () => {
+  it('ghost buttons are underlined, with link-colour text at rest and hover and heading-colour text when active', () => {
     expect(css).toMatch(/\.gg-btn-ghost\s*{[^}]*text-decoration:\s*underline/);
-    expect(css).toMatch(/\.gg-btn-ghost\s*{[^}]*color:\s*var\(--color-accent-700\)/);
-    expect(css).toMatch(/\.gg-btn-ghost:not\(:disabled\):active\s*{[^}]*color:\s*var\(--color-accent-800\)/);
+    expect(css).toMatch(/\.gg-btn-ghost\s*{[^}]*color:\s*var\(--color-v2-link\)/);
+    expect(css).toMatch(/\.gg-btn-ghost:not\(:disabled\):active\s*{[^}]*color:\s*var\(--color-v2-heading\)/);
     expect(css.match(/\.gg-btn-ghost:not\(:disabled\):hover\s*{/g)).toHaveLength(1);
     expect(css).toMatch(/\.gg-btn-ghost\.gg-btn-ghost-plain[^{]*{[^}]*text-decoration:\s*none/);
-    expect(css).toMatch(/\.gg-check-box\s*{[^}]*border:\s*2px solid var\(--color-neutral-700\)/);
+    expect(css).toMatch(/\.gg-check-box\s*{[^}]*border:\s*2px solid var\(--color-v2-muted\)/);
   });
 
   it('the link button has no padding and reaches a 44px target without it', () => {
@@ -165,7 +165,7 @@ describe('top buttons (#176)', () => {
     expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*{[^}]*border:\s*1px solid/);
   });
 
-  it('the top-bar border is accent-600, the same outline as the mobile header button', () => {
-    expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*border-color:\s*var\(--color-accent-600\)/);
+  it('the top-bar border is the link colour, the same outline as the mobile header button', () => {
+    expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*border-color:\s*var\(--color-v2-link\)/);
   });
 });

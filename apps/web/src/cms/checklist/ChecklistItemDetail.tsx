@@ -54,7 +54,7 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
             <section
               key={part.heading}
               className={`flex flex-col gap-2 py-4 first:pt-0 last:pb-0${
-                index > 0 ? ' border-t border-[var(--color-divider)]' : ''
+                index > 0 ? ' border-t border-[var(--color-v2-divider)]' : ''
               }`}
             >
               <h2 className="text-lg font-semibold">{part.heading}</h2>

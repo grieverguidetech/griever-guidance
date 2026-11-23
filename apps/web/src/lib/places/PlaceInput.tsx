@@ -302,7 +302,7 @@ export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage
             aria-label={copy.placesListLabel}
             hidden={!listVisible}
             aria-busy={searching || picking}
-            className="absolute left-0 right-0 z-10 m-0 mt-1 max-h-72 list-none overflow-auto rounded-md border border-neutral-600 bg-bg p-0"
+            className="absolute left-0 right-0 z-10 m-0 mt-1 max-h-72 list-none overflow-auto rounded-md border border-v2-field-edge bg-v2-page p-0"
           >
             {searching && (
               <li role="option" aria-disabled="true" aria-selected={false} className="gg-hint flex min-h-[44px] items-center px-3 py-2">
@@ -322,7 +322,7 @@ export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage
                   id={optionId(i)}
                   role="option"
                   aria-selected={i === active}
-                  className={`flex min-h-[44px] cursor-pointer flex-col justify-center px-3 py-2 hover:bg-surface ${i === active ? 'bg-surface outline outline-2 -outline-offset-2 outline-accent-700' : ''}`}
+                  className={`flex min-h-[44px] cursor-pointer flex-col justify-center px-3 py-2 hover:bg-v2-field-fill ${i === active ? 'bg-v2-field-fill outline outline-2 -outline-offset-2 outline-v2-link' : ''}`}
                   // Keeps focus in the input, so choosing never fires a blur first.
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => void choose(o)}

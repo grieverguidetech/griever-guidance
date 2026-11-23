@@ -27,7 +27,7 @@ describe('Overview', () => {
     const { onOpen } = setup();
     const card = screen.getByRole('button', { name: 'The person Not started Start with their name Continue' });
     expect(card).toHaveClass('gg-panel');
-    expect(card.className).toContain('--color-accent-700');
+    expect(card.className).toContain('--color-v2-link');
     await userEvent.click(card);
     expect(onOpen).toHaveBeenCalledWith('person');
   });
@@ -219,7 +219,7 @@ describe('Overview', () => {
     const icons = container.querySelectorAll('svg');
     expect(icons).toHaveLength(1);
     expect(icons[0]).toHaveAttribute('aria-hidden', 'true');
-    expect(icons[0]).toHaveClass('text-[color:var(--color-success-700)]');
+    expect(icons[0]).toHaveClass('text-[color:var(--color-v2-success)]');
     expect(screen.getByText('Ready')).toBeInTheDocument();
   });
 

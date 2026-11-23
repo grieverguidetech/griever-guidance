@@ -242,8 +242,8 @@ describe('PlaceInput', () => {
   it('draws the spinner ring light under the accent arc', () => {
     const css = readFileSync(join(import.meta.dirname, '../../styles.css'), 'utf8');
     const block = /\.gg-spinner \{[^}]*\}/.exec(css)?.[0] ?? '';
-    expect(block).toContain('border: 2px solid var(--color-neutral-300)');
-    expect(block).toContain('border-top-color: var(--color-accent-700)');
+    expect(block).toContain('border: 2px solid var(--color-v2-divider)');
+    expect(block).toContain('border-top-color: var(--color-v2-link)');
   });
 
   it('the spinner only spins when motion is allowed', () => {

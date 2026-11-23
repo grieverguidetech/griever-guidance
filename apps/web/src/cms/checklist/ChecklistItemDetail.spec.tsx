@@ -115,6 +115,6 @@ describe('ChecklistItemDetail', () => {
     headings.forEach((h) => expect(h.closest('.gg-panel')).toBe(panel));
     const sections = headings.map((h) => h.closest('section') as HTMLElement);
     expect(sections[0].className).not.toContain('border-t');
-    sections.slice(1).forEach((s) => expect(s.className).toContain('border-[var(--color-divider)]'));
+    sections.slice(1).forEach((s) => expect(s.className).toContain('border-[var(--color-v2-divider)]'));
   });
 });

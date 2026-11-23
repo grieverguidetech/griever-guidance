@@ -65,7 +65,7 @@ export function Eyebrow({ name, accent2 = false }: { name: string; accent2?: boo
       className="m-0 text-[11px] uppercase"
       style={{
         letterSpacing: '0.1em',
-        color: accent2 ? 'var(--color-accent-2-700)' : 'var(--color-accent-700)',
+        color: accent2 ? 'var(--color-v2-heading)' : 'var(--color-v2-link)',
       }}
     >
       For {name}

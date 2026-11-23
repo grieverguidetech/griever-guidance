@@ -121,12 +121,12 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
           rows={12}
         />
         {error && (
-          <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-2-700)' }}>
+          <p role="alert" className="text-[13px] m-0" style={{ color: 'var(--color-v2-error)' }}>
             {error}
           </p>
         )}
         {handOff && (
-          <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-700)' }}>
+          <p className="text-[13px] m-0" style={{ color: 'var(--color-v2-link)' }}>
             {handOff === 'copied' ? 'Copied.' : 'Shared.'} Once it has been published, come back and add the
             link so you can send it to people.
           </p>
@@ -205,7 +205,7 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
       </div>
 
       {error && (
-        <p className="text-[13px] m-0" style={{ color: 'var(--color-accent-2-700)' }}>
+        <p role="alert" className="text-[13px] m-0" style={{ color: 'var(--color-v2-error)' }}>
           {error}
         </p>
       )}

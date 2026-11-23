@@ -47,10 +47,10 @@ interface Props {
 
 const CARD =
   'gg-panel w-full min-h-[44px] flex flex-col gap-1 text-left font-[inherit] text-[color:inherit] border-0 cursor-pointer ' +
-  'hover:[background:color-mix(in_srgb,var(--color-text)_7%,var(--color-surface))] ' +
-  'active:[background:color-mix(in_srgb,var(--color-text)_14%,var(--color-surface))]';
-/** The next card: a 3px accent-700 bar down the left edge, drawn inside so nothing shifts. */
-const NEXT_BAR = ' shadow-[inset_3px_0_0_var(--color-accent-700)]';
+  'hover:[background:color-mix(in_srgb,var(--color-text)_7%,var(--color-v2-field-fill))] ' +
+  'active:[background:color-mix(in_srgb,var(--color-text)_14%,var(--color-v2-field-fill))]';
+/** The next card: a 3px link-colour bar down the left edge, drawn inside so nothing shifts. */
+const NEXT_BAR = ' shadow-[inset_3px_0_0_var(--color-v2-link)]';
 
 /** "May 29, 2026" when the date is complete; otherwise whatever was typed. */
 function dateLabel(value: string, years?: { minYear: number; maxYear: number }): string {
@@ -136,7 +136,7 @@ function CheckIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="shrink-0 text-[color:var(--color-success-700)]"
+      className="shrink-0 text-[color:var(--color-v2-success)]"
     >
       <path d="M3 8.5l3.2 3.2L13 4.8" />
     </svg>
@@ -190,7 +190,7 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
                   {key === nextSection ? (
                     <>
                       {' '}
-                      <span className="text-[14px] font-semibold text-[color:var(--color-accent-700)]">
+                      <span className="text-[14px] font-semibold text-[color:var(--color-v2-link)]">
                         {shell.continue}
                       </span>
                     </>

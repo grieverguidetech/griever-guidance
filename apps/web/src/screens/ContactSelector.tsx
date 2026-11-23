@@ -80,9 +80,9 @@ export function ContactRow({
         <span className="gg-card-meta">{formatPhone(contact.phone)}</span>
       </span>
       {selected ? (
-        <CheckCircle size={20} weight="fill" style={{ color: 'var(--color-accent)' }} />
+        <CheckCircle size={20} weight="fill" style={{ color: 'var(--color-v2-focus)' }} />
       ) : (
-        <Circle size={20} weight="regular" style={{ color: 'var(--color-neutral-700)' }} />
+        <Circle size={20} weight="regular" style={{ color: 'var(--color-v2-muted)' }} />
       )}
     </button>
   );

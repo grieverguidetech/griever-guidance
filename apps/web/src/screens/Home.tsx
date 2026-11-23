@@ -48,8 +48,8 @@ export function Home({ sessions, onOpen, onCreate, canCreate, checklistLink }: P
                   className="gg-card flex-row items-center justify-between gap-3 w-full text-left"
                   style={{
                     minHeight: 44,
-                    // Opaque ink/bg mix: 3.16:1 against the page background.
-                    border: '1px solid color-mix(in srgb, var(--color-ink) 50%, var(--color-bg))',
+                    // Opaque ink/page mix: 3.63:1 on the sky glow, 3.88:1 on the sun glow (3:1 needed, WCAG 1.4.11).
+                    border: '1px solid color-mix(in srgb, var(--color-text) 60%, var(--color-v2-page))',
                   }}
                 >
                   <span className="flex flex-col min-w-0 break-words">

@@ -59,13 +59,13 @@ export function WhoHearsFirst({ contacts, onBack, onSave, initialFirstIds, onTic
                 checked={checked}
                 onChange={() => toggle(contact.contactId)}
               />
-              <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)]">
+              <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-v2-focus)]">
                 {checked ? (
                   <CheckCircle
                     aria-hidden="true"
                     size={20}
                     weight="fill"
-                    style={{ color: 'var(--color-accent)' }}
+                    style={{ color: 'var(--color-v2-focus)' }}
                   />
                 ) : (
                   <Circle
@@ -89,7 +89,7 @@ export function WhoHearsFirst({ contacts, onBack, onSave, initialFirstIds, onTic
         })}
       </div>
 
-      <div className="gg-card" style={{ background: 'var(--color-accent-100)' }}>
+      <div className="gg-card" style={{ background: 'var(--color-v2-wash)' }}>
         <p className="gg-card-body m-0" style={{ opacity: 1, fontSize: 13, lineHeight: 1.6 }}>
           Everyone you didn't tick is filed under <strong>Friends &amp; family</strong>. That's the
           only sorting this app needs.

@@ -53,7 +53,7 @@ export function WideningCircle({ flow, contacts, notifiedContactIds }: Props) {
         </p>
       </div>
 
-      <div className="gg-card" style={{ background: 'var(--color-accent-100)' }}>
+      <div className="gg-card" style={{ background: 'var(--color-v2-wash)' }}>
         <p className="gg-card-body m-0" style={{ opacity: 1, fontSize: 13, lineHeight: 1.6 }}>
           Close family heard from you personally
           {flow.session?.dateOfPassing ? ` on ${flow.session.dateOfPassing}` : ''}. Nobody will

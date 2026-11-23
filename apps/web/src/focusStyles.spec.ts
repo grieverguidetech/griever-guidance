@@ -31,6 +31,14 @@ function token(name: string): string {
   return match[1];
 }
 
+/** A `--color-<name>: rgba(r,g,b,a)` token as an opaque hex and its alpha. */
+function rgbaToken(name: string): { hex: string; alpha: number } {
+  const match = THEME.match(new RegExp(`--color-${name}:\\s*rgba\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*([\\d.]+)\\)`));
+  if (!match) throw new Error(`rgba token --color-${name} not found in theme.generated.css`);
+  const hex = '#' + [match[1], match[2], match[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('');
+  return { hex, alpha: Number(match[4]) };
+}
+
 /** WCAG 2.x relative luminance and contrast ratio. */
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -63,7 +71,7 @@ function rule(selector: string): string {
   return match[1];
 }
 
-/** The colour token a declaration uses, e.g. `accent-700` from `var(--color-accent-700)`. */
+/** The colour token a declaration uses, e.g. `v2-link` from `var(--color-v2-link)`. */
 function colourIn(declarations: string, property: string): string {
   const match = declarations.match(new RegExp(`${property}:[^;]*var\\(--color-([a-z0-9-]+)\\)`));
   if (!match) throw new Error(`${property} has no colour token in: ${declarations}`);
@@ -90,9 +98,9 @@ describe('visible focus (#162)', () => {
   });
 
   const backgrounds = {
-    page: token('bg'),
-    surface: token('surface'),
-    'accent-100': token('accent-100'),
+    page: token('v2-page'),
+    surface: token('v2-field-fill'),
+    wash: token('v2-wash'),
   };
 
   it('every script-focused target gets a bar that clears 3:1 on every background', () => {
@@ -108,7 +116,7 @@ describe('visible focus (#162)', () => {
     expect(declarations).toMatch(/outline:\s*2px solid transparent/);
     expect(declarations).toMatch(/box-shadow:\s*var\(--v2-nudge-shadow\)/);
     expect(declarations).not.toMatch(/--shadow-md/);
-    expect(declarations).not.toMatch(/accent-700/);
+    expect(declarations).not.toMatch(/v2-link/);
   });
 
   it('the phone nudge rule comes after the generic tabindex rule, since source order decides (#803)', () => {
@@ -123,8 +131,9 @@ describe('visible focus (#162)', () => {
     expect(declarations).not.toMatch(/outline:\s*none/);
     const ring = token(colourIn(declarations, 'outline'));
     expect(colourIn(declarations, 'border-color')).toBe(colourIn(declarations, 'outline'));
-    // The unfocused border is --color-divider: ink at 16% over the field surface.
-    const unfocusedBorder = over(token('ink'), 0.16, backgrounds.surface);
+    // The unfocused border is --color-v2-divider (ink at 16%) over the field surface.
+    const divider = rgbaToken('v2-divider');
+    const unfocusedBorder = over(divider.hex, divider.alpha, backgrounds.surface);
     for (const [name, bg] of Object.entries({ ...backgrounds, 'unfocused border': unfocusedBorder })) {
       expect({ name, ratio: contrast(ring, bg) >= 3 }).toEqual({ name, ratio: true });
     }
@@ -149,7 +158,7 @@ describe('visible focus (#162)', () => {
     const glassFill = THEME.match(/--color-v2-card-fill:\s*rgba\(\s*255,\s*255,\s*255,\s*([\d.]+)\s*\)/);
     const glassAlpha = Number(glassFill?.[1]);
     const glassOver = (ground: string) => over('#ffffff', glassAlpha, ground);
-    const ink = token('ink');
+    const ink = token('text');
     // The row and chip fill under the pointer: 7% (hover) or 14% (active) of the text colour, over glass.
     const washes = [0.07, 0.14];
     const datebox = CSS.match(/\.gg-datebox-trigger:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
@@ -161,11 +170,11 @@ describe('visible focus (#162)', () => {
     });
 
     it('keeps the deliberate exceptions on their own colours', () => {
-      expect(rule('.gg-input:focus-visible')).toContain('var(--color-accent-700)');
-      expect(rule('[data-gg-field]:focus-visible')).toContain('var(--color-accent-700)');
-      expect(rule('.gg-card-selected:focus-visible')).toContain('var(--color-accent-700)');
+      expect(rule('.gg-input:focus-visible')).toContain('var(--color-v2-link)');
+      expect(rule('[data-gg-field]:focus-visible')).toContain('var(--color-v2-link)');
+      expect(rule('.gg-card-selected:focus-visible')).toContain('var(--color-v2-link)');
       expect(CSS).toContain('.gg-btn-primary:focus-visible');
-      expect(CSS).toMatch(/\[data-gg-btn='secondary'\]:focus-visible \{ outline-color: var\(--color-accent-700\); \}/);
+      expect(CSS).toMatch(/\[data-gg-btn='secondary'\]:focus-visible \{ outline-color: var\(--color-v2-link\); \}/);
       expect(rule('.gg-phone-nudge:focus,\n.gg-phone-nudge:focus-visible')).toContain('outline: 2px solid transparent');
     });
 
@@ -179,7 +188,7 @@ describe('visible focus (#162)', () => {
 
     it('clears 3:1 on the field fill and on the datebox hover wash (12% accent) over it', () => {
       const field = token('v2-field-fill');
-      const hover = over(token('accent'), 0.12, field);
+      const hover = over(token('v2-focus'), 0.12, field);
       expect(contrast(focus, field)).toBeGreaterThanOrEqual(3);
       expect(contrast(focus, hover)).toBeGreaterThanOrEqual(3);
     });
@@ -190,7 +199,7 @@ describe('visible focus (#162)', () => {
       const active = CSS.match(/\.gg-seg-opt-active:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
       expect(inset).toMatch(/outline-offset:\s*-\d+px/);
       expect(active).toContain('outline-color: var(--color-v2-page)');
-      expect(contrast(token('v2-page'), token('accent-700'))).toBeGreaterThanOrEqual(3);
+      expect(contrast(token('v2-page'), token('v2-link'))).toBeGreaterThanOrEqual(3);
       expect(contrast(focus, token('v2-page'))).toBeGreaterThanOrEqual(3);
     });
 
@@ -202,7 +211,7 @@ describe('visible focus (#162)', () => {
 
   it('computes contrast the WCAG way', () => {
     expect(contrast('#000000', '#ffffff')).toBeCloseTo(21, 5);
-    // Matches the measured value noted in styles.css for the base accent on the page.
-    expect(contrast(token('accent'), token('bg'))).toBeCloseTo(3.65, 2);
+    // The focus colour on the page, the value noted in styles.css.
+    expect(contrast(token('v2-focus'), token('v2-page'))).toBeCloseTo(5.97, 2);
   });
 });

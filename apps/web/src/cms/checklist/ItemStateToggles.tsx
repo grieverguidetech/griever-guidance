@@ -8,7 +8,7 @@ const copy = screenCopy('cmsChecklist');
 
 // Pressed = tinted fill, darker double border and a check, so colour is never the only cue.
 const PRESSED =
-  'gg-btn gg-btn-secondary aria-pressed:border-accent-700 aria-pressed:bg-accent-100 aria-pressed:shadow-[inset_0_0_0_1px_var(--color-accent-700)]';
+  'gg-btn gg-btn-secondary aria-pressed:border-v2-link aria-pressed:bg-v2-wash aria-pressed:shadow-[inset_0_0_0_1px_var(--color-v2-link)]';
 
 interface Props {
   state: ChecklistItemState | null;

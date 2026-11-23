@@ -7,7 +7,7 @@ import { PRODUCT_NAME } from '@griever/shared';
  */
 export function AppHeader() {
   return (
-    <header className="flex items-center min-h-11 py-3 mb-6 border-b border-[color:var(--color-divider)]">
+    <header className="flex items-center min-h-11 py-3 mb-6 border-b border-[color:var(--color-v2-divider)]">
       <span className="flex items-start gap-2 min-w-0">
         <svg viewBox="0 0 64 64" width={24} height={24} aria-hidden="true" focusable="false" className="h-6 w-6 shrink-0">
           <path d="M12 40a20 20 0 0 1 40 0z" style={{ fill: 'var(--color-v2-link)' }} />
