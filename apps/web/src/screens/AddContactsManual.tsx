@@ -87,7 +87,7 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone, draft, onDr
           }}
         />
         {error && (
-          <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+          <p className="text-[12px] m-0" style={{ color: 'var(--color-v2-error)' }}>
             {error}
           </p>
         )}

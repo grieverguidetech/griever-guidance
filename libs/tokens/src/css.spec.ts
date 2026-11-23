@@ -44,6 +44,13 @@ describe('toWebThemeCss', () => {
     expect(names[Object.keys(spacing).length]).toMatch(/^--v2-/);
   });
 
+  it('puts --space-* in :root only, never in @theme', () => {
+    expect(Object.keys(declarations(css, ':root {')).filter((n) => n.startsWith('--space-'))).toHaveLength(
+      Object.keys(spacing).length,
+    );
+    expect(Object.keys(declarations(css, '@theme {')).filter((n) => n.startsWith('--space-'))).toEqual([]);
+  });
+
   it('holds no v1 var: no --radius-*, --font-serif or v1 colour', () => {
     expect(css).not.toMatch(/--radius-|--font-serif/);
     expect(css).not.toMatch(/--color-(accent|neutral|success|surface|bg|white|ink)/);

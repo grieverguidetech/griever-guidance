@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Specs name classes and vars as plain test strings; Tailwind must not turn them into CSS. */
+@source not "./**/*.spec.{ts,tsx}";
 /* Sora (300, 400, 500) is loaded via <link> in index.html (keeps @import rules from
    tripping over Tailwind's injected layers). */
 

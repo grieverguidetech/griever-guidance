@@ -260,7 +260,7 @@ export function PeopleHelping({
                 <p
                   id={`${id}-error`}
                   className="m-0 text-[13px]"
-                  style={{ color: 'var(--color-danger, #b91c1c)' }}
+                  style={{ color: 'var(--color-v2-error)' }}
                 >
                   {EMAIL_INVALID}
                 </p>

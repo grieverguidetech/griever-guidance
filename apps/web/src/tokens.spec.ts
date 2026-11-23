@@ -67,20 +67,45 @@ describe('tokens match the web theme', () => {
 });
 
 /** Tailwind's own `rounded-*` steps read its default radius vars, not our tokens (#1010). Web uses `--v2-radius`. */
-const TAILWIND_ROUNDED = /\brounded(-[a-z]{1,2})?-(sm|md|lg|xl|2xl|3xl)\b/;
+const TAILWIND_ROUNDED =
+  /(?<![\w-])rounded(-(s|e|t|r|b|l|ss|se|ee|es|tl|tr|br|bl))?(-(xs|sm|md|lg|xl|2xl|3xl|4xl))?(?![\w[-])/;
 
-describe('no Tailwind default radius or serif in web source (#1010)', () => {
-  it('flags a stock rounded step, with or without a side', () => {
-    // Built from parts so Tailwind does not scan these strings and emit the default radius vars.
-    expect(TAILWIND_ROUNDED.test(dash('rounded', 'md'))).toBe(true);
-    expect(TAILWIND_ROUNDED.test(`flex ${dash('rounded', 'xl')} p-2`)).toBe(true);
-    expect(TAILWIND_ROUNDED.test(dash('rounded', 't', 'lg'))).toBe(true);
+// styles.css has `@source not` for specs, so these strings can be written plainly.
+describe('no Tailwind default radius in web source (#1010)', () => {
+  it('flags a stock rounded step, a bare rounded and a side form', () => {
+    for (const cls of [
+      'rounded',
+      'rounded-xs',
+      'rounded-md',
+      'rounded-4xl',
+      'rounded-t',
+      'rounded-t-lg',
+      'rounded-tl-xl',
+      'rounded-ss',
+      'flex rounded-md p-2',
+      'hover:rounded-lg',
+      'className="rounded"',
+    ]) {
+      expect(TAILWIND_ROUNDED.test(cls), cls).toBe(true);
+    }
   });
 
-  it('accepts the token corner and a literal corner', () => {
-    expect(TAILWIND_ROUNDED.test('rounded-[var(--v2-radius)]')).toBe(false);
-    expect(TAILWIND_ROUNDED.test('rounded-[2px]')).toBe(false);
-    expect(TAILWIND_ROUNDED.test('rounded-full')).toBe(false);
+  it('accepts the token corner, a literal corner, full and none', () => {
+    for (const cls of [
+      'rounded-[var(--v2-radius)]',
+      'rounded-[2px]',
+      'rounded-t-[2px]',
+      'rounded-full',
+      'rounded-none',
+      'rounded-t-none',
+      'gg-rounded-md',
+    ]) {
+      expect(TAILWIND_ROUNDED.test(cls), cls).toBe(false);
+    }
+  });
+
+  it('styles.css keeps specs out of the Tailwind scan', () => {
+    expect(read('styles.css')).toContain('@source not "./**/*.spec.{ts,tsx}";');
   });
 
   it('finds none in apps/web/src, outside this guard', () => {

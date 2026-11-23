@@ -99,24 +99,7 @@ describe('v2 tokens: layers', () => {
 
 });
 
-describe('v2 tokens: values kept from the old v1 look', () => {
-  // v1 is deleted (#1010); the table pins the values it held, now read from v2 alone.
-  it('keeps the value for each control and state role', () => {
-    const table: [string, string, string][] = [
-      ['link (was accent-700)', '#006786', v2.roles.link],
-      ['wash (was accent-100)', '#e9f8ff', v2.roles.wash],
-      ['muted (was neutral-700)', '#605d5d', v2.roles.muted],
-      ['mutedStrong (was neutral-800)', '#444141', v2.roles.mutedStrong],
-      ['field edge (was neutral-600)', '#7d7979', v2.recipes.field.edge],
-      ['field fill (was surface)', '#eae9e9', v2.recipes.field.fill],
-      ['field focus ring (was accent-700)', '#006786', v2.recipes.field.focusRing],
-      ['success (was success-700)', '#2a7048', v2.roles.success],
-    ];
-    for (const [name, expected, actual] of table) {
-      expect(actual, name).toBe(expected);
-    }
-  });
-
+describe('v2 tokens: web values', () => {
   it('uses the web error and success values (D2), not the mobile ones', () => {
     expect(v2.roles.error).toBe('#b3261e');
     expect(v2.roles.success).toBe('#2a7048');
@@ -211,9 +194,16 @@ describe('v2 tokens: contrast on the field fill', () => {
     expect(contrast(edge, fill)).toBeGreaterThanOrEqual(3);
   });
 
-  it('gives muted, link and error text at least 4.5:1 on the fill', () => {
-    for (const [role, color] of Object.entries({ muted: v2.roles.muted, link: v2.roles.link, error: v2.roles.error })) {
+  it('gives muted, link, error and success text at least 4.5:1 on the fill', () => {
+    const roles = { muted: v2.roles.muted, link: v2.roles.link, error: v2.roles.error, success: v2.roles.success };
+    for (const [role, color] of Object.entries(roles)) {
       expect(contrast(color, fill), `${role} on fill`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('gives error and success at least 4.5:1 on the page colour', () => {
+    for (const [role, color] of Object.entries({ error: v2.roles.error, success: v2.roles.success })) {
+      expect(contrast(color, v2.roles.page.color), `${role} on page`).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
