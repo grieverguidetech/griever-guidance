@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 import { minTouchTarget, v2 } from '@griever/tokens';
 import { Button } from './Button';
+import { serifFamily, serifWeight } from './typography';
 import { LinearSwirl } from './Swirl';
 
 describe('Button (mobile)', () => {
@@ -60,7 +61,10 @@ describe('Button (mobile)', () => {
       expect(swirl.props.driftMs).toBe(recipe.driftMs);
       const label = StyleSheet.flatten(screen.getByText('Save').props.style);
       expect(label.color).toBe(recipe.text.color);
-      expect(label.fontWeight).toBe(String(recipe.text.weight));
+      // The weight comes from the typography helper: regular for secondary, semibold for primary.
+      const face = variant === 'secondary' ? 'regular' : 'semibold';
+      expect(label.fontFamily).toBe(serifFamily(face));
+      expect(label.fontWeight).toBe(serifWeight(face));
       const frame = flat(screen.getByRole('button', { name: 'Save' }));
       expect(frame).toMatchObject({ borderWidth: recipe.border.width, borderColor: recipe.border.color, borderRadius: 8 });
     });
@@ -94,6 +98,12 @@ describe('Button (mobile)', () => {
     it('secondary busy spinner uses the secondary text colour', () => {
       render(<Button label="Save" variant="secondary" onPress={jest.fn()} busy />);
       expect(screen.UNSAFE_getByType(ActivityIndicator).props.color).toBe(recipes.secondary.text.color);
+    });
+
+    it('aria-disabled secondary keeps the recipe text colour, which is readable on the swirl', () => {
+      render(<Button label="Save" variant="secondary" onPress={jest.fn()} ariaDisabled />);
+      expect(screen.UNSAFE_getAllByType(LinearSwirl)).toHaveLength(1);
+      expect(StyleSheet.flatten(screen.getByText('Save').props.style).color).toBe(recipes.secondary.text.color);
     });
 
     it('aria-disabled primary has no swirl, a solid ink fill and page-coloured text', () => {

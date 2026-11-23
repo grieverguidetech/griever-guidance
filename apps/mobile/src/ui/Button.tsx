@@ -31,15 +31,10 @@ const UNAVAILABLE_FILL = v2.roles.ink;
 
 type Recipe = (typeof RECIPES)[keyof typeof RECIPES];
 
-/** The recipe's shadow as native shadow props (the first shadow only: the swirl buttons have one). */
+/** The recipe's shadow as a boxShadow string. react-native-web 0.21 warns on the old shadow* props; RN 0.88 reads this natively. */
 function recipeShadow(recipe: Recipe) {
-  const shadow = recipe.shadow[0];
-  return {
-    shadowColor: shadow.color,
-    shadowOffset: { width: shadow.x, height: shadow.y },
-    shadowRadius: shadow.blur / 2,
-    shadowOpacity: 1,
-  };
+  const { x, y, blur, color } = recipe.shadow[0];
+  return { boxShadow: `${x}px ${y}px ${blur}px ${color}` };
 }
 
 /** The recipe's border, radius and shadow as one outer style. */
@@ -48,7 +43,7 @@ function recipeFrame(recipe: Recipe) {
     borderWidth: recipe.border.width,
     borderColor: recipe.border.color,
     borderRadius: recipe.radius,
-    // A shadow needs a fill on the view that casts it; the swirl sits on top and hides this.
+    // Shows only if the swirl has not drawn yet.
     backgroundColor: recipe.swirl.stops[0],
     ...recipeShadow(recipe),
   };
@@ -152,7 +147,8 @@ export function Button({
     extra['aria-haspopup'] = 'dialog';
   }
 
-  const font = useSerifStyle('semibold');
+  // Weight by the typography helper: the regular face for secondary, semibold (Sora 500 once #972 lands) for the rest.
+  const font = useSerifStyle(variant === 'secondary' ? 'regular' : 'semibold');
   // Said once when the work starts. On native, a state change alone is not spoken.
   const working = showBusy;
   useEffect(() => {
@@ -167,7 +163,8 @@ export function Button({
   const unavailableFill = ariaDisabled && variant === 'primary';
   const recipe = variant === 'primary' || variant === 'secondary' ? RECIPES[variant] : undefined;
   const swirled = recipe !== undefined && !unavailableFill;
-  const labelColor = unavailableFill ? PAGE : recipe && !ariaDisabled ? recipe.text.color : undefined;
+  // The recipe colour in every state: the muted neutral-700 was under 4.5:1 on the soft ocean swirl.
+  const labelColor = unavailableFill ? PAGE : recipe?.text.color;
   const text = (
     <Phrasing>
       <Text
@@ -177,7 +174,6 @@ export function Button({
           variant === 'primary' ? styles.labelPrimary : styles.labelLink,
           labelStyle(variant, ariaDisabled),
           (variant === 'tertiary' || variant === 'ghost') && styles.labelTertiary,
-          recipe && { fontWeight: String(recipe.text.weight) as '400' | '500' },
           labelColor !== undefined && { color: labelColor },
         ]}
       >
