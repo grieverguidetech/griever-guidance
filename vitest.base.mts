@@ -31,12 +31,13 @@ export function vitestConfig(
       environment,
       include: ['src/**/*.{test,spec}.{ts,tsx}'],
       passWithNoTests: false,
-      // #1049: in CI, also annotate each failure on the run and write a JUnit file that the
-      // "Print unit test failures" step in ci.yml prints. A big failed run once lost its Vitest
-      // summary from the job log, so the failure must not depend on that log alone.
+      // #1049: in CI, also write a JUnit file that the "Print unit test failures" step in ci.yml
+      // prints. A big failed run once lost its Vitest summary from the job log, so the failure must
+      // not depend on that log alone. (Vitest adds its github-actions reporter and job summary by
+      // itself on GitHub Actions; Nx's streamed prefixes stop the annotations, the summary still works.)
       ...(process.env.CI
         ? {
-            reporters: ['default', 'github-actions', 'junit'],
+            reporters: ['default', 'junit'],
             outputFile: { junit: 'test-output/vitest/junit.xml' },
           }
         : {}),

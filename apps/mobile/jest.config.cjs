@@ -27,6 +27,4 @@ module.exports = {
   // Several specs render the whole app and walk a journey (e.g. sessions.spec). On a shared CI
   // runner one of them passed 5s (the default) and turned main red; 20s is still a clear hang signal.
   testTimeout: 20_000,
-  // #1049: in CI, also annotate each failure on the run (the job log alone once lost a failure).
-  ...(process.env.CI ? { reporters: ['default', 'github-actions'] } : {}),
 };

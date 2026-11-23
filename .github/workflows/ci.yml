@@ -49,18 +49,19 @@ jobs:
             echo "::error::Remove .only/.skip/.todo from tests"; exit 1
           fi
 
-      - run: pnpm nx affected -t typecheck --base=$NX_BASE --head=$NX_HEAD --parallel=3
-
       # --outputStyle=stream: Nx's default in CI buffers a task's output and prints it in one
       # write when the task fails, then calls process.exit(). On a piped stdout that write is
-      # cut at the pipe buffer, so a big failed run lost its Vitest summary (#1049).
-      # Streaming writes the output while the task runs.
+      # cut at the pipe buffer, so a big failed run lost its summary (#1049). Streaming writes
+      # the output while the task runs. Each line is prefixed with the project name.
+      - run: pnpm nx affected -t typecheck --base=$NX_BASE --head=$NX_HEAD --parallel=3 --outputStyle=stream
+
       - run: pnpm nx affected -t test --base=$NX_BASE --head=$NX_HEAD --parallel=3 --outputStyle=stream
 
-      # Belt and braces for #1049: vitest.base.mts writes a JUnit file per Vitest project in CI.
-      # Mobile (jest) has no JUnit file; its failures reach the run as github-actions annotations
-      # (apps/mobile/jest.config.cjs). This step only reads files and runs on failure, and
-      # continue-on-error stops it from ever changing the job result.
+      # Belt and braces for #1049: vitest.base.mts writes a JUnit file per Vitest project in CI,
+      # and Vitest also writes its own job summary. Mobile (jest) relies on the streamed log.
+      # This step only reads files and runs on failure; continue-on-error and exit 0 stop it from
+      # ever changing the job result. awk keeps each failing testcase's name, even when the test
+      # wrote console output (a <system-out> block sits between the name and the <failure>).
       - name: Print unit test failures
         if: failure()
         continue-on-error: true
@@ -68,7 +69,7 @@ jobs:
           for f in $(find apps libs -path '*/node_modules' -prune -o -name junit.xml -path '*test-output/vitest*' -print); do
             if grep -q '<failure' "$f"; then
               echo "::group::Failures in $f"
-              grep -B1 -A12 '<failure' "$f" | head -300
+              awk '/<testcase /{tc=$0} /<failure/{print tc; n=12} n>0{print; n--}' "$f" | head -300
               echo "::endgroup::"
             fi
           done
