@@ -5,7 +5,7 @@ import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { CHECKLIST_PHASES, templates } from '@griever/shared';
-import { colors } from '@griever/tokens';
+import { colors, v2 } from '@griever/tokens';
 import { Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
@@ -634,8 +634,9 @@ describe('HubScreen', () => {
     expect(screen.getByText('Needs the place')).toBeTruthy();
   });
 
-  it('draws every available row as a filled panel card: surface fill, no border, 44 pt, darker when pressed', () => {
+  it('draws every available row as a glass card: recipe fill, 1 pt edge, 44 pt, dimmer when pressed', () => {
     setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' } } as unknown as Session);
+    const recipe = v2.recipes.card;
     for (const name of [/^Announce the passing/, /^Share the service/, /^Share the obituary/, /^Send thank-yous/]) {
       // The host node has the resolved style; the Pressable above it holds the function that takes `pressed`.
       let card = screen.getAllByRole('button', { name })[0].parent;
@@ -645,20 +646,35 @@ describe('HubScreen', () => {
       expect(card).toBeTruthy();
       const rest = StyleSheet.flatten(card?.props.style({ pressed: false }));
       const pressed = StyleSheet.flatten(card?.props.style({ pressed: true }));
-      expect(rest.backgroundColor).toBe(colors.surface);
-      expect(rest.borderWidth).toBeUndefined();
+      expect(rest.backgroundColor).toBe(recipe.fill);
+      expect(rest.borderWidth).toBe(recipe.border.width);
       expect(rest.minHeight).toBeGreaterThanOrEqual(44);
-      expect(pressed.backgroundColor).not.toBe(colors.surface);
-      expect(luminance(pressed.backgroundColor as string)).toBeLessThan(luminance(colors.surface));
-      // Muted text, accent text and the state word keep 4.5:1 on the resting and the pressed panel.
-      for (const bg of [colors.surface, pressed.backgroundColor as string]) {
-        expect(contrast(colors['neutral-700'], bg)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(colors['accent-700'], bg)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(colors['neutral-800'], bg)).toBeGreaterThanOrEqual(4.5);
-        // The check is a graphic: 3:1 (WCAG 1.4.11).
-        expect(contrast(colors['success-700'], bg)).toBeGreaterThanOrEqual(3);
-      }
+      expect(pressed.opacity).toBeLessThan(1);
     }
+    // Muted text, accent text and the state word keep 4.5:1 on the glass over the page and both glows.
+    const [r, g, b, a] = (recipe.fill.match(/[\d.]+/g) ?? []).map(Number);
+    const blend = (ground: string) =>
+      `#${[1, 3, 5].map((i, k) => Math.round([r, g, b][k] * a + parseInt(ground.slice(i, i + 2), 16) * (1 - a)).toString(16).padStart(2, '0')).join('')}`;
+    for (const ground of [v2.primitives.colors.page, v2.primitives.colors.glowSun, v2.primitives.colors.glowSky]) {
+      const bg = blend(ground);
+      expect(contrast(colors['neutral-700'], bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colors['accent-700'], bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colors['neutral-800'], bg)).toBeGreaterThanOrEqual(4.5);
+      // The check is a graphic: 3:1 (WCAG 1.4.11).
+      expect(contrast(colors['success-700'], bg)).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('shows a focus ring in the v2 focus colour while a card has focus', () => {
+    setup();
+    const card = screen.getByTestId('hub-next-card');
+    expect(StyleSheet.flatten(card.props.style).borderColor).toBe(v2.recipes.card.border.color);
+    fireEvent(card, 'focus');
+    const style = StyleSheet.flatten(screen.getByTestId('hub-next-card').props.style);
+    expect(style.borderColor).toBe(v2.roles.focus);
+    expect(style.borderWidth).toBe(2);
+    fireEvent(card, 'blur');
+    expect(StyleSheet.flatten(screen.getByTestId('hub-next-card').props.style).borderColor).toBe(v2.recipes.card.border.color);
   });
 
   it('gives only the next card the accent bar and the Continue line', () => {

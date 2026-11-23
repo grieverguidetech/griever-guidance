@@ -13,6 +13,8 @@ export function buildRoles(p: Primitives) {
     },
     body: { size: p.size.body, weight: p.font.weights.regular, family: p.font.family },
     page: { color: p.colors.page, glows: { topRight: p.colors.glowSun, bottomLeft: p.colors.glowSky } },
+    /** The focus ring on controls that are not buttons, like hub cards. At least 3:1 on every ground (v2.spec). */
+    focus: p.colors.secondaryBorder,
     /** The strong swirl: the primary action. */
     loud: p.gradients.sunset,
     /** The quiet swirl: secondary actions. */

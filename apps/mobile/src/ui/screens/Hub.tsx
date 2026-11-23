@@ -1,7 +1,7 @@
-import { useId, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, minTouchTarget, spacing } from '@griever/tokens';
+import { colors, minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import { glassCard } from '../Card';
 import { Icon } from '../Icon';
@@ -147,6 +147,7 @@ const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
 function SendCard(props: { row: HubRow; title: string; stateWord: string; continueWord: string; onPress: () => void }) {
   const { row } = props;
   const semibold = useSerifStyle('semibold');
+  const [focused, setFocused] = useState(false);
   // The "Needs ..." line replaces the summary. The check is decorative, so it is not in the name.
   const line = row.meta ?? row.summary;
   // The visible words in reading order. Continue is last, and only on the next card.
@@ -157,7 +158,9 @@ function SendCard(props: { row: HubRow; title: string; stateWord: string; contin
       testID={row.lit ? 'hub-next-card' : undefined}
       accessibilityLabel={label}
       onPress={props.onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={({ pressed }) => [styles.card, focused && styles.cardFocused, pressed && styles.cardPressed]}
     >
       {row.lit ? <View testID="next-bar" style={styles.nextBar} /> : null}
       <Phrasing>
@@ -198,6 +201,8 @@ const styles = StyleSheet.create({
   // The v2 glass card (shared with Card), full width, at least 44 pt.
   card: { ...glassCard, minHeight: minTouchTarget, padding: spacing[3], gap: 2, overflow: 'hidden' },
   // Glass is see-through, so a press dims the whole card instead of mixing a colour in.
+  // The glass edge is decorative (about 1:1), so focus gets a 2 pt ring in the v2 focus colour (3:1 on every ground).
+  cardFocused: { borderWidth: 2, borderColor: v2.roles.focus },
   cardPressed: { opacity: 0.8 },
   // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
   nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors['accent-700'] },
