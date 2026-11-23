@@ -135,10 +135,31 @@ describe('styles.css page ground and glows', () => {
     expect(rule('body')).not.toMatch(/z-index|transform|filter|isolation|will-change|position/);
   });
 
+  it('keeps html free of a background, so the body colour sits on the canvas under the glow layer', () => {
+    const rootRules = [...css.matchAll(/(?:^|\n)\s*(?:html|:root)\s*\{[^}]*\}/g)].map((m) => m[0]).join('\n');
+    expect(rootRules).not.toMatch(/background/);
+  });
+
+  it('gives plain inputs the v2 field edge, 3:1 or more on the page and both glows', () => {
+    const hex = (name: string) => {
+      const found = theme.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i'));
+      if (!found) {
+        throw new Error(`${name} is not a hex var in theme.generated.css`);
+      }
+      return found[1];
+    };
+    expect(rule('.gg-input')).toContain('border: 1px solid var(--color-v2-field-edge)');
+    for (const ground of ['--color-v2-page', '--color-v2-glow-sun', '--color-v2-glow-sky']) {
+      expect(contrast(hex('--color-v2-field-edge'), hex(ground)), ground).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('lets the glow show: no full-page wrapper paints an opaque background over it', () => {
     const offenders = sourceFiles(__dirname).filter((file) => {
       const text = readFileSync(file, 'utf8');
-      return /min-h-screen[^>]*background/.test(text) && !file.endsWith('v2Styles.spec.ts');
+      // Inline styles or Tailwind bg classes, in any attribute order, on any full-height wrapper.
+      const wrapper = /<\w+[^>]*\b(?:min-h-screen|h-screen|min-h-dvh)\b[^>]*>/g;
+      return [...text.matchAll(wrapper)].some((m) => /background|!?\bbg-/.test(m[0])) && !file.endsWith('v2Styles.spec.ts');
     });
     expect(offenders).toEqual([]);
   });

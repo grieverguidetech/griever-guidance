@@ -162,10 +162,14 @@ describe('toMarketingCss', () => {
     expect(vars['--gg-primary-bg']).toBe(
       `linear-gradient(${gradients.sunset.angle}deg, ${gradients.sunset.stops.join(', ')})`,
     );
-    expect(vars['--gg-secondary-bg']).toContain('linear-gradient(120deg, #a5cbe3');
+    expect(vars['--gg-secondary-bg']).toContain(
+      'linear-gradient(120deg, #a5cbe3',
+    );
     expect(vars['--gg-primary-text']).toBe(c.primaryText);
     expect(vars['--gg-primary-border']).toBe(`1px solid ${c.primaryBorder}`);
-    expect(vars['--gg-primary-shadow']).toBe(`0px 2px 12px ${shadows.sunset.color}`);
+    expect(vars['--gg-primary-shadow']).toBe(
+      `0px 2px 12px ${shadows.sunset.color}`,
+    );
     expect(vars['--gg-card-bg']).toBe(c.glassFill);
     expect(vars['--gg-card-border']).toBe(`1px solid ${c.glassBorder}`);
     expect(vars['--gg-card-shadow']).toBe(`0px 1px 9px ${shadows.glass.color}`);
@@ -181,18 +185,25 @@ describe('toMarketingCss', () => {
   });
 
   it('a primitive change cascades to every var that uses it', () => {
-    const p = structuredClone(primitives) as unknown as Parameters<typeof buildRoles>[0];
+    const p = structuredClone(primitives) as unknown as Parameters<
+      typeof buildRoles
+    >[0];
     p.colors.page = '#010203';
     p.colors.heading = '#0a0b0c';
     p.colors.primaryBorder = '#112233';
     p.gradients.sunset.stops = ['#aaaaaa', '#bbbbbb', '#cccccc'];
     p.radius = 3;
     const roles = buildRoles(p);
-    const vars = declarations(toMarketingCss({ roles, recipes: buildRecipes(roles, p) }), ':root {');
+    const vars = declarations(
+      toMarketingCss({ roles, recipes: buildRecipes(roles, p) }),
+      ':root {',
+    );
     expect(vars['--gg-page']).toBe('#010203');
     expect(vars['--gg-heading']).toBe('#0a0b0c');
     expect(vars['--gg-primary-border']).toBe('1px solid #112233');
-    expect(vars['--gg-primary-bg']).toBe('linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)');
+    expect(vars['--gg-primary-bg']).toBe(
+      'linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)',
+    );
     expect(vars['--gg-primary-radius']).toBe('3px');
     expect(vars['--gg-card-radius']).toBe('3px');
   });
@@ -202,7 +213,9 @@ describe('toMarketingCss', () => {
 function rawNames(css: string, opener: string): string[] {
   const start = css.indexOf(opener);
   const end = css.indexOf('\n}', start);
-  return [...css.slice(start, end).matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]);
+  return [...css.slice(start, end).matchAll(/(--[\w-]+)\s*:/g)].map(
+    (m) => m[1],
+  );
 }
 
 /** The names that appear more than once in the list. */
@@ -230,7 +243,9 @@ describe('toWebThemeCss with v2', () => {
     expect(theme['--font-v2']).toBe(webFontStack(v2.primitives));
     expect(root['--v2-primary-bg']).toMatch(/^linear-gradient\(120deg, /);
     expect(root['--v2-secondary-bg']).toMatch(/^linear-gradient\(120deg, /);
-    expect(root['--v2-card-shadow']).toBe(`0px 1px 9px ${v2.primitives.shadows.glass.color}`);
+    expect(root['--v2-card-shadow']).toBe(
+      `0px 1px 9px ${v2.primitives.shadows.glass.color}`,
+    );
     expect(root['--v2-radius']).toBe('8px');
     expect(root['--v2-settle-ms']).toBe('4500ms');
     expect(root['--v2-drift-ms']).toBe('9000ms');
@@ -244,16 +259,21 @@ describe('toWebThemeCss with v2', () => {
   });
 
   it('no v2 name collides with a v1 name, and every v2 name starts with v2', () => {
-    const v1 = { ...declarations(toWebThemeCss(input), '@theme {'), ...declarations(toWebThemeCss(input), ':root {') };
-    const added = [...Object.keys(theme), ...Object.keys(root)].filter((n) => !(n in v1));
+    const v1 = {
+      ...declarations(toWebThemeCss(input), '@theme {'),
+      ...declarations(toWebThemeCss(input), ':root {'),
+    };
+    const added = [...Object.keys(theme), ...Object.keys(root)].filter(
+      (n) => !(n in v1),
+    );
     expect(added.length).toBeGreaterThan(30);
     const all = [...Object.keys(theme), ...Object.keys(root)];
     expect(new Set(all).size).toBe(all.length);
     for (const name of added) {
       if (name === '--color-text') {
-      continue;
-    }
-    expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2$)/);
+        continue;
+      }
+      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2$)/);
     }
     expect(all.length - added.length).toBe(Object.keys(v1).length);
   });
@@ -268,10 +288,21 @@ describe('toWebThemeCss with v2', () => {
   });
 
   it('the duplicate check reports a repeated line (negative control)', () => {
-    const doubled = css.replace('  --v2-radius: 8px;\n', '  --v2-radius: 8px;\n  --v2-radius: 9px;\n');
+    const doubled = css.replace(
+      '  --v2-radius: 8px;\n',
+      '  --v2-radius: 8px;\n  --v2-radius: 9px;\n',
+    );
     expect(repeated(rawNames(doubled, ':root {'))).toEqual(['--v2-radius']);
-    const crossed = css.replace('  --v2-radius: 8px;\n', '  --v2-radius: 8px;\n  --color-v2-link: red;\n');
-    expect(repeated([...rawNames(crossed, '@theme {'), ...rawNames(crossed, ':root {')])).toEqual(['--color-v2-link']);
+    const crossed = css.replace(
+      '  --v2-radius: 8px;\n',
+      '  --v2-radius: 8px;\n  --color-v2-link: red;\n',
+    );
+    expect(
+      repeated([
+        ...rawNames(crossed, '@theme {'),
+        ...rawNames(crossed, ':root {'),
+      ]),
+    ).toEqual(['--color-v2-link']);
   });
 
   it('writes the type vars the page ticket reads', () => {
@@ -279,7 +310,9 @@ describe('toWebThemeCss with v2', () => {
     expect(theme['--color-v2-eyebrow']).toBe(v2.roles.eyebrow.color);
     expect(root['--v2-body-size']).toBe(`${v2.roles.body.size}px`);
     expect(root['--v2-eyebrow-size']).toBe(`${v2.roles.eyebrow.size}px`);
-    expect(root['--v2-eyebrow-tracking']).toBe(`${v2.roles.eyebrow.tracking}em`);
+    expect(root['--v2-eyebrow-tracking']).toBe(
+      `${v2.roles.eyebrow.tracking}em`,
+    );
     expect(root['--v2-heading-weight']).toBe('300');
     expect(root['--v2-weight-light']).toBe('300');
     expect(root['--v2-weight-regular']).toBe('400');
@@ -291,7 +324,9 @@ describe('toWebThemeCss with v2', () => {
   });
 
   it('a primitive change cascades into the emitted vars', () => {
-    const p = structuredClone(v2.primitives) as unknown as Parameters<typeof buildRoles>[0];
+    const p = structuredClone(v2.primitives) as unknown as Parameters<
+      typeof buildRoles
+    >[0];
     p.colors.link = '#010203';
     p.colors.ink = '#0d0e0f';
     p.colors.page = '#fafafa';
@@ -309,7 +344,10 @@ describe('toWebThemeCss with v2', () => {
     p.motion.spinMs = 7000;
     p.font.weights.medium = 600;
     const roles = buildRoles(p);
-    const changed = toWebThemeCss({ ...input, v2: { primitives: p, roles, recipes: buildRecipes(roles, p) } });
+    const changed = toWebThemeCss({
+      ...input,
+      v2: { primitives: p, roles, recipes: buildRecipes(roles, p) },
+    });
     const t = declarations(changed, '@theme {');
     const r = declarations(changed, ':root {');
     expect(t['--color-v2-link']).toBe('#010203');
@@ -321,7 +359,9 @@ describe('toWebThemeCss with v2', () => {
     expect(t['--color-v2-focus']).toBe('#112233');
     expect(t['--color-v2-secondary-border']).toBe('#112233');
     expect(t['--font-v2']).toMatch(/^'Fixture', /);
-    expect(r['--v2-primary-bg']).toBe('linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)');
+    expect(r['--v2-primary-bg']).toBe(
+      'linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)',
+    );
     expect(r['--v2-radius']).toBe('3px');
     expect(r['--v2-settle-ms']).toBe('3000ms');
     expect(r['--v2-primary-shadow']).toContain('rgba(1,2,3,0.5)');
@@ -334,7 +374,11 @@ describe('toWebThemeCss with v2', () => {
 
 describe('webFontStack', () => {
   it('starts with the primitive family and ends in a generic family', () => {
-    expect(webFontStack(v2.primitives)).toBe("'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif");
-    expect(webFontStack({ font: { ...v2.primitives.font, family: 'Other' } })).toMatch(/^'Other', .*sans-serif$/);
+    expect(webFontStack(v2.primitives)).toBe(
+      "'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    );
+    expect(
+      webFontStack({ font: { ...v2.primitives.font, family: 'Other' } }),
+    ).toMatch(/^'Other', .*sans-serif$/);
   });
 });

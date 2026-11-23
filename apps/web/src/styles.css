@@ -232,6 +232,8 @@ h1 { font-weight: var(--v2-heading-weight); }
     margin-bottom: 5px;
     color: color-mix(in srgb, var(--color-text) 70%, transparent);
   }
+  /* The edge is the v2 field edge: 3:1 or more on the page and both glows (WCAG 1.4.11). The fill alone
+     is 1.00:1 on the sky glow, so the edge is what shows the box. */
   .gg-input {
     width: 100%;
     min-height: 44px;
@@ -241,14 +243,14 @@ h1 { font-weight: var(--v2-heading-weight); }
     color: var(--color-text);
     caret-color: var(--color-accent);
     background: var(--color-surface);
-    border: 1px solid var(--color-divider);
+    border: 1px solid var(--color-v2-field-edge);
     border-radius: var(--radius-md);
   }
   .gg-input::placeholder {
     color: color-mix(in srgb, var(--color-text) 68%, transparent);
     opacity: 1;
   }
-  .gg-input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
+  .gg-input:hover { border-color: var(--color-neutral-700); }
   textarea.gg-input { min-height: 76px; resize: vertical; line-height: 1.5; }
 
   /* — date field: free-text box + native calendar button — */
