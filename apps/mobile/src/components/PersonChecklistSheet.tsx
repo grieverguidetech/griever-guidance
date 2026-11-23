@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
-import { computeChecklist } from '@griever/hooks';
+import { computeChecklist } from '@griever/shared';
 import { TIME_PHASE_KEYS } from '@griever/shared';
 import type {
   ChecklistFields,

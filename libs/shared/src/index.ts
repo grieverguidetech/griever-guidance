@@ -22,3 +22,4 @@ export * from './greeting.js';
 export * from './places.js';
 export * from './obituaryPeople.js';
 export * from './joinLink.js';
+export * from './checklistProgress.js';
