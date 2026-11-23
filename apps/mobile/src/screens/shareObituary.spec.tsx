@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
-import { AccessibilityInfo, AppState, BackHandler, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Share, StyleSheet } from 'react-native';
+import { screenCopy } from '@griever/copy';
+import { AccessibilityInfo, AppState, ScrollView, BackHandler, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Share, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Session } from '@griever/hooks';
@@ -12,7 +13,7 @@ import { obituaryTextFor } from '../lib/obituaryText';
 import * as MailComposer from 'expo-mail-composer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { publisherEmailKey } from '../lib/mailCompose';
-import { onFlowPullRequest } from '../lib/requestFlowPull';
+import { onFlowPullRequest, registerManualPull } from '../lib/requestFlowPull';
 
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(), getStringAsync: jest.fn() }));
 
@@ -1053,6 +1054,38 @@ describe('ShareObituaryScreen when the web has not marked the step Ready (#824, 
     nudgeSetup(notReady);
     expect(heard).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/sync|pull|refresh/i)).toBeNull();
+    stop();
+  });
+});
+
+describe('pull to refresh on the obituary screen (#959)', () => {
+  const failed = screenCopy('phoneRefresh').failed;
+  const control = () => screen.UNSAFE_getAllByType(ScrollView)[0].props.refreshControl as { props: { refreshing: boolean; onRefresh: () => void } } | undefined;
+
+  it('offers no pull when sync is not allowed', () => {
+    setup(base);
+    expect(control()).toBeUndefined();
+    expect(screen.queryByText(failed)).toBeNull();
+  });
+
+  it('shows the spinner until the pull ends, then nothing when it worked', async () => {
+    let finish: (ok: boolean) => void = () => undefined;
+    const stop = registerManualPull(() => new Promise<boolean>((resolve) => (finish = resolve)));
+    setup(base);
+    act(() => control()?.props.onRefresh());
+    expect(control()?.props.refreshing).toBe(true);
+    await act(async () => finish(true));
+    expect(control()?.props.refreshing).toBe(false);
+    expect(screen.queryByText(failed)).toBeNull();
+    stop();
+  });
+
+  it('stops the spinner and shows the calm line, announced, when the pull fails', async () => {
+    const stop = registerManualPull(async () => false);
+    setup(base);
+    await act(async () => control()?.props.onRefresh());
+    expect(control()?.props.refreshing).toBe(false);
+    expect(screen.getByText(failed).props.accessibilityLiveRegion).toBe('polite');
     stop();
   });
 });

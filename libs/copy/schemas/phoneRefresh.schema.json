@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for pull to refresh on the phone (hub and send screens): the line shown when the latest could not be loaded",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "failed"
+  ],
+  "properties": {
+    "failed": {
+      "$ref": "#/$defs/text"
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

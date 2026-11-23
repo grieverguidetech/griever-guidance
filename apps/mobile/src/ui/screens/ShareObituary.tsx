@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react';
-import type { ComponentRef, MutableRefObject, Ref } from 'react';
+import type { ComponentRef, MutableRefObject, ReactElement, ReactNode, Ref } from 'react';
+import type { RefreshControlProps } from 'react-native';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing } from '@griever/tokens';
@@ -125,6 +126,9 @@ export interface ObituaryTextEditor {
 }
 
 export interface ShareObituaryProps {
+  /** Pull to refresh: the ScrollView's control and the failure line. Both absent when sync is not allowed. */
+  refreshControl?: ReactElement<RefreshControlProps>;
+  refreshNotice?: ReactNode;
   /** Nothing started on the web for the obituary: the nudge replaces the text box, Email and Copy. Step 2 (link, Paste link, publisher, Continue) is hidden too (#889). */
   nudge?: WebNudgeProps;
   copy: ShareObituaryCopy;
@@ -172,7 +176,7 @@ export interface ShareObituaryProps {
  * "Who should know?". Mobile's own screen
  * (apps/mobile/src/ui). The link lives in the app; only whether the field has been left or Continue pressed lives here.
  */
-export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef, nudge }: ShareObituaryProps) {
+export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, linkValid, publisher, onPublisherChange, preview, onBack, onWhatYoullNeed, onContinue, onDraft, onPasteLink, pasteMessage, draftUnavailable, publisherEmail, textEditor, emailed, keyboardOpen, onDone, headingRef, checklistRef, nudge, refreshControl, refreshNotice }: ShareObituaryProps) {
   const insets = useSafeAreaInsets();
   // A link that was saved earlier and is not good shows its error at once; a link being typed waits until the field is left.
   const [touched, setTouched] = useState(() => link.trim() !== '' && !linkValid);
@@ -197,7 +201,8 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   return (
     <>
     {/* The bar sits outside the scrolling content; with no bar, the content clears the home indicator itself. */}
-    <ScrollView style={styles.flex} contentContainerStyle={[styles.content, !showDone && { paddingBottom: spacing[3] + insets.bottom }]} keyboardShouldPersistTaps="handled">
+    <ScrollView style={styles.flex} contentContainerStyle={[styles.content, !showDone && { paddingBottom: spacing[3] + insets.bottom }]} keyboardShouldPersistTaps="handled" refreshControl={refreshControl}>
+      {refreshNotice}
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <Button label={copy.back} variant="header" onPress={onBack} />

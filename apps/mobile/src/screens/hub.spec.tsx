@@ -10,6 +10,7 @@ import { Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
 import { HubScreen } from './HubScreen';
 import type { HubScreenProps } from './HubScreen';
+import { onFlowPullRequest, registerManualPull } from '../lib/requestFlowPull';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 // This path is specific to this react-native version. Re-check it when react-native is upgraded.
@@ -837,5 +838,47 @@ describe('HubScreen: the next card and the bottom button', () => {
     expect(announce).not.toHaveBeenCalled();
     expect(ios).not.toHaveBeenCalled();
     expect(screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'polite' })).toHaveLength(0);
+  });
+});
+
+describe('pull to refresh on the hub (#959)', () => {
+  const failed = screenCopy('phoneRefresh').failed;
+  const control = () => screen.UNSAFE_getAllByType(ScrollView)[0].props.refreshControl as { props: { refreshing: boolean; onRefresh: () => void } } | undefined;
+
+  it('offers no pull when sync is not allowed', () => {
+    setup();
+    expect(control()).toBeUndefined();
+    expect(screen.queryByText(failed)).toBeNull();
+  });
+
+  it('shows the spinner until the pull ends, then nothing when it worked', async () => {
+    let finish: (ok: boolean) => void = () => undefined;
+    const stop = registerManualPull(() => new Promise<boolean>((resolve) => (finish = resolve)));
+    setup();
+    act(() => control()?.props.onRefresh());
+    expect(control()?.props.refreshing).toBe(true);
+    await act(async () => finish(true));
+    expect(control()?.props.refreshing).toBe(false);
+    expect(screen.queryByText(failed)).toBeNull();
+    stop();
+  });
+
+  it('stops the spinner and shows the calm line, announced, when the pull fails', async () => {
+    const stop = registerManualPull(async () => false);
+    setup();
+    await act(async () => control()?.props.onRefresh());
+    expect(control()?.props.refreshing).toBe(false);
+    expect(screen.getByText(failed).props.accessibilityLiveRegion).toBe('polite');
+    stop();
+  });
+});
+
+describe('the hub asks for a pull when it opens (#959)', () => {
+  it('asks the sync once, and shows nothing for it', () => {
+    const heard = jest.fn();
+    const stop = onFlowPullRequest(heard);
+    setup();
+    expect(heard).toHaveBeenCalledTimes(1);
+    stop();
   });
 });

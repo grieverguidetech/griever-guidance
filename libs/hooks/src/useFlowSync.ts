@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createFlow, listFlows, parseSyncedPatch, patchFlow } from '@griever/api-client';
 import type {
   FlowsFailureReason,
@@ -47,6 +47,13 @@ export interface UseFlowSyncResult {
   lastError: FlowsFailureReason | null;
   /** True once the first pull of this sign-in has been applied. The editor's landing waits for it, briefly. */
   pulled: boolean;
+  /**
+   * Asks the server for the latest now, for a pull to refresh. Resolves true once the answer is applied
+   * (the same path as an automatic pull), false when it could not be loaded. Never rejects. False when sync is off.
+   */
+  pullNow: () => Promise<boolean>;
+  /** Counts the pulls applied since sign-in, so a screen can drop a "could not load" line when one works. */
+  pullCount: number;
 }
 
 export const FLOW_QUEUE_STORAGE_KEY = 'gg.flowQueue.v1';
@@ -376,11 +383,15 @@ const offline = { ok: false, reason: 'offline' } as const;
 export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
   const [lastError, setLastError] = useState<FlowsFailureReason | null>(null);
   const [pulledFor, setPulledFor] = useState<string | null>(null);
+  const [pullCount, setPullCount] = useState(0);
   const latest = useRef(options);
   latest.current = options;
   const stateRef = useRef<SyncState | null>(null);
   // Set by the effect below; lets the sessions effect ask for a flush.
   const kickRef = useRef<(delayMs: number) => void>(() => undefined);
+  // Set by the effect below; runs one pull for the caller and says whether it worked.
+  const pullNowRef = useRef<() => Promise<boolean>>(async () => false);
+  const pullNow = useCallback(() => pullNowRef.current(), []);
 
   const { enabled, userId, sessions } = options;
   const active = enabled && userId !== '';
@@ -423,6 +434,10 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     let needPull = true;
     // Bumped by each request for a pull (a wake). See pull(): an answer to an older request is not used.
     let pullAsks = 0;
+    // Each request gets a number. Two pulls can be out at once (a cycle and a pull to refresh); an answer older
+    // than one already applied is dropped, so the older data never lands last.
+    let pullSeq = 0;
+    let appliedSeq = 0;
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const inFlight = new Set<Cancel>();
@@ -452,6 +467,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
      */
     const pull = async (accessToken: string): Promise<'done' | 'stale' | 'failed'> => {
       const asked = pullAsks;
+      const seq = ++pullSeq;
       const result = await withTimeout((signal) => client().listFlows(accessToken, signal), offline, inFlight);
       if (!alive) return 'failed';
       if (!result.ok) {
@@ -461,6 +477,10 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       if (asked !== pullAsks) {
         return 'stale';
       }
+      if (seq < appliedSeq) {
+        return 'done';
+      }
+      appliedSeq = seq;
       const state = getState();
       // Sync lag: a person removed here (removeSession) that the server still lists is left out. Once a clean pull no longer
       // lists the id, it is forgotten. A pull that dropped records may be hiding it, so keep it then.
@@ -502,6 +522,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       writeStored(latest.current.storage, state);
       latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
       setPulledFor(userId);
+      setPullCount((count) => count + 1);
       return 'done';
     };
 
@@ -660,6 +681,37 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       }
       arm(delayMs);
     };
+    // A manual pull. It does not wait for a running cycle; the answer goes through the same pull() and apply path.
+    // 'stale' (a wake asked while it was out) is tried once more, then counted as failed.
+    pullNowRef.current = async () => {
+      try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const accessToken = await token();
+          if (!alive) {
+            return false;
+          }
+          if (!accessToken) {
+            fail('signed_out');
+            return false;
+          }
+          const pulled = await pull(accessToken);
+          if (pulled === 'done') {
+            needPull = false;
+            failures = 0;
+            fail(null);
+            return true;
+          }
+          if (pulled === 'failed') {
+            return false;
+          }
+        }
+        // Asked again while this one was out: the cycle that wake queued pulls the newer answer.
+        return true;
+      } catch {
+        // Never thrown to the app.
+      }
+      return false;
+    };
     let unsubscribe: () => void = () => undefined;
     try {
       unsubscribe = latest.current.subscribe(() => {
@@ -682,6 +734,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     return () => {
       alive = false;
       kickRef.current = () => undefined;
+      pullNowRef.current = async () => false;
       if (timer !== undefined) clearTimeout(timer);
       clearInterval(interval);
       // Abort every request still in flight; `alive` is false, so their results are ignored.
@@ -694,7 +747,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     };
   }, [active, userId]);
 
-  return { lastError, pulled: active && pulledFor === userId };
+  return { lastError, pulled: active && pulledFor === userId, pullNow, pullCount };
 }
 
 function markKnown(state: SyncState, flows: readonly FlowRecord[], userId: string): void {

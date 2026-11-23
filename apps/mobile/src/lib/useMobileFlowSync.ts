@@ -6,7 +6,7 @@ import { useSyncAuth } from './AccountProvider';
 import { createDeviceCache } from './deviceCache';
 import { AUTH_ENABLED, SYNC_ENABLED } from './features';
 import { onLeftFamily } from './leftFamily';
-import { onFlowPullRequest } from './requestFlowPull';
+import { announcePullSucceeded, onFlowPullRequest, registerManualPull } from './requestFlowPull';
 
 /** The phone's wake source: the app coming back to the foreground. Returns the unsubscribe. */
 export function subscribeAppActive(onWake: () => void): () => void {
@@ -115,14 +115,31 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, stor
     });
   }, [allowed]);
 
-  useFlowSync({
+  // Sync runs, and so a pull can be waited for, only once this account's saved queue has been read.
+  const running = allowed && queue !== null && readyQueue === queue;
+  const { pullNow, pullCount } = useFlowSync({
     sessions,
     userId,
-    enabled: allowed && queue !== null && readyQueue === queue,
+    enabled: running,
     getAccessToken: getAccessToken ?? (async () => null),
     storage: joined,
     subscribe,
     applyRemoteFlows,
     moveFlowId,
   });
+
+  // Lets a screen pull to refresh and wait for the result (#959). Offered only while sync runs.
+  useEffect(() => {
+    if (!running) {
+      return;
+    }
+    return registerManualPull(pullNow);
+  }, [running, pullNow]);
+
+  // Any applied pull clears an old "could not load" line.
+  useEffect(() => {
+    if (pullCount > 0) {
+      announcePullSucceeded();
+    }
+  }, [pullCount]);
 }
