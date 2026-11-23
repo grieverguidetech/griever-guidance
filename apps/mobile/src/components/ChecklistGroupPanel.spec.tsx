@@ -210,6 +210,23 @@ describe('ChecklistGroupPanel (#697)', () => {
     expect(tickRow(firstLabel).props.accessibilityState.checked).toBe(false);
   });
 
+  it('draws a swirl mark on a done row and a ring on an open row, without changing the checkbox state or the 44 pt row', async () => {
+    await open(RIGHT_AWAY, { [first]: 'done' });
+    const done = tickRow(firstLabel);
+    const open_ = tickRow(phrases.items[itemIds[1] as ChecklistItemId]);
+    const hidden = { includeHiddenElements: true };
+    expect(within(done).queryByTestId('done-mark-swirl', hidden)).toBeTruthy();
+    expect(within(done).queryByTestId('done-mark-ring', hidden)).toBeNull();
+    expect(within(open_).queryByTestId('done-mark-ring', hidden)).toBeTruthy();
+    expect(within(open_).queryByTestId('done-mark-swirl', hidden)).toBeNull();
+    expect(done.props.accessibilityState.checked).toBe(true);
+    expect(open_.props.accessibilityState.checked).toBe(false);
+    expect(done.props.role).toBe('checkbox');
+    expect(StyleSheet.flatten(done.props.style).minHeight).toBeGreaterThanOrEqual(44);
+    // The mark is decoration: a screen reader finds only the row.
+    expect(within(done).queryByTestId('done-mark-swirl')).toBeNull();
+  });
+
   it('ticks an item, saves it on the person and strikes it through', async () => {
     const onSave = await open(RIGHT_AWAY);
     fireEvent.press(tickRow(firstLabel));

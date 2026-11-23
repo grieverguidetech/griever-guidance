@@ -11,6 +11,7 @@ import type {
 } from '@griever/shared';
 import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
 import { Sheet, focusNode, SerifText as Text } from '../ui';
+import { DoneMark } from '../ui/DoneMark';
 import type { ButtonNode } from '../ui';
 import { ChecklistGroupPanel } from './ChecklistGroupPanel';
 import { MUTED } from './colors';
@@ -129,10 +130,12 @@ export function PersonChecklistSheet({
             >
               <Text style={styles.label}>{group.label}</Text>
               {group.done ? (
-                <View style={styles.done} importantForAccessibility="no">
-                  <Text style={styles.check} allowFontScaling={false}>
-                    ✓
-                  </Text>
+                <View
+                  style={styles.done}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  <DoneMark checked />
                   <Text style={styles.doneText}>{checklistCopy.done}</Text>
                 </View>
               ) : null}
@@ -161,6 +164,5 @@ const styles = StyleSheet.create({
   pressed: { backgroundColor: colors['accent-100'] },
   label: { flex: 1, fontSize: 16, color: colors.ink },
   done: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  check: { fontSize: 16, color: colors['success-700'], fontWeight: '700' },
   doneText: { fontSize: 14, color: colors['success-700'] },
 });
