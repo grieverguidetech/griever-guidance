@@ -196,8 +196,10 @@ h1 { font-weight: var(--v2-heading-weight); }
     flex-direction: column;
     gap: var(--space-2);
     padding: var(--space-3);
-    background: var(--color-surface);
-    border-radius: var(--radius-md);
+    background: var(--color-v2-card-fill);
+    border: var(--v2-border-thin) solid var(--color-v2-card-border);
+    border-radius: var(--v2-radius);
+    box-shadow: var(--v2-card-shadow);
   }
   .gg-card-selectable { cursor: pointer; }
   .gg-card-selected { outline: 2px solid var(--color-accent); outline-offset: -2px; }
@@ -386,8 +388,10 @@ h1 { font-weight: var(--v2-heading-weight); }
 
   /* — calm primitives (#479): panel, row, chip, hint, meta, enter — */
   .gg-panel {
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
+    background: var(--color-v2-card-fill);
+    border: var(--v2-border-thin) solid var(--color-v2-card-border);
+    border-radius: var(--v2-radius);
+    box-shadow: var(--v2-card-shadow);
     padding: var(--space-4);
   }
   /* #757: the one look for every phone nudge: soft blue, lifted. */
@@ -398,13 +402,17 @@ h1 { font-weight: var(--v2-heading-weight); }
     box-shadow: var(--shadow-md);
     padding: var(--space-3) var(--space-4);
   }
-  /* #514: an input on a panel needs a visible edge (WCAG 1.4.11, 3:1). neutral-600 is
-     3.55:1 on --color-surface (the panel) and 3.85:1 on --color-bg (the input fill). */
+  /* #514: an input on a panel needs a visible edge (WCAG 1.4.11, 3:1). It takes the v2 field recipe;
+     the edge is 3:1 or more against glass over the page and both glows (guarded by v2Styles.spec.ts). */
   .gg-panel .gg-input {
-    background: var(--color-bg);
-    border-color: var(--color-neutral-600);
+    background: var(--color-v2-field-fill);
+    border-color: var(--color-v2-field-edge);
   }
-  .gg-panel .gg-input:hover { border-color: var(--color-neutral-700); }
+  .gg-panel .gg-input:hover { border-color: var(--color-v2-field-edge); }
+  .gg-panel .gg-input:focus-visible {
+    border-color: var(--color-v2-field-focus);
+    outline-color: var(--color-v2-field-focus);
+  }
   .gg-row {
     display: flex;
     align-items: center;
