@@ -103,7 +103,7 @@ export function TimeField({ copy, value, onChange, accessibleName, missing }: Pr
       </Pressable>
       {open && Platform.OS === 'ios' ? (
         <View style={styles.picker}>
-          <DateTimePicker value={draft} mode="time" display="spinner" is24Hour={false} accentColor={v2.roles.link} onChange={moveDraft} />
+          <DateTimePicker value={draft} mode="time" display="spinner" is24Hour={false} accentColor={v2.recipes.field.focusRing} onChange={moveDraft} />
           <View style={styles.actions}>
             {value ? <Button label={copy.clear} variant="tertiary" onPress={clear} /> : null}
             <Button label={copy.done} variant="secondary" onPress={done} />

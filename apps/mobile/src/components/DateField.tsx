@@ -109,7 +109,7 @@ export function DateField({ copy, value, onChange, accessibleName, maximumDate, 
       </Pressable>
       {open && Platform.OS === 'ios' ? (
         <View style={styles.picker}>
-          <DateTimePicker value={draft} mode="date" display="inline" maximumDate={maximumDate} minimumDate={minimumDate} accentColor={v2.roles.link} onChange={moveDraft} />
+          <DateTimePicker value={draft} mode="date" display="inline" maximumDate={maximumDate} minimumDate={minimumDate} accentColor={v2.recipes.field.focusRing} onChange={moveDraft} />
           <View style={styles.actions}>
             {value ? <Button label={copy.dateClear} variant="tertiary" onPress={clear} /> : null}
             <Button label={copy.dateDone} variant="secondary" onPress={done} />
