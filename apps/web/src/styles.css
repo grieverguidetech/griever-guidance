@@ -77,7 +77,13 @@ h1 { font-weight: var(--v2-heading-weight); }
 
 ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* #1005 focus colour: the global ring, the selected card's focus ring and the datebox trigger use
+   --color-v2-focus (3.23:1 on the sky glow, a thin margin). Deliberate exceptions, unchanged: swirl
+   buttons keep accent-700 (5.26:1 on the swirl, see below); the phone nudge takes script focus with no
+   ring; fields keep their accent-700 field ring; the selected card's second ring stays accent-700 on a
+   page gap (#1000); the selection ring itself (.gg-card-selected in @layer components) stays accent.
+   Guarded by focusStyles.spec.ts. */
+:focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 2px; }
 /* Anything focused by script (a heading after navigation, a confirm group, a status note) is
    not a keyboard stop: a quiet left bar instead of the ring, so the keyboard user still sees
    where focus went (WCAG 2.4.7). The bar is accent-700, which is 5.72:1 on --color-bg,
@@ -111,7 +117,7 @@ h1 { font-weight: var(--v2-heading-weight); }
    against the unlayered `:focus { outline: none }` reset above — the selection
    ring would vanish the instant a card is clicked (clicking focuses it). Keep
    it visible while focused too. */
-.gg-card-selected:focus { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.gg-card-selected:focus { outline: 2px solid var(--color-v2-focus); outline-offset: -2px; }
 /* Keyboard focus on a selected card must still change its look (WCAG 2.4.7): the selection ring stays,
    and a second accent-700 ring sits 2px outside it, on a page-coloured gap (5.26:1 or more on page and glows). */
 .gg-card-selected:focus-visible {
@@ -385,7 +391,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   }
   .gg-datebox-trigger:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-v2-focus);
     outline-offset: -2px;
   }
   /* The native <input type="date"> exists only to open the OS picker — keep it
