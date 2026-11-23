@@ -66,7 +66,7 @@ describe('WebNudge (mobile)', () => {
   it('hides the swirl, the speckles and the orb from screen readers and touches', async () => {
     await givenReduceMotion(false);
     renderNudge();
-    for (const id of ['linear-swirl-decoration', 'nudge-speckles', 'nudge-orb']) {
+    for (const id of ['nudge-swirl', 'nudge-speckles', 'nudge-orb']) {
       const node = screen.getByTestId(id, { includeHiddenElements: true });
       expect(node.props.accessibilityElementsHidden).toBe(true);
       expect(node.props.importantForAccessibility).toBe('no-hide-descendants');
@@ -102,7 +102,7 @@ describe('WebNudge (mobile)', () => {
   });
 
   async function layOutCard(view: ReturnType<typeof render>) {
-    const outer = view.getByTestId('linear-swirl-decoration', { includeHiddenElements: true }).parent;
+    const outer = view.getByTestId('nudge-swirl', { includeHiddenElements: true }).parent;
     await act(async () => {
       fireEvent(outer as never, 'layout', { nativeEvent: { layout: { width: 300, height: 120 } } });
     });

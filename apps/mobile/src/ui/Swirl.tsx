@@ -68,6 +68,8 @@ type LinearSwirlProps = {
   driftMs: number;
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
+  /** Names the decoration in tests when a screen draws more than one swirl. */
+  testID?: string;
 };
 
 /** Start and end points of the gradient line, as fractions of the box. */
@@ -88,6 +90,7 @@ export function LinearSwirl({
   driftMs,
   style,
   children,
+  testID = 'linear-swirl-decoration',
 }: LinearSwirlProps) {
   const id = useId();
   const [width, setWidth] = useState(0);
@@ -117,7 +120,7 @@ export function LinearSwirl({
       <View
         {...HIDDEN}
         pointerEvents="none"
-        testID="linear-swirl-decoration"
+        testID={testID}
         style={styles.decoration}
       >
         <Animated.View

@@ -62,6 +62,7 @@ export function WebNudge({ title, line, button, onGotIt }: WebNudgeProps) {
           stops={SWIRL_STOPS}
           angle={recipe.swirl.angle}
           driftMs={recipe.driftMs}
+          testID="nudge-swirl"
           style={StyleSheet.absoluteFill}
         />
         <View
