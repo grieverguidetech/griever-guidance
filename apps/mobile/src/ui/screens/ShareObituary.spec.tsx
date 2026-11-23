@@ -219,13 +219,13 @@ describe('ShareObituary text box (#823, #968)', () => {
     expect(screen.UNSAFE_queryAllByType(TextInput).find((i) => i.props.accessibilityLabel === 'Obituary text')).toBeUndefined();
   });
 
-  it('one tap on Edit opens a focused multiline box with the cursor at the end', () => {
+  it('one tap on Edit opens a focused multiline box with the cursor at the start', () => {
     draw(editor());
     edit();
     const box = screen.getByLabelText('Obituary text');
     expect(box.props.multiline).toBe(true);
     expect(box.props.autoFocus).toBe(true);
-    expect(box.props.selection).toEqual({ start: 22, end: 22 });
+    expect(box.props.selection).toEqual({ start: 0, end: 0 });
     expect(box.props.value).toBe('Anna loved the garden.');
     expect(screen.getByRole('button', { name: 'Done editing' })).toBeTruthy();
   });

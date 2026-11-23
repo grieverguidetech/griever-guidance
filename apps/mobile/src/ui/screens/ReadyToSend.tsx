@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactElement, ReactNode, Ref } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import type { RefreshControlProps, Text as RNText } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
@@ -111,6 +112,9 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   const [focusDetails, setFocusDetails] = useState(false);
   const detailsRef = useRef<ComponentRef<typeof RNText>>(null);
   const toneReasonId = useId();
+  const insets = useSafeAreaInsets();
+  // The bar rides above the keyboard and distracts while writing, so it waits until Done.
+  const [messageEditing, setMessageEditing] = useState(false);
   // The words dropped by "Use the suggested wording", kept until the next edit.
   const [dropped, setDropped] = useState<string | null>(null);
   // The swap removes the button that was pressed, so focus moves on to its replacement once it is drawn.
@@ -124,6 +128,17 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   const shareErrorId = useId();
   const shareReason = blank ? copy.shareBlank : blockedReason;
   const reason = hasRecipients ? (blank ? copy.blank : blockedReason) : undefined;
+
+  // The status line below is redrawn when the bar comes back, and a redrawn line is not read out, so say the reason once.
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (wasEditing.current && !messageEditing && reason) {
+      AccessibilityInfo.announceForAccessibility(reason);
+    }
+    wasEditing.current = messageEditing;
+    // Only when editing changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageEditing]);
 
   // Opening Change details moves the screen reader to the row, so the new inputs are found.
   useEffect(() => {
@@ -212,7 +227,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={refreshControl}>
+      <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, messageEditing && { paddingBottom: spacing[3] + insets.bottom }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={refreshControl}>
         {refreshNotice}
         <View style={styles.topBar}>
           <Button label={copy.back} variant="header" onPress={onBack} />
@@ -227,6 +242,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
             value={message}
             onChangeText={changeMessage}
             boxStyle={styles.messageBox}
+            onEditingChange={setMessageEditing}
             toggle={{ edit: copy.messageEdit, editName: copy.messageEditName, done: copy.messageDone, doneName: copy.messageDoneName }}
           >
             {lead ? <Body tone="strong">{lead}</Body> : null}
@@ -289,15 +305,17 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
           </View>
         ) : null}
       </ScrollView>
-      <ActionBar
-        testID={BAR_TEST_ID}
-        label={hasRecipients ? sendLabel : chooseLabel}
-        onPress={hasRecipients ? onSend : onChoose}
-        note={hasRecipients ? note : undefined}
-        buttonRef={hasRecipients ? undefined : peopleButtonRef}
-        disabledReason={reason}
-        liveReason
-      />
+      {messageEditing ? null : (
+        <ActionBar
+          testID={BAR_TEST_ID}
+          label={hasRecipients ? sendLabel : chooseLabel}
+          onPress={hasRecipients ? onSend : onChoose}
+          note={hasRecipients ? note : undefined}
+          buttonRef={hasRecipients ? undefined : peopleButtonRef}
+          disabledReason={reason}
+          liveReason
+        />
+      )}
     </View>
   );
 }
