@@ -43,6 +43,14 @@ export function buildRecipes(r: Roles, p: Primitives) {
       orb: { size: p.size.orb, conic: [p.colors.ocean, p.colors.sea, p.colors.lavender, p.colors.sunGold] },
       radius: p.radius,
     },
+    /** Text fields. The edge is a control edge, so it holds 3:1 (v2.spec). */
+    field: {
+      fill: p.colors.fieldFill,
+      edge: p.colors.fieldEdge,
+      edgeOnPanel: p.colors.fieldEdge,
+      focusRing: p.colors.fieldFocus,
+      radius: p.radius,
+    },
     doneMark: r.doneMark,
   } as const;
 }

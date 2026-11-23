@@ -30,6 +30,18 @@ const colors = {
   nudgeText: '#0f2f4a',
   nudgeBorder: 'rgba(30,123,184,0.35)',
   openRing: '#6f6a62',
+
+  // Controls and states, copied value for value from today's look (v1 tokens, mobile colors.ts, web styles.css).
+  link: '#006786', // accent-700
+  wash: '#e9f8ff', // accent-100, the selected-row fill
+  muted: '#605d5d', // neutral-700
+  mutedStrong: '#444141', // neutral-800
+  divider: 'rgba(32,30,29,0.16)', // web --color-divider: #201e1d at 16%
+  error: '#b3261e', // web value, chosen over mobile's #b91c1c (D2)
+  success: '#2a7048', // web value, chosen over mobile's #2f7a50 (D2)
+  fieldFill: '#eae9e9', // web --color-surface
+  fieldEdge: '#7d7979', // neutral-600
+  fieldFocus: '#006786', // accent-700
 } as const;
 
 /** One angle for every linear swirl. */
