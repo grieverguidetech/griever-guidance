@@ -337,8 +337,9 @@ infra/
   identity, gateway-messages, gateway-flows, and gateway-places each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
   together. The only shared code is libs/gateway-auth (rule 2b below).
-  apps/agent and libs/agent-workflow import only libs/shared and libs/copy (and, for apps/agent, the MCP SDK
-  and zod), never libs/hooks, libs/api-client, libs/identity or libs/gateway-*.
+  apps/agent imports only libs/agent-workflow, libs/shared and libs/copy (plus the MCP SDK and zod);
+  libs/agent-workflow imports only libs/shared and libs/copy. Neither imports libs/hooks, libs/api-client,
+  libs/identity or libs/gateway-*.
 ```
 
 ---

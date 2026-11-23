@@ -61,6 +61,13 @@ describe('agent worker', () => {
       expect(res.status).toBe(501);
     });
 
+    it('does not call the limiter without a CF-Connecting-IP header', async () => {
+      const limit = vi.fn().mockResolvedValue({ success: false });
+      const res = await call('/mcp', post(), { AGENT_RATE_LIMITER: { limit } });
+      expect(res.status).toBe(501);
+      expect(limit).not.toHaveBeenCalled();
+    });
+
     it('does not rate limit GET /mcp or /health', async () => {
       const limit = vi.fn().mockResolvedValue({ success: false });
       const env = { AGENT_RATE_LIMITER: { limit } };
@@ -75,8 +82,12 @@ describe('agent worker', () => {
     const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
       vi.spyOn(console, m).mockImplementation(() => undefined),
     );
-    const limit = vi.fn().mockRejectedValue(new Error('down'));
-    await call('/mcp', post({ 'CF-Connecting-IP': '203.0.113.7' }), { AGENT_RATE_LIMITER: { limit } });
+    const down = vi.fn().mockRejectedValue(new Error('down'));
+    const over = vi.fn().mockResolvedValue({ success: false });
+    const headers = { 'CF-Connecting-IP': '203.0.113.7' };
+    await call('/mcp', post(headers), { AGENT_RATE_LIMITER: { limit: down } });
+    await call('/mcp', post(headers), { AGENT_RATE_LIMITER: { limit: over } });
+    await call('/mcp');
     await call('/nope');
     for (const spy of spies) {
       expect(spy).not.toHaveBeenCalled();

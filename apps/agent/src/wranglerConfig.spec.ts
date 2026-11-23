@@ -31,8 +31,10 @@ describe('apps/agent wrangler.toml', () => {
   });
 
   it('has no routes and no workers.dev or preview URLs', () => {
-    expect(lines.some((l) => l.startsWith('routes'))).toBe(false);
-    expect(lines.some((l) => l.startsWith('[[routes'))).toBe(false);
+    expect(lines.some((l) => /^\s*routes?\s*=/.test(l))).toBe(false);
+    expect(lines.some((l) => /^\s*\[\[?routes/.test(l))).toBe(false);
+    expect(lines.some((l) => l.startsWith('[env.'))).toBe(false);
+    expect(lines.some((l) => /^\s*(workers_dev|preview_urls)\s*=\s*true/.test(l))).toBe(false);
     expect(lines).toContain('workers_dev = false');
     expect(lines).toContain('preview_urls = false');
   });
@@ -44,7 +46,7 @@ describe('apps/agent wrangler.toml', () => {
   });
 
   it('uses a rate limiter namespace_id no other wrangler.toml uses', () => {
-    const ids = (text: string) => [...text.matchAll(/^\s*namespace_id\s*=\s*"(\d+)"/gm)].map((m) => m[1]);
+    const ids = (text: string) => [...text.matchAll(/^\s*namespace_id\s*=\s*"?(\d+)"?/gm)].map((m) => m[1]);
     const mine = ids(agentToml);
     const others = wranglerFiles(repoRoot)
       .filter((f) => f !== resolve(__dirname, '../wrangler.toml'))
