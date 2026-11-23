@@ -16,7 +16,6 @@
    theme.generated.css: plain custom properties (Broadsheet's 1.25× spacing / near-square radii
    don't map to Tailwind's single-multiplier scales). */
 :root {
-  --color-text: var(--color-ink);
   --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
 
   --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
@@ -41,7 +40,7 @@
 }
 
 body {
-  background: var(--color-bg);
+  background: var(--color-v2-page);
   color: var(--color-text);
   font-family: var(--font-v2);
   font-size: var(--v2-body-size);
@@ -50,6 +49,21 @@ body {
   font-synthesis-style: none;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+}
+
+/* The page glows: warm at the top right, cool at the bottom left, same sizes as mobile's PageGlow
+   (an 80% by 60% ellipse from the corner, full colour fading to clear). One fixed layer behind
+   the content: no pointer events, no animation, no stacking context on body, so sheets and the
+   action bar stack as before. Not background-attachment: fixed (iOS Safari ignores it). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(80% 60% at 100% 0%, var(--color-v2-glow-sun), transparent),
+    radial-gradient(80% 60% at 0% 100%, var(--color-v2-glow-sky), transparent);
 }
 
 h1, h2, h3, h4, h5, h6 {

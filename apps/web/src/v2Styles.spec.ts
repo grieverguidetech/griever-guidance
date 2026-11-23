@@ -102,3 +102,46 @@ describe('styles.css type roles', () => {
     expect(contrast(v2.roles.eyebrow.color, surface as string)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+describe('styles.css page ground and glows', () => {
+  const glow = rule('body::before');
+
+  it('paints the body with the generated page colour and ink', () => {
+    const body = rule('body');
+    expect(body).toContain('background: var(--color-v2-page)');
+    expect(body).toContain('color: var(--color-text)');
+    expect(theme).toContain(`--color-v2-page: ${v2.roles.page.color};`);
+    expect(theme).toContain(`--color-text: ${v2.roles.ink};`);
+  });
+
+  it('drops the hand-written --color-text alias', () => {
+    expect(css).not.toMatch(/--color-text\s*:/);
+  });
+
+  it('puts both glows on one fixed layer behind content that takes no pointer events', () => {
+    expect(glow).toMatch(/position:\s*fixed/);
+    expect(glow).toMatch(/inset:\s*0/);
+    expect(glow).toMatch(/pointer-events:\s*none/);
+    expect(glow).toMatch(/z-index:\s*-1/);
+    expect(glow).toContain('var(--color-v2-glow-sun)');
+    expect(glow).toContain('var(--color-v2-glow-sky)');
+    expect(glow).toMatch(/radial-gradient\(80% 60% at 100% 0%/);
+    expect(glow).toMatch(/radial-gradient\(80% 60% at 0% 100%/);
+  });
+
+  it('does not animate the glow, use background-attachment, or make body a stacking context', () => {
+    expect(glow).not.toMatch(/animation|transition|transform/);
+    expect(`${rule('body')}\n${glow}`).not.toMatch(/background-attachment/);
+    expect(rule('body')).not.toMatch(/z-index|transform|filter|isolation|will-change|position/);
+  });
+
+  it('uses no literal colours in the page and glow rules, and defines every var they use', () => {
+    const rules = `${rule('body')}\n${glow}`;
+    expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    const used = [...rules.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(0);
+    for (const name of new Set(used)) {
+      expect(`${theme}\n${css}`, name).toMatch(new RegExp(`${name}:`));
+    }
+  });
+});
