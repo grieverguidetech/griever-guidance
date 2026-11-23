@@ -19,7 +19,7 @@ export type HubMomentKey = 'announce' | 'service' | 'obituary' | 'thanks';
 export interface HubCopy {
   heading: string;
   intro: string;
-  /** The top-bar button that opens the checklist sheet. */
+  /** The primary swirl button on the title row that opens the checklist sheet. */
   whatYoullNeed: string;
   /** Native hint read after the button's name. */
   whatYoullNeedHint: string;
@@ -90,9 +90,11 @@ export function Hub(props: HubProps) {
   const { copy } = props;
   return (
     <View style={styles.screen}>
-      <View style={styles.topBar}>
+      <View testID="hub-top-bar" style={styles.topBar}>
         {props.name}
-        <Button label={copy.whatYoullNeed} hint={copy.whatYoullNeedHint} variant="tertiary" opensDialog onPress={props.onWhatYoullNeed} buttonRef={props.whatYoullNeedRef} />
+        <View testID="hub-checklist-slot" style={styles.checklist}>
+          <Button label={copy.whatYoullNeed} hint={copy.whatYoullNeedHint} variant="primary" opensDialog onPress={props.onWhatYoullNeed} buttonRef={props.whatYoullNeedRef} />
+        </View>
       </View>
       <View style={styles.head}>
         <Eyebrow>{props.eyebrow}</Eyebrow>
@@ -200,7 +202,9 @@ const FOCUS_RING = 2;
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
-  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
+  // The name and the button share one row. If both cannot fit (320 pt, largest text), the button wraps below, still at the right.
+  topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'space-between', alignItems: 'center' },
+  checklist: { marginLeft: 'auto' },
   head: { gap: spacing[1] },
   rows: { gap: spacing[2] },
   // The v2 glass card (shared with Card), full width, at least 44 pt.
