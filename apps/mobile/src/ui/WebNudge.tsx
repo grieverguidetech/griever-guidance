@@ -13,6 +13,8 @@ export interface WebNudgeProps {
 }
 
 const recipe = v2.recipes.nudge;
+const SWIRL_STOPS = [...recipe.swirl.stops];
+const ORB_STOPS = [...recipe.orb.conic];
 
 /** The recipe shadows in RN's boxShadow form, as Card and Button do. */
 const shadow = recipe.shadow.map((s) => ({
@@ -51,78 +53,92 @@ const HIDDEN = {
  * to the card: it would hide the button. The swirl, speckles and orb are decoration, hidden.
  */
 export function WebNudge({ title, line, button, onGotIt }: WebNudgeProps) {
-  const headingFont = useSerifStyle('regular');
+  const headingFont = useSerifStyle('semibold');
   const bodyFont = useSerifStyle('regular');
   return (
     <View testID="web-nudge" style={styles.card}>
-      <LinearSwirl
-        stops={[...recipe.swirl.stops]}
-        angle={recipe.swirl.angle}
-        driftMs={recipe.driftMs}
-        style={StyleSheet.absoluteFill}
-      />
-      <View
-        {...HIDDEN}
-        pointerEvents="none"
-        testID="nudge-speckles"
-        style={StyleSheet.absoluteFill}
-      >
-        {SPECKLES.map((spot, i) => (
-          <View
-            key={i}
-            style={[
-              styles.speckle,
-              spot,
-              {
-                backgroundColor:
-                  recipe.speckles.colors[i % recipe.speckles.colors.length],
-                opacity: recipe.speckles.alpha,
-              },
-            ]}
-          />
-        ))}
-      </View>
-      <View style={styles.row}>
-        <View style={styles.orb}>
-          <ConicSwirl
-            stops={[...recipe.orb.conic]}
-            size={recipe.orb.size}
-            spinMs={recipe.driftMs}
-            testID="nudge-orb"
-          />
+      <View style={styles.clip}>
+        <LinearSwirl
+          stops={SWIRL_STOPS}
+          angle={recipe.swirl.angle}
+          driftMs={recipe.driftMs}
+          style={StyleSheet.absoluteFill}
+        />
+        <View
+          {...HIDDEN}
+          pointerEvents="none"
+          testID="nudge-speckles"
+          style={StyleSheet.absoluteFill}
+        >
+          {SPECKLES.map((spot, i) => (
+            <View
+              key={i}
+              style={[
+                styles.speckle,
+                spot,
+                {
+                  backgroundColor:
+                    recipe.speckles.colors[i % recipe.speckles.colors.length],
+                  opacity: recipe.speckles.alpha,
+                },
+              ]}
+            />
+          ))}
         </View>
-        <View style={styles.words}>
-          <Text
-            role="heading"
-            aria-level={2}
-            accessibilityRole="header"
-            style={[styles.heading, headingFont]}
-          >
-            {title}
-          </Text>
-          <Text style={[styles.line, bodyFont]}>{line}</Text>
+        <View style={styles.row}>
+          <View style={styles.orb}>
+            <ConicSwirl
+              stops={ORB_STOPS}
+              size={recipe.orb.size}
+              spinMs={v2.primitives.motion.spinMs}
+              testID="nudge-orb"
+            />
+          </View>
+          <View style={styles.words}>
+            <Text
+              role="heading"
+              aria-level={2}
+              accessibilityRole="header"
+              style={[styles.heading, headingFont]}
+            >
+              {title}
+            </Text>
+            <Text style={[styles.line, bodyFont]}>{line}</Text>
+          </View>
         </View>
+        <Button label={button} variant="primary" onPress={onGotIt} />
       </View>
-      <Button label={button} variant="primary" onPress={onGotIt} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // The shadow and border live here; clipping is on the inner view so Android does not cut the shadow.
   card: {
-    gap: spacing[3],
-    padding: spacing[4],
-    overflow: 'hidden',
     borderWidth: recipe.border.width,
     borderColor: recipe.border.color,
     borderRadius: recipe.radius,
     boxShadow: shadow,
   },
+  clip: {
+    gap: spacing[3],
+    padding: spacing[4],
+    overflow: 'hidden',
+    borderRadius: Math.max(0, recipe.radius - recipe.border.width),
+  },
   row: { flexDirection: 'row', gap: spacing[2], alignItems: 'flex-start' },
   orb: { paddingTop: 1 },
   words: { flex: 1, gap: spacing[1] },
-  heading: { color: recipe.text.color, fontSize: recipe.text.size, lineHeight: 22 },
-  line: { color: recipe.text.color, fontSize: recipe.text.size, lineHeight: 22 },
+  heading: {
+    color: recipe.text.color,
+    fontSize: recipe.text.size,
+    lineHeight: 22,
+  },
+  line: {
+    color: recipe.text.color,
+    fontSize: recipe.text.size,
+    lineHeight: 22,
+  },
   speckle: {
     position: 'absolute',
     width: SPECKLE_SIZE,

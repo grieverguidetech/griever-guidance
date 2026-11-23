@@ -58,8 +58,9 @@ describe('WebNudge (mobile)', () => {
   it('does not make the card one accessible block', async () => {
     await givenReduceMotion(false);
     renderNudge();
-    const heading = screen.getByRole('heading', { name: WORDS.title });
-    expect(heading.parent?.parent?.props.accessible).not.toBe(true);
+    const card = screen.getByTestId('web-nudge');
+    expect(card.props.accessible).not.toBe(true);
+    expect(card.props.accessibilityLabel).toBeUndefined();
   });
 
   it('hides the swirl, the speckles and the orb from screen readers and touches', async () => {
@@ -81,7 +82,9 @@ describe('WebNudge (mobile)', () => {
     expect(style.borderColor).toBe(recipe.border.color);
     expect(style.borderWidth).toBe(recipe.border.width);
     expect(style.borderRadius).toBe(recipe.radius);
-    expect(style.boxShadow).toHaveLength(2);
+    expect(style.boxShadow).toEqual(
+      recipe.shadow.map((x) => ({ offsetX: x.x, offsetY: x.y, blurRadius: x.blur, color: x.color })),
+    );
     const line = StyleSheet.flatten(screen.getByText(WORDS.line).props.style);
     expect(line.color).toBe(recipe.text.color);
     expect(line.fontSize).toBe(recipe.text.size);
@@ -98,13 +101,23 @@ describe('WebNudge (mobile)', () => {
     expect(onGotIt).toHaveBeenCalledTimes(1);
   });
 
-  it('runs no motion under Reduce Motion', async () => {
-    await givenReduceMotion(true);
-    const view = renderNudge();
+  async function layOutCard(view: ReturnType<typeof render>) {
     const outer = view.getByTestId('linear-swirl-decoration', { includeHiddenElements: true }).parent;
     await act(async () => {
       fireEvent(outer as never, 'layout', { nativeEvent: { layout: { width: 300, height: 120 } } });
     });
+  }
+
+  it('runs the swirl and the orb when Reduce Motion is off (control)', async () => {
+    await givenReduceMotion(false);
+    await layOutCard(renderNudge());
+    expect(Animated.timing).toHaveBeenCalledTimes(2);
+    expect(passStarts).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs no motion under Reduce Motion', async () => {
+    await givenReduceMotion(true);
+    await layOutCard(renderNudge());
     expect(Animated.timing).not.toHaveBeenCalled();
     expect(passStarts).not.toHaveBeenCalled();
   });
