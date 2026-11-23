@@ -9,7 +9,7 @@ import { fill, screenCopy } from '@griever/copy';
 import { useSessionWithAccountName } from '../lib/accountName';
 import { ActionBar, Button, Hub, PaywallSheet, SentNote } from '../ui';
 import type { ButtonNode, HubRow } from '../ui';
-import { colors, spacing } from '@griever/tokens';
+import { spacing } from '@griever/tokens';
 import { PAYMENTS_ENABLED } from '../lib/features';
 import { NameSwitcher } from '../components/NameSwitcher';
 import { personLabel } from '../components/PersonSwitcher';
@@ -307,7 +307,7 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  screen: { flex: 1 },
   // Takes the room the bar leaves, and scrolls: at the largest text size every card is still reachable.
   scroll: { flex: 1 },
   note: { marginBottom: 16 },

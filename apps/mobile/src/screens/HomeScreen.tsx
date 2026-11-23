@@ -101,7 +101,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  screen: { flex: 1 },
   content: { padding: 24, paddingTop: 20 },
   headerRow: { alignSelf: 'flex-start', marginBottom: 8 },
   intro: { marginBottom: 16 },

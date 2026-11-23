@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Animated, Text } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet, Text, View } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
-import { FadeIn } from './ScreenFrame';
+import { v2 } from '@griever/tokens';
+import { FadeIn, ScreenFrame } from './ScreenFrame';
+
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -50,5 +55,46 @@ describe('FadeIn', () => {
     const config = timing.mock.calls[0]?.[1] as { duration: number; toValue: number };
     expect(config.duration).toBeLessThanOrEqual(200);
     expect(config.toValue).toBe(1);
+  });
+});
+
+// True when some view in the tree paints the page colour.
+const paintedPage = () =>
+  screen.UNSAFE_getAllByType(View).some((v) => StyleSheet.flatten(v.props.style as never)?.backgroundColor === v2.roles.page.color);
+
+describe('ScreenFrame', () => {
+  it('draws the page glow behind the children, hidden from screen readers and ignoring touches', () => {
+    render(
+      <ScreenFrame>
+        <Text>Hello</Text>
+      </ScreenFrame>,
+    );
+    const glow = screen.getByTestId('page-glow', { includeHiddenElements: true });
+    expect(glow.props.pointerEvents).toBe('none');
+    expect(glow.props.accessible).toBe(false);
+    expect(glow.props.accessibilityElementsHidden).toBe(true);
+    expect(glow.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(paintedPage()).toBe(true);
+    expect(screen.getByText('Hello')).toBeTruthy();
+  });
+
+  it('FadeIn paints the page colour and draws no glow of its own', async () => {
+    setup(true, false);
+    await show();
+    expect(screen.queryByTestId('page-glow', { includeHiddenElements: true })).toBeNull();
+    expect(paintedPage()).toBe(true);
+  });
+
+  it('FadeIn wrapping ScreenFrame draws exactly one glow', async () => {
+    setup(true, false);
+    render(
+      <FadeIn>
+        <ScreenFrame>
+          <Text>Hello</Text>
+        </ScreenFrame>
+      </FadeIn>,
+    );
+    await act(async () => undefined);
+    expect(screen.getAllByTestId('page-glow', { includeHiddenElements: true })).toHaveLength(1);
   });
 });

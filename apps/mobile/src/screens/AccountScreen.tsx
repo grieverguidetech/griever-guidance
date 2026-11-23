@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { screenCopy } from '@griever/copy';
-import { colors } from '@griever/tokens';
 import { SerifText as Text, Button } from '../ui';
 import type { UseAccountResult } from '@griever/hooks';
 import { useAccount } from '../lib/AccountProvider';
@@ -201,7 +200,7 @@ export function AccountScreen({ onBack, onSignedIn, initialMode }: { onBack: () 
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
   content: { padding: 24, paddingTop: 20, paddingBottom: 40 },
   backRow: { alignSelf: 'flex-start', marginBottom: 16 },
 });

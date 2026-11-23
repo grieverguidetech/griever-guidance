@@ -6,7 +6,7 @@ import { dateNote } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistItemState } from '@griever/shared';
 import { PersonSetup } from '../ui';
 import type { ButtonNode } from '../ui';
-import { colors, spacing } from '@griever/tokens';
+import { spacing } from '@griever/tokens';
 import { DateField } from '../components/DateField';
 import { SavedNote } from '../components/SavedNote';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
@@ -133,6 +133,6 @@ export function SetupScreen({ initial, checklist, onSetItem, onContinue, onBack,
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
   content: { padding: spacing[3], paddingTop: spacing[4] },
 });

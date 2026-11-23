@@ -6,7 +6,6 @@ import { MOMENT_CATEGORY } from '@griever/hooks';
 import type { UseContactsResult } from '@griever/hooks';
 import { firstName } from '@griever/shared';
 import type { MomentKey } from '@griever/shared';
-import { colors } from '@griever/tokens';
 import { focusNode, ReadyToSend } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { FlowProps } from '../app/App';
@@ -253,5 +252,5 @@ function detailsFieldsFor(flow: FlowProps['flow']) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
 });

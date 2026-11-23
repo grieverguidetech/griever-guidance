@@ -77,7 +77,6 @@ function noop() {
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: colors.bg,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors['neutral-400'],
     paddingHorizontal: spacing[3],

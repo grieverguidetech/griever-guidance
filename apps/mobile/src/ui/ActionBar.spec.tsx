@@ -1,7 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { StyleSheet, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { colors } from '@griever/tokens';
 import { ActionBar } from './ActionBar';
 import { Button } from './Button';
 
@@ -37,12 +36,12 @@ describe('ActionBar', () => {
     expect(style.minHeight).toBeGreaterThanOrEqual(52);
   });
 
-  it('pads the bottom by the safe-area inset (34) or more, on the page colour with a top border', () => {
+  it('pads the bottom by the safe-area inset (34) or more, see-through so the page glow shows, with a top border', () => {
     render(<ActionBar label="Next" onPress={jest.fn()} />);
     const bar = screen.UNSAFE_getAllByType(View).find((v) => flat(v).paddingBottom !== undefined);
     const style = flat(bar as never);
     expect(style.paddingBottom).toBeGreaterThanOrEqual(34);
-    expect(style.backgroundColor).toBe(colors.bg);
+    expect(style.backgroundColor).toBeUndefined();
     expect(style.borderTopWidth).toBeGreaterThan(0);
   });
 

@@ -255,7 +255,7 @@ export function Sending({ copy, intro, segments, current, others, handOff, confi
 const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: colors.bg },
+  page: { flex: 1 },
   content: { padding: spacing[3], paddingTop: spacing[4] },
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'space-between', alignItems: 'center' },

@@ -837,7 +837,7 @@ const styles = StyleSheet.create({
   },
   tick: { color: colors.white, fontSize: 12, fontWeight: '700' },
   screen: { gap: spacing[3] },
-  fill: { flex: 1, backgroundColor: colors.bg },
+  fill: { flex: 1 },
   scrollContent: { padding: spacing[3], paddingTop: spacing[4] },
   listEdge: { paddingVertical: spacing[2] },
   rowGap: { height: spacing[2] },
