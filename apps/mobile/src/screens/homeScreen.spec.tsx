@@ -55,7 +55,7 @@ describe('HomeScreen layout (#363)', () => {
     const style = flat(screen.getByText('Anna'));
     expect(style.color).toBe(colors.ink);
     expect(style.fontSize).toBe(17);
-    expect(style.fontFamily).toBe('SourceSerif4_600SemiBold');
+    expect(style.fontFamily).toBe('Sora_500Medium');
   });
 
   it('washes a person row accent-100 while pressed', () => {

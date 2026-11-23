@@ -1,25 +1,23 @@
 import { useFonts } from 'expo-font';
-import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4/400Regular';
-import { SourceSerif4_600SemiBold } from '@expo-google-fonts/source-serif-4/600SemiBold';
-import { SourceSerif4_400Regular_Italic } from '@expo-google-fonts/source-serif-4/400Regular_Italic';
-import { SourceSerif4_600SemiBold_Italic } from '@expo-google-fonts/source-serif-4/600SemiBold_Italic';
-import { fonts } from '@griever/tokens';
+import { Sora_300Light } from '@expo-google-fonts/sora/300Light';
+import { Sora_400Regular } from '@expo-google-fonts/sora/400Regular';
+import { Sora_500Medium } from '@expo-google-fonts/sora/500Medium';
+import { soraFamilies } from '../ui/typography';
 
 /**
- * Source Serif 4, the face the web app uses. The family names come from @griever/tokens, so shared
- * components (apps/mobile/src/ui) ask for the same names this registers. Regular and semibold, each with an italic (the italics are for later screens).
+ * Sora, registered under the native family names in ../ui/typography. Sora has no italic: italic
+ * text shows upright Sora.
  * The font files ship inside the app binary (no network at launch, C5), under the SIL Open Font
- * License 1.1; the licence text is committed at apps/mobile/assets/fonts/SourceSerif4-OFL.txt.
+ * License 1.1; the licence text is committed at apps/mobile/assets/fonts/Sora-OFL.txt.
  */
 export const serifFontFiles = {
-  [fonts.serifRegular]: SourceSerif4_400Regular,
-  [fonts.serifSemiBold]: SourceSerif4_600SemiBold,
-  [fonts.serifItalic]: SourceSerif4_400Regular_Italic,
-  [fonts.serifSemiBoldItalic]: SourceSerif4_600SemiBold_Italic,
+  [soraFamilies.light]: Sora_300Light,
+  [soraFamilies.regular]: Sora_400Regular,
+  [soraFamilies.medium]: Sora_500Medium,
 };
 
 /**
- * Registers the serif. Nothing waits on it: until it is ready, or if it fails, text shows in the
+ * Registers Sora. Nothing waits on it: until it is ready, or if it fails, text shows in the
  * system font. Waiting would put a blank screen in front of someone who needs the app now.
  *
  * Returns true once the fonts have loaded (or failed). React Native does not re-read a font family

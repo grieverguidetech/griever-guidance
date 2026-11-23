@@ -14,26 +14,23 @@ function styleOf(style: TextStyle, ready = true) {
 }
 
 describe('SerifText on native', () => {
-  it.each([['bold'], ['600'], ['500'], ['700']] as const)('fontWeight %s uses the semibold face and clears the weight', (fontWeight) => {
+  it.each([['bold'], ['600'], ['500'], ['700']] as const)('fontWeight %s uses Sora 500 and clears the weight', (fontWeight) => {
     const s = styleOf({ fontWeight });
-    expect(s.fontFamily).toBe('SourceSerif4_600SemiBold');
+    expect(s.fontFamily).toBe('Sora_500Medium');
     expect(s.fontWeight).toBeUndefined();
   });
 
-  it.each([[undefined], ['400'], ['normal']] as const)('fontWeight %s uses the regular face', (fontWeight) => {
+  it.each([[undefined], ['400'], ['normal']] as const)('fontWeight %s uses Sora 400', (fontWeight) => {
     const s = styleOf({ fontWeight });
-    expect(s.fontFamily).toBe('SourceSerif4_400Regular');
+    expect(s.fontFamily).toBe('Sora_400Regular');
     expect(s.fontWeight).toBeUndefined();
   });
 
-  it('italic uses the italic faces and clears fontStyle', () => {
+  it('italic text is upright Sora: no italic face, and fontStyle is cleared', () => {
     const regular = styleOf({ fontStyle: 'italic' });
-    expect(regular.fontFamily).toBe('SourceSerif4_400Regular_Italic');
+    expect(regular.fontFamily).toBe('Sora_400Regular');
     expect(regular.fontStyle).toBeUndefined();
-  });
-
-  it('bold italic uses the semibold italic face', () => {
-    expect(styleOf({ fontStyle: 'italic', fontWeight: '600' }).fontFamily).toBe('SourceSerif4_600SemiBold_Italic');
+    expect(styleOf({ fontStyle: 'italic', fontWeight: '600' }).fontFamily).toBe('Sora_500Medium');
   });
 
   it('keeps the caller weight and adds no family until the serif is ready', () => {

@@ -3,15 +3,15 @@ import { colors } from '@griever/tokens';
 import { SerifText } from './SerifText';
 
 export interface SentNoteProps {
-  /** The first sentence, set in bold italic. */
+  /** The first sentence, set in Sora 500. */
   lead: string;
-  /** What follows it, set in italic. Split from the lead in the copy, never parsed here. */
+  /** What follows it, set in Sora 400. Split from the lead in the copy, never parsed here. */
   rest?: string;
 }
 
 /**
  * The calm note after a send, for example "Everyone has been told. We don't keep a copy...".
- * Plain italic text with no border or card. Contrast: neutral-800 on the
+ * Plain text with no border or card. Contrast: neutral-800 on the
  * page colour passes 4.5:1 (same as Body).
  */
 export function SentNote({ lead, rest }: SentNoteProps) {
@@ -26,7 +26,7 @@ export function SentNote({ lead, rest }: SentNoteProps) {
 }
 
 const styles = StyleSheet.create({
-  text: { fontSize: 14, lineHeight: 21, fontStyle: 'italic', color: colors['neutral-800'] },
-  lead: { fontStyle: 'italic', fontWeight: '600' },
-  rest: { fontStyle: 'italic', fontWeight: '400' },
+  text: { fontSize: 14, lineHeight: 21, color: colors['neutral-800'] },
+  lead: { fontWeight: '600' },
+  rest: { fontWeight: '400' },
 });

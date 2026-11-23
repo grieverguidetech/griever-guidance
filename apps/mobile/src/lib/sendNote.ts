@@ -13,7 +13,7 @@ const MOMENT_BY_CATEGORY: Record<TemplateCategory, MomentKey> = {
   aftercare: 'thanks',
 };
 
-/** The note on Home after a send: `lead` in bold italic, `rest` in italic, `spoken` for the screen reader. */
+/** The note on Home after a send: `lead` in Sora 500, `rest` in Sora 400, `spoken` for the screen reader. */
 export interface SentNoteText {
   lead: string;
   rest: string;

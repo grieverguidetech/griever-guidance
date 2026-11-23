@@ -1,7 +1,8 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
-import { Button, Heading, SerifReadyContext } from '../ui';
+import { v2 } from '@griever/tokens';
+import { Button, Eyebrow, Heading, SerifReadyContext } from '../ui';
 
 /** Mobile's own UI (apps/mobile/src/ui) on the native renderer. */
 describe('mobile UI on native', () => {
@@ -28,7 +29,7 @@ describe('mobile UI on native', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('uses the system font until the serif has loaded, then Source Serif 4', () => {
+  it('uses the system font until the serif has loaded, then Sora 300 in the heading colour', () => {
     const family = () => StyleSheet.flatten(screen.getByRole('heading').props.style).fontFamily;
     const { rerender } = render(
       <SerifReadyContext.Provider value={false}>
@@ -41,6 +42,25 @@ describe('mobile UI on native', () => {
         <Heading level={1}>Title</Heading>
       </SerifReadyContext.Provider>,
     );
-    expect(family()).toBe('SourceSerif4_600SemiBold');
+    expect(family()).toBe('Sora_300Light');
+    expect(StyleSheet.flatten(screen.getByRole('heading').props.style).color).toBe(v2.roles.heading.color);
+  });
+});
+
+describe('Heading weight on native', () => {
+  it.each([[2], [3]] as const)('level %i uses Sora 400, only level 1 is Sora 300', (level) => {
+    render(<Heading level={level}>Title</Heading>);
+    expect(StyleSheet.flatten(screen.getByRole('heading').props.style).fontFamily).toBe('Sora_400Regular');
+  });
+});
+
+describe('Eyebrow on native', () => {
+  it('is 13px, uppercase, 0.08em tracking, in the eyebrow role colour', () => {
+    render(<Eyebrow>For Margaret</Eyebrow>);
+    const style = StyleSheet.flatten(screen.getByText('For Margaret').props.style);
+    expect(style.fontSize).toBe(13);
+    expect(style.textTransform).toBe('uppercase');
+    expect(style.letterSpacing).toBeCloseTo(1.04);
+    expect(style.color).toBe(v2.roles.eyebrow.color);
   });
 });

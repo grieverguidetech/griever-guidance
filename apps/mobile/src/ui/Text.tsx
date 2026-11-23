@@ -1,6 +1,6 @@
 import type { ComponentRef, ReactNode, Ref } from 'react';
 import { StyleSheet, Text } from 'react-native';
-import { colors } from '@griever/tokens';
+import { colors, v2 } from '@griever/tokens';
 import { useSerifStyle } from './typography';
 
 export interface EyebrowProps {
@@ -56,10 +56,10 @@ export function Body({ children, tone = 'default', small = false, id, hidden = f
 
 const styles = StyleSheet.create({
   eyebrow: {
-    fontSize: 11,
-    letterSpacing: 1.1,
+    fontSize: v2.roles.eyebrow.size,
+    letterSpacing: v2.roles.eyebrow.tracking * v2.roles.eyebrow.size,
     textTransform: 'uppercase',
-    color: colors['accent-700'],
+    color: v2.roles.eyebrow.color,
   },
   accent2: { color: colors['accent-2-700'] },
   body: {
