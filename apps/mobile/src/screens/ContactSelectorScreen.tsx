@@ -200,7 +200,7 @@ export function ContactSelectorScreen({ flow, contacts, notified, open = true, o
         ListHeaderComponent={
           <View style={styles.review}>
             <View style={styles.topBar}>
-              <Button label={copy.back} variant="header" onPress={() => setMode({ kind: 'list' })} />
+              <Button label={copy.back} variant="secondary" onPress={() => setMode({ kind: 'list' })} />
             </View>
             <View style={styles.head}>
               <Heading level={1} headingRef={reviewHeading}>

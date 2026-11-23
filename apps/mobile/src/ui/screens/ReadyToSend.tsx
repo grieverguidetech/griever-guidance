@@ -214,7 +214,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={refreshControl}>
           {refreshNotice}
           <View style={styles.topBar}>
-            <Button label={copy.back} variant="header" onPress={onBack} />
+            <Button label={copy.back} variant="secondary" onPress={onBack} />
           </View>
           <Heading level={1} headingRef={headingRef}>
             {heading}
@@ -230,7 +230,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
       <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, messageEditing && { paddingBottom: spacing[3] + insets.bottom }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={refreshControl}>
         {refreshNotice}
         <View style={styles.topBar}>
-          <Button label={copy.back} variant="header" onPress={onBack} />
+          <Button label={copy.back} variant="secondary" onPress={onBack} />
         </View>
         <Heading level={1} headingRef={headingRef}>
           {heading}
@@ -253,7 +253,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
             <>
               <Button
                 label={copy.softer}
-                variant="ghost"
+                variant="tertiary"
                 pressed={tone === 'softer'}
                 ariaDisabled={edited}
                 announceDisabled
@@ -280,8 +280,8 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
               <Switch value={greeting.value} onValueChange={greeting.onChange} trackColor={{ true: v2.roles.link }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden />
             </Pressable>
           ) : null}
-          {edited ? <Button label={copy.useSuggested} variant="ghost" buttonRef={useSuggestedRef} onPress={useSuggestedWording} /> : null}
-          {!edited && dropped !== null ? <Button label={copy.bringBack} variant="ghost" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
+          {edited ? <Button label={copy.useSuggested} variant="tertiary" buttonRef={useSuggestedRef} onPress={useSuggestedWording} /> : null}
+          {!edited && dropped !== null ? <Button label={copy.bringBack} variant="tertiary" buttonRef={bringBackRef} onPress={bringBackWords} /> : null}
           <Status id={swapNoteId} message={swapNote} />
         </View>
         {details?.label !== undefined ? (

@@ -202,7 +202,7 @@ export function Account({
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={onBack} />
+        <Button label={copy.back} variant="secondary" onPress={onBack} />
       </View>
       <View style={styles.head}>
         <Heading level={1} headingRef={headingRef}>
@@ -277,7 +277,7 @@ export function Account({
         <View style={styles.group}>
           <Heading level={2}>{copy.signOutHeading}</Heading>
           <Body tone="muted">{copy.signOutHint}</Body>
-          <Button label={copy.signOut} variant="header" onPress={onSignOut} />
+          <Button label={copy.signOut} variant="secondary" onPress={onSignOut} />
         </View>
       ) : null}
       <View style={styles.group}>
