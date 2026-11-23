@@ -1,0 +1,17 @@
+name = "griever-guidance-agent"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+
+# Phase 1: this Worker has no address and is not deployed (REQUIREMENTS.md section 6, "Domain and
+# hosting"). No `routes`, no workers.dev, no preview URLs. Routing it is a later, ask-first change.
+workers_dev = false
+preview_urls = false
+
+# Per-IP rate limit on POST /mcp (src/rateLimit.ts), keyed on CF-Connecting-IP. Same binding type as
+# apps/gateway: `limit` requests per `period` seconds (period must be 10 or 60). The code reads the
+# binding by this name; if it is missing the limit is simply off.
+# `namespace_id` must be unique among this account's rate limiters (1001 and 1002 are the gateway's).
+[[ratelimits]]
+name = "AGENT_RATE_LIMITER"
+namespace_id = "1003"
+simple = { limit = 300, period = 60 }

@@ -273,6 +273,10 @@ Tokens v2 (`libs/tokens/src/v2`) has three layers: primitives (raw values), role
 
 ```
 apps/
+  agent/      The agent interface: a stateless MCP server (Streamable HTTP, POST /mcp) on Cloudflare Workers,
+              Worker griever-guidance-agent. Serves start_workflow and next_step from libs/agent-workflow.
+              Holds no credentials, stores and logs nothing, and calls no other service. Not routed and
+              not deployed (no route, workers_dev = false).
   gateway/    Hono on Cloudflare Workers (and locally via @hono/node-server), port 3001 in dev.
               Composes libs/identity, libs/gateway-messages, libs/gateway-flows and libs/gateway-places into
               one HTTP surface (CORS + routing) — this app owns no domain logic itself.
@@ -333,8 +337,8 @@ infra/
   identity, gateway-messages, gateway-flows, and gateway-places each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
   together. The only shared code is libs/gateway-auth (rule 2b below).
-  libs/agent-workflow imports only libs/shared and libs/copy, never libs/hooks, libs/api-client,
-  libs/identity or libs/gateway-*.
+  apps/agent and libs/agent-workflow import only libs/shared and libs/copy (and, for apps/agent, the MCP SDK
+  and zod), never libs/hooks, libs/api-client, libs/identity or libs/gateway-*.
 ```
 
 ---
@@ -346,6 +350,7 @@ infra/
 | Mobile | Expo + React Native (core components only) |
 | Web | React + Vite + Tailwind |
 | Gateway | Hono on Cloudflare Workers, fronting the AWS data function |
+| Agent interface | MCP server (@modelcontextprotocol/server 2.4.0, stateless createMcpHandler) on Cloudflare Workers |
 | Accounts | Clerk |
 | Data | DynamoDB behind an AWS Lambda data function (accounts, shared people). Convex and Supabase were removed (#203, #326) |
 | Marketing | Astro |
@@ -374,6 +379,9 @@ URLs to hand users or hardcode.
 `apps/gateway/wrangler.toml`. `CLERK_ISSUER`, `DATA_FUNCTION_URL` and `FEATURE_AUTH` are GitHub repo
 variables that the deploy workflow passes to the gateway and the web build.
 
+`apps/agent` (Worker `griever-guidance-agent`) has no address: no route, no workers.dev, not in
+`deploy.yml`. Routing it is a Cloudflare change and asks first.
+
 ---
 
 ### Running the project
@@ -395,7 +403,7 @@ Never define a type in an app that anything else might need. If it crosses a bou
 Apps import from `libs/api-client` and call nothing else. No raw `fetch` in app code.
 
 **2a. The gateway is the only thing that holds server credentials.**
-`apps/web` calls `apps/gateway`'s REST endpoints (and Clerk, with its public publishable key). No service-role key or other server secret in `apps/web`. (This rule was about Convex before it was removed, #203.)
+`apps/web` calls `apps/gateway`'s REST endpoints (and Clerk, with its public publishable key). No service-role key or other server secret in `apps/web`. (This rule was about Convex before it was removed, #203.) `apps/agent` holds no server credentials: no secrets, no Clerk, no data function access.
 
 **2b. Identity, messages, and flows are separate libs — no cross-imports.**
 `libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` each own their routes and business logic independently. `apps/gateway`'s only job is composing their Hono routers into one HTTP surface (CORS + routing) — domain logic never lives in `apps/gateway` itself, and none of them ever imports another. The one exception is a single shared helper lib, `libs/gateway-auth` (Clerk token verification with `clerkAuth`, plus the verifier the data function imports via `@griever/gateway-auth/verify-token`; the per-user write rate limit `writeRateLimit`; the data-function calls made as the caller, `callData`; and the service call `callDeleteUser`), which the domain libs may import. It is the only shared helper; `libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` still never import each other.
@@ -612,6 +620,8 @@ apps/gateway  PORT, CORS_ORIGINS, ANTHROPIC_API_KEY,
               service path, same value as the data function's DATA_SERVICE_SECRET)
               WRITE_RATE_LIMITER (binding, 120 requests per 60 s per user, writes under /flows* and /me*)
               PLACES_RATE_LIMITER (binding, 60 requests per 60 s per IP, the /places routes)
+apps/agent    AGENT_RATE_LIMITER (binding, 300 requests per 60 s per IP, POST /mcp; missing = limit off).
+              No vars and no secrets.
 data function (Lambda gg-app-data; all set by infra/aws/data.yml)
               GG_DATA_TABLE, GG_CONTENT_TABLE, DATA_AUTH_ISSUER, DATA_AUTH_JWKS_URL,
               DATA_AUTH_AUTHORIZED_PARTIES, DATA_SERVICE_SECRET (empty = the delete path answers 404)
@@ -660,6 +670,9 @@ This is a grief app. All user-facing copy — templates, labels, error messages,
 - No exclamation points in user-facing copy
 - No `npm` or `yarn` — pnpm only
 - No gateway routes without request body/query validation
+- No agent tool input for names, contacts or free text: enums and step ids only, in strict schemas that refuse unknown keys (C8)
+- No `sms:`, `mailto:`, `tel:` or web links in agent tool output, and no agent tool that takes a phone number, an email or a name (C1)
+- No state, storage or input logging in apps/agent
 - No cross-imports between `libs/identity`, `libs/gateway-messages`, `libs/gateway-flows`, and `libs/gateway-places` (only `libs/gateway-auth` is shared)
 - No contact ids in flow sync (C3), and no invitee picked from contacts: the owner types the email (C6)
 - No service-role key anywhere (see "Identity")

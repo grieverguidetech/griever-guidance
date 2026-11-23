@@ -218,6 +218,24 @@ importers:
         specifier: ^4.90.0
         version: 4.90.0(@cloudflare/workers-types@4.20260511.1)
 
+  apps/agent:
+    dependencies:
+      '@griever/agent-workflow':
+        specifier: workspace:*
+        version: link:../../libs/agent-workflow
+      '@griever/copy':
+        specifier: workspace:*
+        version: link:../../libs/copy
+      '@griever/shared':
+        specifier: workspace:*
+        version: link:../../libs/shared
+      '@modelcontextprotocol/server':
+        specifier: 2.4.0
+        version: 2.4.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   apps/gateway:
     dependencies:
       '@griever/gateway-flows':
@@ -2895,6 +2913,14 @@ packages:
   '@mermaid-js/parser@2.0.1':
     resolution: {integrity: sha512-j37dj/h6p6pots1L7pLPPNuABEEu9WP4OYg9pW1g+nYG331j0+3canE9OagtYdytYvdSAMG+2fKU5cxep6LgjA==}
     engines: {node: '>=22.12.0'}
+
+  '@modelcontextprotocol/core@2.4.0':
+    resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/server@2.4.0':
+    resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
+    engines: {node: '>=20'}
 
   '@module-federation/bridge-react-webpack-plugin@2.4.0':
     resolution: {integrity: sha512-yxDv/FJoLiKo2eqIcEWvSnSpJgyYkCzJvNaFsQ2QE3rNv68IeAarlSzCo+d0QyQoPJnTETyHsOh1SSBazIzecw==}
@@ -13362,6 +13388,15 @@ snapshots:
   '@mermaid-js/parser@2.0.1':
     dependencies:
       '@chevrotain/types': 13.2.0
+
+  '@modelcontextprotocol/core@2.4.0':
+    dependencies:
+      zod: 4.6.7
+
+  '@modelcontextprotocol/server@2.4.0':
+    dependencies:
+      '@modelcontextprotocol/core': 2.4.0
+      zod: 4.6.7
 
   '@module-federation/bridge-react-webpack-plugin@2.4.0(node-fetch@2.7.0(encoding@0.1.13))':
     dependencies:
