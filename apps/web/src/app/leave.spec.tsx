@@ -143,8 +143,8 @@ async function openAccount(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function openYourPeople(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
-  await screen.findByRole('heading', { level: 1, name: 'Your people' });
+  await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
+  await screen.findByRole('heading', { level: 1, name: "Who you've lost" });
 }
 
 describe('stop helping (#223)', () => {

@@ -1,6 +1,6 @@
 {
   "navOverview": "Overview",
-  "navPeople": "Your people",
+  "navPeople": "Who you've lost",
   "navPerson": "The person",
   "navAnnouncement": "Announcement",
   "navService": "Service",
@@ -36,7 +36,7 @@
   "nameNoteStart": "Add your first name in ",
   "nameNoteLink": "Account",
   "nameNoteEnd": " so your messages are signed.",
-  "peopleTitle": "Your people",
+  "peopleTitle": "Who you've lost",
   "peopleListLabel": "People",
   "peopleUnnamed": "Not named yet",
   "peopleUnnamedStarted": "Not named yet, started {date}",
@@ -69,5 +69,5 @@
   "arrivedNote": "A person is here now. Their page is open.",
   "loadingTitle": "One moment",
   "dateCalendarButton": "Choose date from calendar",
-  "personMissing": "That page isn't here. Your people are below."
+  "personMissing": "That page isn't here. The people you've lost are below."
 }

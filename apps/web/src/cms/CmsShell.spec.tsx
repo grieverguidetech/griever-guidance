@@ -22,7 +22,7 @@ describe('CmsShell people view', () => {
   it('has one h1, the full nav, and "Your account" calls onAccount after focusing the h1', async () => {
     const onAccount = vi.fn();
     render(
-      <CmsShell title="Your people" nobody personName="" section="people" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={onAccount}>
+      <CmsShell title="Who you've lost" nobody personName="" section="people" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={onAccount}>
         <p>List</p>
       </CmsShell>,
     );
@@ -64,7 +64,7 @@ describe('CmsShell save line', () => {
 
   it('is absent in the people view', () => {
     render(
-      <CmsShell title="Your people" nobody personName="" section="people" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={vi.fn()}>
+      <CmsShell title="Who you've lost" nobody personName="" section="people" onSelect={vi.fn()} onPeople={vi.fn()} onAccount={vi.fn()}>
         <p>List</p>
       </CmsShell>,
     );
@@ -106,11 +106,11 @@ describe('CmsShell', () => {
     expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveAttribute('aria-current');
   });
 
-  it('routes section items to onSelect, Your people to onPeople and the account item to onAccount', async () => {
+  it('routes section items to onSelect, Who you\'ve lost to onPeople and the account item to onAccount', async () => {
     const { onSelect, onAccount, onPeople } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'Overview' }));
     expect(onSelect).toHaveBeenCalledWith('overview');
-    await userEvent.click(screen.getByRole('button', { name: 'Your people' }));
+    await userEvent.click(screen.getByRole('button', { name: "Who you've lost" }));
     expect(onPeople).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole('button', { name: 'Your account' }));
     expect(onAccount).toHaveBeenCalledTimes(1);
@@ -124,10 +124,10 @@ describe('CmsShell', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });
 
-  it('moves focus to the h1 when Your people is chosen from the phone menu', async () => {
+  it('moves focus to the h1 when Who you\'ve lost is chosen from the phone menu', async () => {
     setup();
     await userEvent.click(screen.getByRole('button', { name: 'Sections · Service' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Your people' }));
+    await userEvent.click(screen.getByRole('button', { name: "Who you've lost" }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
   });
 

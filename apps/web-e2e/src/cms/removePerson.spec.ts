@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
  */
 const WCAG = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
-test('an owner removes a person from Account, and Your people no longer lists them', async ({ page }) => {
+test('an owner removes a person from Account, and Who you\'ve lost no longer lists them', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1, name: 'Overview' })).toBeVisible();
   await page.getByRole('button', { name: "Start with someone I've lost" }).click();
@@ -31,7 +31,7 @@ test('an owner removes a person from Account, and Your people no longer lists th
   const emptied = await new AxeBuilder({ page }).withTags(WCAG).disableRules(['color-contrast']).analyze();
   expect(emptied.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 
-  await nav.getByRole('link', { name: /^Your people/ }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
+  await nav.getByRole('link', { name: /^Who you've lost/ }).click();
+  await expect(page.getByRole('heading', { level: 1, name: "Who you've lost" })).toBeVisible();
   await expect(page.getByText('Margaret Hayes')).toHaveCount(0);
 });

@@ -218,7 +218,7 @@ describe('background sync in the app (#520)', () => {
     signedIn(true);
     renderApp(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: "Who you've lost" })).not.toBeInTheDocument();
     expect(screen.getAllByText('Margaret Hayes').length).toBeGreaterThan(0);
   });
 
@@ -238,7 +238,7 @@ describe('background sync in the app (#520)', () => {
         await vi.advanceTimersByTimeAsync(1300);
       });
       // 1400 ms in: still the quiet loading status, not an empty list.
-      expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: "Who you've lost" })).not.toBeInTheDocument();
       expect(screen.getByText('Loading…')).toBeInTheDocument();
       expect(screen.getAllByRole('banner')).toHaveLength(1);
       expect(screen.getAllByRole('navigation', { name: /^Sections/ })).toHaveLength(1);
@@ -249,7 +249,7 @@ describe('background sync in the app (#520)', () => {
         await vi.advanceTimersByTimeAsync(200);
       });
       expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: "Who you've lost" })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -296,7 +296,7 @@ describe('background sync in the app (#520)', () => {
     expect(window.location.pathname).toBe(`/people/${FLOW}/service`);
   });
 
-  it('a deep link to a person not in this account waits the first-pull cap, then shows Your people with a calm line, never the id (#849)', async () => {
+  it('a deep link to a person not in this account waits the first-pull cap, then shows Who you\'ve lost with a calm line, never the id (#849)', async () => {
     const other = '33333333-3333-4333-8333-333333333333';
     signedIn(true);
     // The device list is already kept for this account, as after any earlier sign-in.
@@ -317,8 +317,8 @@ describe('background sync in the app (#520)', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(200);
       });
-      expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
-      expect(screen.getByText("That page isn't here. Your people are below.")).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: "Who you've lost" })).toBeInTheDocument();
+      expect(screen.getByText("That page isn't here. The people you've lost are below.")).toBeInTheDocument();
       expect(window.location.pathname).toBe('/people');
       expect(document.body.textContent).not.toContain(other);
     } finally {
@@ -380,7 +380,7 @@ describe('background sync in the app (#520)', () => {
         await vi.advanceTimersByTimeAsync(2000);
       });
       expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { level: 1, name: 'Your people' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 1, name: "Who you've lost" })).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -500,7 +500,7 @@ describe('background sync in the app (#520)', () => {
     expect(window.location.search).toBe('?from=link');
     expect(window.location.hash).toBe('#top');
     expect(await screen.findByRole('heading', { level: 1, name: 'Obituary' })).toBeInTheDocument();
-    expect(screen.queryByText("That page isn't here. Your people are below.")).toBeNull();
+    expect(screen.queryByText("That page isn't here. The people you've lost are below.")).toBeNull();
   });
 
   it('keeps focus in the field being typed in when the person moves to a new id (#942)', async () => {

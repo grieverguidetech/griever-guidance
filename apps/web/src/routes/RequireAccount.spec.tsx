@@ -343,8 +343,8 @@ describe('the guard on the App', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/account' });
     await h1('Account');
-    await user.click(screen.getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(screen.getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     act(() => {
       window.history.back();
     });

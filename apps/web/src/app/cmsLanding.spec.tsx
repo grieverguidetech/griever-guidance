@@ -1,6 +1,6 @@
 /**
  * #448: with the editor on, the app lands on the Overview (or The person) once per load or sign-in,
- * and "Change" opens "Your people" and stays there; Back from Settings or Profile returns to the Overview (#451). Real localStorage; the flag is mocked.
+ * and "Change" opens "Who you've lost" and stays there; Back from Settings or Profile returns to the Overview (#451). Real localStorage; the flag is mocked.
  */
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { renderApp } from '../test/renderApp';
@@ -66,11 +66,11 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const PEOPLE = 'Your people';
+const PEOPLE = "Who you've lost";
 const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 const ANOTHER = "Someone else I've lost";
-const MISSING_LINE = "That page isn't here. Your people are below.";
+const MISSING_LINE = "That page isn't here. The people you've lost are below.";
 
 function person(id: string, name: string, openedAt: string, extra: Partial<Session> = {}) {
   return {
@@ -109,7 +109,7 @@ async function expectStaysOnHome() {
   expect(screen.getByRole('heading', { level: 1, name: HOME })).toBeInTheDocument();
 }
 
-/** Lets any pending effect run, then checks "Your people" is still showing (no bounce back). */
+/** Lets any pending effect run, then checks "Who you've lost" is still showing (no bounce back). */
 async function expectStaysOnPeople() {
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(screen.getByRole('heading', { level: 1, name: PEOPLE })).toBeInTheDocument();
@@ -186,7 +186,7 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', '', '2026-10-10T12:00:00.000Z', { checklist: { headstone: 'done' } }));
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     expect(screen.getByRole('button', { name: 'Not named yet, started Oct 10' })).toBeInTheDocument();
     expect(stored()).toHaveLength(1);
@@ -212,7 +212,7 @@ describe('landing with the editor on (#448)', () => {
     expect(stored()).toHaveLength(0);
   });
 
-  it('an owner with nobody saved can press "Start with someone I\'ve lost" on Your people (C11)', async () => {
+  it('an owner with nobody saved can press "Start with someone I\'ve lost" on Who you\'ve lost (C11)', async () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
@@ -237,7 +237,7 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     await user.click(screen.getByRole('link', { name: 'Your account' }));
     await user.click(await screen.findByRole('button', { name: 'Sign out' }));
@@ -254,7 +254,7 @@ describe('landing with the editor on (#448)', () => {
     expect(stored()).toHaveLength(0);
   });
 
-  it('lands a member with nothing shared on the Overview, and Your people has the empty-state copy and no create button (C11)', async () => {
+  it('lands a member with nothing shared on the Overview, and Who you\'ve lost has the empty-state copy and no create button (C11)', async () => {
     signedInAs('member');
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
@@ -292,7 +292,7 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     const home = await h1(PEOPLE);
     await waitFor(() => expect(home).toHaveFocus());
     await expectStaysOnPeople();
@@ -301,15 +301,15 @@ describe('landing with the editor on (#448)', () => {
     expect(await h1('The person')).toBeInTheDocument();
   });
 
-  it('in "Your people" the full nav shows for the person, under the one h1', async () => {
+  it('in "Who you\'ve lost" the full nav shows for the person, under the one h1', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
-    // Every item is a link (each has a URL): the five pages, Your people and Your account.
+    // Every item is a link (each has a URL): the five pages, Who you've lost and Your account.
     expect(within(nav).getAllByRole('link')).toHaveLength(7);
     expect(Array.from(nav.querySelectorAll('a, button')).map((b) => b.textContent?.trim())).toEqual([
       'Overview',
@@ -317,7 +317,7 @@ describe('landing with the editor on (#448)', () => {
       'Service',
       'Obituary',
       'Thank-yous',
-      'Your people',
+      "Who you've lost",
       'Your account',
     ]);
     expect(within(nav).getByRole('link', { name: PEOPLE })).toHaveAttribute('aria-current', 'page');
@@ -328,7 +328,7 @@ describe('landing with the editor on (#448)', () => {
     await waitFor(() => expect(focused1).toHaveFocus());
   });
 
-  it('Your people with 2 people shows the full nav and the most recent person\'s checklist, Your people current', async () => {
+  it('Who you\'ve lost with 2 people shows the full nav and the most recent person\'s checklist, Who you\'ve lost current', async () => {
     const user = userEvent.setup();
     seed(
       person('s1', 'Older Person', '2026-10-01T00:00:00.000Z'),
@@ -337,7 +337,7 @@ describe('landing with the editor on (#448)', () => {
     window.history.replaceState(null, '', '/');
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(nav.querySelectorAll('a, button')).toHaveLength(7);
@@ -348,18 +348,18 @@ describe('landing with the editor on (#448)', () => {
     expect(aside.querySelector('[data-checklist-item]')).not.toBeNull();
   });
 
-  it('a section chosen from Your people opens that person there', async () => {
+  it('a section chosen from Who you\'ve lost opens that person there', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Service/ }));
     expect(await h1('Service')).toBeInTheDocument();
   });
 
-  it('from Your people with 2 people, Service opens with focus and names the newest person; Back returns to Your people', async () => {
+  it('from Who you\'ve lost with 2 people, Service opens with focus and names the newest person; Back returns to Who you\'ve lost', async () => {
     const user = userEvent.setup();
     seed(
       person('s1', 'Older Person', '2026-10-01T00:00:00.000Z'),
@@ -367,7 +367,7 @@ describe('landing with the editor on (#448)', () => {
     );
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: /^Service/ }));
     const service = await h1('Service');
@@ -380,7 +380,7 @@ describe('landing with the editor on (#448)', () => {
     expect(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: PEOPLE })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('a checklist item opened from the Your people panel shows the item and names the newest person', async () => {
+  it('a checklist item opened from the Who you\'ve lost panel shows the item and names the newest person', async () => {
     const user = userEvent.setup();
     seed(
       person('s1', 'Older Person', '2026-10-01T00:00:00.000Z'),
@@ -388,7 +388,7 @@ describe('landing with the editor on (#448)', () => {
     );
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     const opener = document.querySelector<HTMLElement>('aside [data-checklist-item]');
     expect(opener).not.toBeNull();
@@ -397,12 +397,12 @@ describe('landing with the editor on (#448)', () => {
     expect(screen.getByRole('navigation', { name: 'Sections for Margaret Hayes' })).toBeInTheDocument();
   });
 
-  it('Your account opened from "Your people" shows the full nav for the most recent person, and Change returns to "Your people"', async () => {
+  it('Your account opened from "Who you\'ve lost" shows the full nav for the most recent person, and Change returns to "Who you\'ve lost"', async () => {
     const user = userEvent.setup();
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     await user.click(screen.getByRole('link', { name: 'Your account' }));
     await h1('Account');
@@ -410,14 +410,14 @@ describe('landing with the editor on (#448)', () => {
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     expect(within(nav).getByRole('link', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('link', { name: /^Overview/ })).toBeInTheDocument();
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     const people = await h1(PEOPLE);
     await waitFor(() => expect(people).toHaveFocus());
     await expectStaysOnPeople();
     expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).not.toBeInTheDocument();
   });
 
-  it('with no person, Your account keeps the full nav, and Your people returns to the list and creates nothing (C11)', async () => {
+  it('with no person, Your account keeps the full nav, and Who you\'ve lost returns to the list and creates nothing (C11)', async () => {
     signedInAs('member');
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'member', owner: { id: 'o1', name: 'Anna' } } });
@@ -438,7 +438,7 @@ describe('landing with the editor on (#448)', () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'), person('s2', 'Robert Hayes', '2026-10-20T00:00:00.000Z'));
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
     await h1(PEOPLE);
     await user.click(screen.getByRole('link', { name: 'Your account' }));
     await h1('Account');
@@ -522,7 +522,7 @@ describe('landing with the editor on (#448)', () => {
 });
 
 describe('navigation (#566)', () => {
-  it('shows the logo header, and the people screen has the side nav with Your people current', async () => {
+  it('shows the logo header, and the people screen has the side nav with Who you\'ve lost current', async () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     const user = userEvent.setup();
     renderApp(<App />);
@@ -602,7 +602,7 @@ describe('navigation (#566)', () => {
     ['Your account', async (user: ReturnType<typeof userEvent.setup>) => {
       await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your account' }));
     }, 'Account'],
-    ['Your people', async (user: ReturnType<typeof userEvent.setup>) => {
+    ["Who you've lost", async (user: ReturnType<typeof userEvent.setup>) => {
       await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: PEOPLE }));
     }, PEOPLE],
     ['a section', async (user: ReturnType<typeof userEvent.setup>) => {
@@ -630,7 +630,7 @@ describe('navigation (#566)', () => {
     });
   });
 
-  it('Back to a screen whose person was deleted lands on Your people, with no new entry and Forward kept', async () => {
+  it('Back to a screen whose person was deleted lands on Who you\'ve lost, with no new entry and Forward kept', async () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     const user = userEvent.setup();
     renderApp(<App />);
@@ -662,7 +662,7 @@ describe('navigation (#566)', () => {
     push.mockRestore();
   });
 
-  it('Back to Your account after the person was deleted restores Your account, not Your people', async () => {
+  it('Back to Your account after the person was deleted restores Your account, not Who you\'ve lost', async () => {
     seed(person('s1', 'Margaret Hayes', '2026-10-10T00:00:00.000Z'));
     const user = userEvent.setup();
     renderApp(<App />);
@@ -824,7 +824,7 @@ describe('navigation (#566)', () => {
   });
 });
 
-describe('Your people and Your account paths: review fixes (#850)', () => {
+describe('Who you\'ve lost and Your account paths: review fixes (#850)', () => {
   const OLDER = '3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10';
   const NEWER = 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e';
   const ENDED = "You've been signed out. Your work on this device is safe. Sign in again when you're ready.";
@@ -856,7 +856,7 @@ describe('Your people and Your account paths: review fixes (#850)', () => {
     renderApp(<App />, { path: '/account' });
     // An interaction first: the heading hook only moves focus for someone who has used the page.
     await userEvent.setup().click(await h1('Account'));
-    const link = within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' });
+    const link = within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" });
     link.focus();
     act(() => clerk.endElsewhere());
     expect(await screen.findByText(ENDED)).toBeInTheDocument();
@@ -889,8 +889,8 @@ describe('Your people and Your account paths: review fixes (#850)', () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/account' });
     await h1('Account');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     const back = vi.spyOn(window.history, 'back');
     const push = vi.spyOn(window.history, 'pushState');
     act(() => {
@@ -913,17 +913,17 @@ describe('Your people and Your account paths: review fixes (#850)', () => {
     push.mockRestore();
   });
 
-  it('an item opened from Your people, then a reload: closing it still goes Back to Your people', async () => {
+  it('an item opened from Who you\'ve lost, then a reload: closing it still goes Back to Who you\'ve lost', async () => {
     seedTwo();
     const user = userEvent.setup();
     const first = renderApp(<App />, { path: '/people' });
-    await h1('Your people');
+    await h1("Who you've lost");
     await user.click(within(screen.getByRole('complementary', { name: "What you'll need" })).getByRole('button', { name: 'Get a legal pronouncement of death' }));
     await h1('Get a legal pronouncement of death');
     first.unmount();
     renderApp(<App />, { path: window.location.pathname });
     await user.click(await screen.findByRole('button', { name: 'Back' }));
-    await h1('Your people');
+    await h1("Who you've lost");
     expect(window.location.pathname).toBe('/people');
   });
 });

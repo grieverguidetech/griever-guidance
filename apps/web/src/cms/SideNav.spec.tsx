@@ -13,11 +13,19 @@ function setup(props: Partial<Parameters<typeof SideNav>[0]> = {}) {
 }
 
 describe('SideNav', () => {
-  it('lists the 7 items in order, with Overview first, Your people before the account, and no The person link, inside the Sections nav', () => {
+  it('lists the 7 items in order, with Overview first, Who you\'ve lost before the account, and no The person link, inside the Sections nav', () => {
     setup();
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     const names = within(nav).getAllByRole('listitem').map((li) => li.textContent?.trim());
-    expect(names).toEqual(['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your people', 'Your account']);
+    expect(names).toEqual(['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', "Who you've lost", 'Your account']);
+  });
+
+  it('has a Who you\'ve lost item and no item named Your people', () => {
+    setup();
+    const nav = screen.getByRole('navigation', { name: /^Sections/ });
+    expect(within(nav).getByRole('button', { name: "Who you've lost" })).toBeInTheDocument();
+    expect(within(nav).queryByRole('button', { name: /your people/i })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: /your people/i })).not.toBeInTheDocument();
   });
 
   it('names the person in the landmark, and keeps Sections with no name', () => {
@@ -43,7 +51,7 @@ describe('SideNav', () => {
       'Service',
       'Obituary',
       'Thank-yous',
-      'Your people',
+      "Who you've lost",
       'Your account',
     ]);
   });
@@ -52,7 +60,7 @@ describe('SideNav', () => {
     setup({ section: 'people' });
     const nav = screen.getByRole('navigation', { name: /^Sections/ });
     const current = within(nav).getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page');
-    expect(current.map((b) => b.textContent?.trim())).toEqual(['Your people']);
+    expect(current.map((b) => b.textContent?.trim())).toEqual(["Who you've lost"]);
   });
 
   it('is 12rem wide from md up, never shrinks, and stays sticky', () => {
@@ -85,7 +93,7 @@ describe('SideNav', () => {
     const { onSelect } = setup();
     const menu = screen.getByRole('button', { name: 'Sections · Service' });
     await userEvent.click(menu);
-    await userEvent.click(screen.getByRole('button', { name: 'Your people' }));
+    await userEvent.click(screen.getByRole('button', { name: "Who you've lost" }));
     expect(onSelect).toHaveBeenCalledWith<[CmsNavKey]>('people');
     expect(menu).toHaveAttribute('aria-expanded', 'false');
   });
@@ -135,10 +143,10 @@ describe('SideNav', () => {
     expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveClass('bg-accent-100');
   });
 
-  it('on The person screen marks Your people current, and says so in the phone menu button', () => {
+  it('on The person screen marks Who you\'ve lost current, and says so in the phone menu button', () => {
     setup({ section: 'person' });
-    expect(screen.getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('button', { name: 'Sections · Your people' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: "Who you've lost" })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Sections · Who you\'ve lost' })).toBeInTheDocument();
     expect(screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page')).toHaveLength(1);
   });
 
@@ -162,21 +170,21 @@ describe('SideNav', () => {
       'Service',
       'Obituary',
       'Thank-yous',
-      'Your people',
+      "Who you've lost",
       'Your account',
     ]);
     await userEvent.setup().click(screen.getByRole('button', { name: /^Obituary/ }));
     expect(onSelect).toHaveBeenCalledWith('obituary');
   });
 
-  it('with nobody named marks the current item: Your people or Your account', () => {
+  it('with nobody named marks the current item: Who you\'ve lost or Your account', () => {
     setup({ personName: '', section: 'people' });
-    expect(screen.getByRole('button', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: "Who you've lost" })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Your account' })).not.toHaveAttribute('aria-current');
     cleanup();
     setup({ personName: '', section: 'account' });
     expect(screen.getByRole('button', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('button', { name: 'Your people' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('button', { name: "Who you've lost" })).not.toHaveAttribute('aria-current');
   });
 
   it('holds no hard-coded copy', () => {
@@ -187,7 +195,7 @@ describe('SideNav', () => {
   describe('with paths (#849)', () => {
     const hrefFor = (key: CmsNavKey) => (key === 'people' || key === 'account' ? null : `/people/abc/${key}`);
 
-    it('makes the pages links with their href, and keeps Your people and Your account as buttons', () => {
+    it('makes the pages links with their href, and keeps Who you\'ve lost and Your account as buttons', () => {
       setup({ hrefFor });
       const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
       expect(nav.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
@@ -197,18 +205,24 @@ describe('SideNav', () => {
         '/people/abc/obituary',
         '/people/abc/thanks',
       ]);
-      expect(nav.getAllByRole('button').map((b) => b.textContent?.trim())).toEqual(['Your people', 'Your account']);
+      expect(nav.getAllByRole('button').map((b) => b.textContent?.trim())).toEqual(["Who you've lost", 'Your account']);
       expect(nav.getByRole('link', { name: /^Service/ })).toHaveAttribute('aria-current', 'page');
       expect(nav.getByRole('link', { name: /^Overview/ })).not.toHaveAttribute('aria-current');
     });
 
-    it('Your people and Your account are links too when they have a path, and keep aria-current (#850)', () => {
+    it('Who you\'ve lost and Your account are links too when they have a path, and keep aria-current (#850)', () => {
       setup({ hrefFor: (key) => (key === 'people' ? '/people' : key === 'account' ? '/account' : null), section: 'account' });
       const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
-      expect(nav.getByRole('link', { name: 'Your people' })).toHaveAttribute('href', '/people');
+      expect(nav.getByRole('link', { name: "Who you've lost" })).toHaveAttribute('href', '/people');
       expect(nav.getByRole('link', { name: 'Your account' })).toHaveAttribute('href', '/account');
       expect(nav.getByRole('link', { name: 'Your account' })).toHaveAttribute('aria-current', 'page');
-      expect(nav.getByRole('link', { name: 'Your people' })).not.toHaveAttribute('aria-current');
+      expect(nav.getByRole('link', { name: "Who you've lost" })).not.toHaveAttribute('aria-current');
+    });
+
+    it('on a person page the Who you\'ve lost link keeps aria-current (#954)', () => {
+      setup({ hrefFor: (key) => (key === 'people' ? '/people' : `/people/abc/${key}`), section: 'person' });
+      const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+      expect(nav.getByRole('link', { name: "Who you've lost" })).toHaveAttribute('aria-current', 'page');
     });
 
     it('a plain click or Enter on a link chooses it in the app, without following the href', async () => {

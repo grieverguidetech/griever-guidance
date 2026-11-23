@@ -85,10 +85,10 @@ const screens: Record<string, (page: Page) => Promise<void>> = {
     await expect(page.getByRole('button', { name: 'Remove everything from this device' })).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 2, name: 'Help and support' })).toBeVisible();
   },
-  'Your people': async (page) => {
+  "Who you've lost": async (page) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
-    await openSection(page, 'Your people', 'Your people');
+    await openSection(page, "Who you've lost", "Who you've lost");
     await expect(page.getByRole('heading', { name: "Who you're writing about" })).toHaveCount(0);
   },
 };
@@ -235,17 +235,17 @@ test.describe('no sync while signed out (#520)', () => {
 });
 
 test.describe('navigation (#566)', () => {
-  test('the header shows the product name, and the side nav has Your people and no The person link or status words', async ({ page }) => {
+  test('the header shows the product name, and the side nav has Who you\'ve lost and no The person link or status words', async ({ page }) => {
     await startPerson(page);
     await expect(page.getByRole('banner').getByRole('img', { name: 'Grievers Guidance' })).toBeVisible();
     await expect(nav(page).getByRole('button', { name: /^The person/ })).toHaveCount(0);
-    await expect(nav(page).getByRole('link', { name: 'Your people' })).toBeVisible();
+    await expect(nav(page).getByRole('link', { name: "Who you've lost" })).toBeVisible();
     await expect(nav(page).getByText('Not started')).toHaveCount(0);
     await expect(nav(page).getByText('Ready', { exact: true })).toHaveCount(0);
     await expect(nav(page).getByText('Not named yet')).toHaveCount(0);
   });
 
-  test('the side nav stays on Your account after another screen and back, and on Your people', async ({ page }) => {
+  test('the side nav stays on Your account after another screen and back, and on Who you\'ve lost', async ({ page }) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
     await openSection(page, 'Your account', 'Account');
@@ -253,9 +253,9 @@ test.describe('navigation (#566)', () => {
     await openSection(page, 'Service', 'Service');
     await openSection(page, 'Your account', 'Account');
     await expect(nav(page).getByRole('link', { name: 'Overview' })).toBeVisible();
-    await openSection(page, 'Your people', 'Your people');
+    await openSection(page, "Who you've lost", "Who you've lost");
     await expect(nav(page).getByRole('link', { name: 'Your account' })).toBeVisible();
-    await expect(nav(page).getByRole('link', { name: 'Your people' })).toHaveAttribute('aria-current', 'page');
+    await expect(nav(page).getByRole('link', { name: "Who you've lost" })).toHaveAttribute('aria-current', 'page');
   });
 
   test('Back walks the editor screens in the order they were opened', async ({ page }) => {
@@ -342,7 +342,7 @@ test.describe('checklist item URLs (#856)', () => {
   });
 });
 
-test.describe('Your people and Your account URLs (#850)', () => {
+test.describe('Who you\'ve lost and Your account URLs (#850)', () => {
   test('Back from /account returns to the page it was opened from, and Forward goes on', async ({ page }) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
@@ -363,10 +363,10 @@ test.describe('Your people and Your account URLs (#850)', () => {
   test('/people and /account open by address and survive a reload', async ({ page }) => {
     await startPerson(page);
     await page.getByLabel('Their name').fill('Margaret Hayes');
-    await openSection(page, 'Your people', 'Your people');
+    await openSection(page, "Who you've lost", "Who you've lost");
     expect(new URL(page.url()).pathname).toBe('/people');
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1, name: 'Your people' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: "Who you've lost" })).toBeVisible();
     await openSection(page, 'Your account', 'Account');
     await page.reload();
     await expect(page.getByRole('heading', { level: 1, name: 'Account' })).toBeVisible();
