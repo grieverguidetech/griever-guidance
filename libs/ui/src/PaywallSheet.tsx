@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Sheet } from './Sheet';
 import type { SheetProps } from './sheetProps';
 import { Body } from './Text';
@@ -38,5 +38,5 @@ export function PaywallSheet({ copy, visible, onClose, onDismiss, returnFocusRef
 }
 
 const styles = StyleSheet.create({
-  box: { backgroundColor: colors.white, borderRadius: 12, padding: spacing[3] },
+  box: { backgroundColor: v2.roles.page.color, borderRadius: 12, padding: spacing[3] },
 });

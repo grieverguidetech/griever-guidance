@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Platform, View } from 'react-native';
 import type { ViewStyle } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 
 export interface CardProps {
   children: ReactNode;
@@ -33,10 +33,10 @@ export function Card({ children, selected = false }: CardProps) {
 const baseCard: ViewStyle = {
   gap: spacing[2],
   padding: spacing[3],
-  backgroundColor: colors.surface,
-  borderRadius: radius.md,
+  backgroundColor: v2.recipes.card.fill,
+  borderRadius: v2.recipes.card.radius,
   borderWidth: 1,
-  borderColor: colors['neutral-300'],
+  borderColor: v2.recipes.card.border.color,
 };
 
-const selectedCard: ViewStyle = { borderWidth: 2, borderColor: colors.accent };
+const selectedCard: ViewStyle = { borderWidth: 2, borderColor: v2.roles.link };

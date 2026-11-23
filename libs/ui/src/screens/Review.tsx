@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import { SerifText } from '../SerifText';
 import type { ButtonNode } from '../Button';
@@ -252,21 +252,21 @@ const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
-  tag: { alignSelf: 'flex-start', backgroundColor: colors['accent-2-100'], borderRadius: radius.md, paddingHorizontal: spacing[2], paddingVertical: 2 },
-  tagText: { color: colors['accent-2-800'], fontSize: 12 },
+  tag: { alignSelf: 'flex-start', backgroundColor: v2.roles.wash, borderRadius: v2.recipes.field.radius, paddingHorizontal: spacing[2], paddingVertical: 2 },
+  tagText: { color: v2.roles.mutedStrong, fontSize: 12 },
   actions: { gap: spacing[1] },
   field: { gap: spacing[1] },
   input: {
     minHeight: 132,
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 14,
     textAlignVertical: 'top',
   },
   // Native focus cue (web draws its own ring through data-gg-field).
-  inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
+  inputFocused: { borderColor: v2.roles.link, borderWidth: 2 },
 });

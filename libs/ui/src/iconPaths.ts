@@ -5,7 +5,7 @@ export interface IconProps {
   name: IconName;
   /** Pixels. */
   size?: number;
-  /** A token colour, for example colors['neutral-700']. */
+  /** A token colour, for example v2.roles.muted. */
   color: string;
   /** Sits at the far right of its parent, centred up and down. The parent needs room (padding). */
   trailing?: boolean;

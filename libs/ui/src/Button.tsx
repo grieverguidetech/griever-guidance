@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent, TextStyle } from 'react-native';
 import { Platform, Pressable, StyleSheet, Text } from 'react-native';
-import { colors, minTouchTarget, spacing } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
 import { Phrasing } from './phrasing';
 import { useSerifStyle } from './typography';
@@ -12,10 +12,10 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
 
 /**
  * Looks follow the mobile app's buttons (decision by Peter, 2026-10-25): rounded 10px corners,
- * a solid accent-700 primary, an accent outline for secondary, and a tinted outlined "link" button
- * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: an
- * accent-700 label with an underline, no fill and no border, and a pale accent wash while pressed.
- * `header` is Back and What you'll need (#362): the page shows through, a thin accent-600 outline,
+ * a solid roles.link primary, a roles.link outline for secondary, and a tinted outlined "link" button
+ * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: a
+ * roles.link label with an underline, no fill and no border, and a roles.wash fill while pressed.
+ * `header` is Back and What you'll need (#362): the page shows through, a thin roles.focus outline,
  * no underline, same as web's top bar. No icons. Palette and serif still follow web.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
@@ -160,30 +160,30 @@ const styles = StyleSheet.create({
   v1Edge: { borderWidth: 1, borderColor: 'transparent', borderRadius: BUTTON_RADIUS },
   // Web swirl: padding stays here because react-native-web zeroes it.
   swirl: { paddingVertical: 14 },
-  // Fills behind text use accent-700 (5.72:1 with the page colour); the base accent is decorative.
-  primary: { backgroundColor: colors['accent-700'], paddingVertical: 14 },
-  // Outlined with the accent, as mobile's secondary button. accent-700 on the page is 5.72:1.
-  secondary: { borderColor: colors['accent-700'], paddingVertical: 14 },
-  tinted: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
+  // Fills behind text use the v2 link colour (see Button.spec for the contrast with the page colour).
+  primary: { backgroundColor: v2.roles.link, paddingVertical: 14 },
+  // Outlined with the link colour, as mobile's secondary button.
+  secondary: { borderColor: v2.roles.link, paddingVertical: 14 },
+  tinted: { borderColor: v2.roles.link, backgroundColor: v2.roles.wash },
   ghost: {},
   // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
   tertiary: {},
-  // accent-600 on the page is 3.74:1, above the 3:1 non-text minimum.
-  header: { borderColor: colors['accent-600'] },
+  // The v2 focus colour holds 3:1 on every ground (v2.spec).
+  header: { borderColor: v2.roles.focus },
   pressed: { opacity: 0.7 },
-  // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
-  pressedWash: { backgroundColor: colors['accent-100'] },
+  // link on wash is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
+  pressedWash: { backgroundColor: v2.roles.wash },
   // Unavailable is a solid muted look, not a fade: opacity would drop the label below 4.5:1.
-  // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
-  unavailableFill: { backgroundColor: colors['neutral-700'] },
+  // Primary: page colour on muted (see Button.spec for the numbers). Others: muted text on the page.
+  unavailableFill: { backgroundColor: v2.roles.muted },
   label: {
   },
   labelPrimary: { fontSize: 15 },
   labelLink: { fontSize: 14 },
-  labelOnFill: { color: colors.bg },
+  labelOnFill: { color: v2.roles.page.color },
   // Web swirl: the label takes the button's own text colour and font (family, weight, size) from styles.css.
   labelSwirl: { color: 'inherit', fontFamily: 'inherit', ...WEB_INHERIT_FONT },
   labelTertiary: { textDecorationLine: 'underline' },
-  labelAccent: { color: colors['accent-700'] },
-  labelUnavailable: { color: colors['neutral-700'] },
+  labelAccent: { color: v2.roles.link },
+  labelUnavailable: { color: v2.roles.muted },
 });

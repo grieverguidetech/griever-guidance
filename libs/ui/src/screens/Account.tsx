@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
 import { Heading } from '../Heading';
@@ -150,12 +150,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 14,
   },
   // Native focus cue (web draws its own ring through data-gg-field).
-  inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
+  inputFocused: { borderColor: v2.roles.link, borderWidth: 2 },
 });

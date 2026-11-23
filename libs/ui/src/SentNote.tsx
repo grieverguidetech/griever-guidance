@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { SerifText } from './SerifText';
 
 export interface SentNoteProps {
@@ -11,7 +11,7 @@ export interface SentNoteProps {
 
 /**
  * The calm note after a send, for example "Everyone has been told. We don't keep a copy...".
- * Plain italic text with no border or card, on web and mobile alike. Contrast: neutral-800 on the
+ * Plain italic text with no border or card, on web and mobile alike. Contrast: roles.mutedStrong on the
  * page colour passes 4.5:1 (same as Body).
  */
 export function SentNote({ lead, rest }: SentNoteProps) {
@@ -26,7 +26,7 @@ export function SentNote({ lead, rest }: SentNoteProps) {
 }
 
 const styles = StyleSheet.create({
-  text: { fontSize: 14, lineHeight: 21, fontStyle: 'italic', color: colors['neutral-800'] },
+  text: { fontSize: 14, lineHeight: 21, fontStyle: 'italic', color: v2.roles.mutedStrong },
   lead: { fontStyle: 'italic', fontWeight: '600' },
   rest: { fontStyle: 'italic', fontWeight: '400' },
 });

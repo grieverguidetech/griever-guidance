@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { Platform } from 'react-native';
-import { colors, v2 } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { Heading, headingColor } from './Heading';
 import type { HeadingLevel } from './Heading';
 
@@ -23,7 +23,7 @@ describe('Heading', () => {
   it('uses the v2 heading colour var on web and ink on native', () => {
     expect(headingColor()).toBe('var(--color-v2-heading)');
     vi.spyOn(Platform, 'OS', 'get').mockReturnValue('ios');
-    expect(headingColor()).toBe(colors.ink);
+    expect(headingColor()).toBe(v2.roles.ink);
     vi.restoreAllMocks();
   });
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from './Button';
 import { Heading } from './Heading';
 import type { SheetProps } from './sheetProps';
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   panel: {
     maxHeight: '85%',
-    backgroundColor: colors.surface,
+    backgroundColor: v2.recipes.field.fill,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: spacing[4],
