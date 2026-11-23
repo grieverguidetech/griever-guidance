@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { render, screen } from '@testing-library/react-native';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { Circle, Path } from 'react-native-svg';
 import { Icon } from './Icon';
 import { ICON_PATHS } from './iconPaths';
@@ -38,9 +38,9 @@ describe('Icon (mobile)', () => {
   });
 
   it('draws the not-started circle as an outline, r 5.5 at 8,8, stroke 1.5, with no fill shape', () => {
-    render(<Icon name="circle" color={colors['neutral-600']} />);
+    render(<Icon name="circle" color={v2.recipes.field.edge} />);
     const [circle] = screen.UNSAFE_getAllByType(Circle);
-    expect(circle.props).toMatchObject({ cx: 8, cy: 8, r: 5.5, stroke: colors['neutral-600'], strokeWidth: 1.5 });
+    expect(circle.props).toMatchObject({ cx: 8, cy: 8, r: 5.5, stroke: v2.recipes.field.edge, strokeWidth: 1.5 });
     expect(screen.UNSAFE_queryAllByType(Path)).toHaveLength(0);
   });
 

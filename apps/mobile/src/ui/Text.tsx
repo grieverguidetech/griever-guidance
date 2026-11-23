@@ -1,11 +1,11 @@
 import type { ComponentRef, ReactNode, Ref } from 'react';
 import { StyleSheet, Text } from 'react-native';
-import { colors, v2 } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { useSerifStyle } from './typography';
 
 export interface EyebrowProps {
   children: ReactNode;
-  /** `accent2` is the second accent (a magenta), for the Announce screen. */
+  /** `accent2` is the eyebrow tone for the Announce screen (v2 heading navy; v2 has no magenta). */
   tone?: 'accent' | 'accent2';
 }
 
@@ -35,7 +35,7 @@ export interface BodyProps {
   textRef?: Ref<ComponentRef<typeof Text>>;
 }
 
-/** Running text. Contrast: neutral-700 and neutral-800 on the page colour both pass 4.5:1. */
+/** Running text. Contrast: roles.muted and roles.mutedStrong on the page colour both pass 4.5:1. */
 export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false, onPress, textRef }: BodyProps) {
   const font = useSerifStyle('regular');
   const extra: Record<string, unknown> = {};
@@ -61,14 +61,14 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: v2.roles.eyebrow.color,
   },
-  accent2: { color: colors['accent-2-700'] },
+  accent2: { color: v2.roles.heading.color },
   body: {
     fontSize: 15,
     lineHeight: 22,
   },
-  default: { color: colors['neutral-800'] },
-  strong: { color: colors.ink },
-  muted: { color: colors['neutral-700'] },
-  danger: { color: '#b91c1c' },
+  default: { color: v2.roles.mutedStrong },
+  strong: { color: v2.roles.ink },
+  muted: { color: v2.roles.muted },
+  danger: { color: v2.roles.error },
   small: { fontSize: 15, lineHeight: 22 },
 });

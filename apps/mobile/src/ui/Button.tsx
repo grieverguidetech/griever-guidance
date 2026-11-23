@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, minTouchTarget, spacing, v2 } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
 import { Phrasing } from './phrasing';
 import { LinearSwirl } from './Swirl';
@@ -15,8 +15,8 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
  * `primary` and `secondary` are the v2 swirl buttons (#976): a sunset or soft ocean LinearSwirl fill, radius, border,
  * text and shadow from `v2.recipes.button`. The other variants keep the 2026-10-25 look (decision by Peter): rounded 10px corners, and a tinted outlined "link" button
  * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: an
- * accent-700 label with an underline, no fill and no border, and a pale accent wash while pressed.
- * `header` is Back and What you'll need (#362): the page shows through, a thin accent-600 outline,
+ * roles.link label with an underline, no fill and no border, and a pale accent wash while pressed.
+ * `header` is Back and What you'll need (#362): the page shows through, a thin v2 focus-colour outline,
  * no underline, same as web's top bar. No icons. Palette and serif still follow web.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
@@ -167,7 +167,7 @@ export function Button({
   const swirled = recipe !== undefined && !ariaDisabled;
   // An unavailable secondary has no swirl: a flat page fill with a dashed border, so it reads as different yet keeps its text colour.
   const unavailableOutline = ariaDisabled && variant === 'secondary';
-  // The recipe colour in every state: the muted neutral-700 was under 4.5:1 on the soft ocean swirl.
+  // The recipe colour in every state: plain roles.muted was under 4.5:1 on the soft ocean swirl.
   const labelColor = unavailableFill ? PAGE : recipe?.text.color;
   const text = (
     <Phrasing>
@@ -185,7 +185,7 @@ export function Button({
       </Text>
     </Phrasing>
   );
-  const spinnerColor = labelColor ?? colors['accent-700'];
+  const spinnerColor = labelColor ?? v2.roles.link;
   const body = working ? (
     <View style={styles.content}>
       <ActivityIndicator
@@ -270,18 +270,18 @@ const styles = StyleSheet.create({
   // Primary and secondary get their fill, border and shadow from the v2 recipes (recipeFrame).
   primary: { paddingVertical: 14 },
   secondary: { paddingVertical: 14 },
-  tinted: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
+  tinted: { borderColor: v2.roles.link, backgroundColor: v2.roles.wash },
   ghost: {},
   // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
   tertiary: {},
-  // accent-600 on the page is 3.74:1, above the 3:1 non-text minimum.
-  header: { borderColor: colors['accent-600'] },
+  // The v2 focus colour holds 3:1 on every ground (v2.spec).
+  header: { borderColor: v2.roles.focus },
   pressed: { opacity: 0.7 },
   pressedSwirl: { opacity: SWIRL_PRESSED_OPACITY },
-  // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
-  pressedWash: { backgroundColor: colors['accent-100'] },
+  // roles.link on roles.wash is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
+  pressedWash: { backgroundColor: v2.roles.wash },
   // Unavailable is a solid look, not a fade: opacity would drop the label below 4.5:1.
-  // Primary: page-coloured text on ink. Secondary: flat page, dashed border, recipe text. The rest: neutral-700 text.
+  // Primary: page-coloured text on ink. Secondary: flat page, dashed border, recipe text. The rest: roles.muted text.
   unavailableFill: { backgroundColor: UNAVAILABLE_FILL },
   unavailableOutline: { backgroundColor: PAGE, borderStyle: 'dashed', boxShadow: 'none' },
   // The swirl fills the frame and carries the padding, so the whole button is gradient. The first stop shows behind it for the shadow.
@@ -294,6 +294,6 @@ const styles = StyleSheet.create({
   labelLink: { fontSize: 15 },
   labelOnFill: { color: PAGE },
   labelTertiary: { textDecorationLine: 'underline' },
-  labelAccent: { color: colors['accent-700'] },
-  labelUnavailable: { color: colors['neutral-700'] },
+  labelAccent: { color: v2.roles.link },
+  labelUnavailable: { color: v2.roles.muted },
 });

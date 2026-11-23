@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from './Button';
 import { Heading } from './Heading';
 import type { SheetProps } from './sheetProps';
@@ -108,14 +108,14 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   panel: {
     maxHeight: '85%',
-    backgroundColor: colors.surface,
+    backgroundColor: v2.recipes.field.fill,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     padding: spacing[4],
   },
   bare: { height: '85%', padding: 0 },
   grab: { alignItems: 'center', justifyContent: 'center', minHeight: 44 },
-  grabBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors['neutral-300'] },
+  grabBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: v2.roles.divider },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2], marginBottom: spacing[2] },
   title: { flex: 1 },
   body: { paddingBottom: spacing[6], gap: spacing[3] },

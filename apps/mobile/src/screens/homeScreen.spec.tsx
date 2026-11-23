@@ -5,8 +5,8 @@ import type { Session } from '@griever/hooks';
 import { v2 } from '@griever/tokens';
 import { HomeScreen } from './HomeScreen';
 
-// ui/Button.tsx (#1008) still draws the header button border in v1 accent-600; swap this when #1008 moves it.
-const HEADER_BORDER = '#1186ac';
+// ui/Button.tsx draws the header button border from the v2 focus role (#1008).
+const HEADER_BORDER = v2.roles.focus;
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({

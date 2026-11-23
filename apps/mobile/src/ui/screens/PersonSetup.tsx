@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode, Ref } from 'react';
 import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
 import { Heading } from '../Heading';
@@ -170,7 +170,7 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
         accessibilityLabel={accessibleName}
         autoCapitalize={capitalize ? 'words' : 'none'}
         placeholder={placeholder}
-        placeholderTextColor={colors['neutral-700']}
+        placeholderTextColor={v2.roles.muted}
         value={value}
         onChangeText={onChangeText}
       />
@@ -183,17 +183,17 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   field: { gap: spacing[1] },
-  optional: { color: colors['neutral-700'], fontWeight: '400' },
+  optional: { color: v2.roles.muted, fontWeight: '400' },
   input: {
     minHeight: 44,
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 15,
   },
   // Native focus cue (web draws its own ring through data-gg-field).
-  inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
+  inputFocused: { borderColor: v2.roles.link, borderWidth: 2 },
 });

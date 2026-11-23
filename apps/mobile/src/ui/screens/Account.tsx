@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import type { ComponentRef, ReactNode } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, TextInput, View } from 'react-native';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { AddressFields, LabelledInput } from '../../components/AddressFields';
 import { DeleteAccountPanel } from '../../components/DeleteAccountPanel';
 import type { DeleteAccountCopy, DeleteOutcome } from '../../components/DeleteAccountPanel';
@@ -298,6 +298,6 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   field: { gap: spacing[1] },
-  value: { fontSize: 15, lineHeight: 22, color: colors['neutral-800'] },
+  value: { fontSize: 15, lineHeight: 22, color: v2.roles.mutedStrong },
   group: { gap: spacing[2], marginTop: spacing[2] },
 });

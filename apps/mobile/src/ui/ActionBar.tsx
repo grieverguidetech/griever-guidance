@@ -2,7 +2,7 @@ import { useId } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Button } from './Button';
 import type { ButtonNode } from './Button';
 import { Status } from './Status';
@@ -78,7 +78,7 @@ function noop() {
 const styles = StyleSheet.create({
   bar: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors['neutral-400'],
+    borderTopColor: v2.roles.divider,
     paddingHorizontal: spacing[3],
     paddingTop: spacing[2],
   },

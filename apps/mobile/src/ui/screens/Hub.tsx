@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, minTouchTarget, spacing, v2 } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
 import { glassCard } from '../Card';
 import { Icon } from '../Icon';
@@ -169,7 +169,7 @@ function SendCard(props: { row: HubRow; title: string; stateWord: string; contin
         <View style={styles.top}>
           <Text style={[styles.title, semibold]}>{props.title}</Text>
           <View style={styles.state}>
-            {row.state === 'done' ? <Icon name="check" size={16} testID="status-check" color={colors['success-700']} /> : null}
+            {row.state === 'done' ? <Icon name="check" size={16} testID="status-check" color={v2.roles.success} /> : null}
             <Body small>{props.stateWord}</Body>
           </View>
         </View>
@@ -210,12 +210,12 @@ const styles = StyleSheet.create({
   cardFocused: { borderWidth: FOCUS_RING, borderColor: v2.roles.focus, padding: spacing[3] },
   // Glass is see-through, so a press dims the whole card. 0.9 keeps muted and accent text at 4.5:1 (hub.spec checks; 0.87 is the floor).
   cardPressed: { opacity: PRESSED_OPACITY },
-  // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
-  nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors['accent-700'] },
+  // Web's NEXT_BAR: 3 pt of roles.link down the left edge, drawn inside so nothing shifts.
+  nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: v2.roles.link },
   top: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 15, lineHeight: 22, color: colors.ink },
+  title: { fontSize: 15, lineHeight: 22, color: v2.roles.ink },
   state: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
-  continue: { fontSize: 15, lineHeight: 22, color: colors['accent-700'] },
+  continue: { fontSize: 15, lineHeight: 22, color: v2.roles.link },
   plain: { paddingVertical: spacing[2], gap: 2 },
 });
 
@@ -231,7 +231,7 @@ function LockedStep(props: { title: string; body: string; meta?: string; reason:
       hint={props.reason}
       onPress={() => props.onLocked(row.current)}
       // Decorative: the reason text and hint are what assistive tech reads.
-      trailing={<Icon name="lock" testID="lock-icon" color={colors['neutral-700']} trailing />}
+      trailing={<Icon name="lock" testID="lock-icon" color={v2.roles.muted} trailing />}
     >
       <Body tone="strong">{props.title}</Body>
       <Body>{props.body}</Body>

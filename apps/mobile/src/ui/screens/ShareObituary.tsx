@@ -3,7 +3,7 @@ import type { ComponentRef, MutableRefObject, ReactElement, ReactNode, Ref } fro
 import type { RefreshControlProps } from 'react-native';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
 import type { ButtonNode } from '../Button';
@@ -460,7 +460,7 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
         // Not on web: a url input there adds the browser's own invalid state on top of ours.
         keyboardType={url && Platform.OS !== 'web' ? 'url' : email ? 'email-address' : 'default'}
         placeholder={placeholder}
-        placeholderTextColor={colors['neutral-700']}
+        placeholderTextColor={v2.roles.muted}
         value={value}
         onChangeText={onChangeText}
       />
@@ -475,20 +475,20 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   field: { gap: spacing[1] },
-  optional: { color: colors['neutral-700'], fontWeight: '400' },
+  optional: { color: v2.roles.muted, fontWeight: '400' },
   input: {
     minHeight: 44,
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 15,
   },
   textInput: { minHeight: 200, fontSize: 16 },
   // Last, so an invalid field keeps its error border while it has focus.
-  inputInvalid: { borderColor: '#b91c1c', borderWidth: 2 },
+  inputInvalid: { borderColor: v2.roles.error, borderWidth: 2 },
   // Native focus cue (web draws its own ring through data-gg-field).
-  inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
+  inputFocused: { borderColor: v2.roles.link, borderWidth: 2 },
 });
