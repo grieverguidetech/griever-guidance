@@ -3,7 +3,7 @@ import { Linking, StyleSheet, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { App } from './App';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
 
@@ -34,7 +34,7 @@ describe('send steps and the top safe area', () => {
     await openPeople();
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
-      return style.paddingTop === 47 && style.backgroundColor === colors.bg;
+      return style.paddingTop === 47 && style.backgroundColor === v2.roles.page.color;
     });
     expect(padded).toBe(true);
   });
@@ -47,7 +47,7 @@ describe('send steps and the top safe area', () => {
     const bar = StyleSheet.flatten(screen.getByTestId('hub-action-bar').props.style);
     expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
     // The frame leaves the bottom to the bar; the top is still padded.
-    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
+    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === v2.roles.page.color);
     expect(frame?.paddingBottom).toBe(0);
   });
 
@@ -63,7 +63,7 @@ describe('send steps and the top safe area', () => {
     await screen.findByText('Text 1 person');
     const bar = StyleSheet.flatten(screen.getByTestId('ready-action-bar').props.style);
     expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
-    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
+    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === v2.roles.page.color);
     expect(frame?.paddingBottom).toBe(0);
   });
 
@@ -75,7 +75,7 @@ describe('send steps and the top safe area', () => {
     await openPeople();
     const bar = StyleSheet.flatten(screen.getByTestId('people-action-bar').props.style);
     expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
-    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
+    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === v2.roles.page.color);
     expect(frame?.paddingBottom).toBe(0);
   });
 
@@ -85,7 +85,7 @@ describe('send steps and the top safe area', () => {
     await screen.findByLabelText('Anna');
     const padded = screen.UNSAFE_getAllByType(View).some((v) => {
       const style = StyleSheet.flatten(v.props.style) ?? {};
-      return style.paddingTop === 47 && style.paddingBottom === 34 && style.backgroundColor === colors.bg;
+      return style.paddingTop === 47 && style.paddingBottom === 34 && style.backgroundColor === v2.roles.page.color;
     });
     expect(padded).toBe(true);
   });
@@ -104,7 +104,7 @@ describe('send steps and the top safe area', () => {
     await screen.findByText('Text Dee');
     const bar = StyleSheet.flatten(screen.getByTestId('sending-action-bar').props.style);
     expect(bar.paddingBottom).toBeGreaterThanOrEqual(34);
-    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === colors.bg);
+    const frame = screen.UNSAFE_getAllByType(View).map((v) => StyleSheet.flatten(v.props.style) ?? {}).find((st) => st.paddingTop === 47 && st.backgroundColor === v2.roles.page.color);
     expect(frame?.paddingBottom).toBe(0);
   });
 });

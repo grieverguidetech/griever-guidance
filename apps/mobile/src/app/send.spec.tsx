@@ -423,6 +423,7 @@ describe('Ready to send (announcement)', () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await toReview();
     typeMessage('My own words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
     fireEvent.press(await screen.findByText('Text Dee'));
     expect(decodeURIComponent(String(jest.mocked(Linking.openURL).mock.calls[0][0]))).toContain('body=Dee,\nMy own words.');

@@ -66,10 +66,10 @@ describe('HomeScreen layout (#363)', () => {
     expect(flat(screen.getByRole('button', { name: 'Anna' })).backgroundColor).toBe(colors['accent-100']);
   });
 
-  it('uses the token page colour for the screen background', () => {
+  it('leaves the page colour and glows to the screen frame', () => {
     const { toJSON } = render(<HomeScreen {...props} />);
     const root = toJSON() as { props: { style?: unknown } };
-    expect(flat(root).backgroundColor).toBe(colors.bg);
+    expect(flat(root).backgroundColor).toBeUndefined();
   });
 });
 

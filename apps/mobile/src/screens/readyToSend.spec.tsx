@@ -108,6 +108,7 @@ describe('Ready to send (Share the service)', () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     render(<Harness />);
     typeMessage('Come as you are, 2 PM at Oak Chapel.');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     fireEvent.press(screen.getByText('Text 1 person'));
     fireEvent.press(await screen.findByText('Text Dee'));
     expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain('body=Dee,\nCome as you are, 2 PM at Oak Chapel.');
@@ -118,6 +119,7 @@ describe('Ready to send (Share the service)', () => {
     open.mockClear();
     render(<Harness />);
     typeMessage('Come as you are.');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     fireEvent.press(screen.getByText('Text 1 person'));
     fireEvent.press(await screen.findByText('Text Dee'));
     const body = bodyOfFirstLink(open);
@@ -130,6 +132,7 @@ describe('Ready to send (Share the service)', () => {
     open.mockClear();
     render(<Harness />);
     typeMessage('Come as you are.');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     fireEvent.press(screen.getByRole('switch', { name: 'Start with their first name' }));
     expect(screen.queryByText('Dee,')).toBeNull();
     fireEvent.press(screen.getByText('Text 1 person'));
@@ -163,6 +166,7 @@ describe('Ready to send (Share the service)', () => {
   it('blocks sending a blank message and says why', () => {
     render(<Harness />);
     typeMessage('   ');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     expect(screen.getByText('Add a message before you send it.')).toBeTruthy();
     expect(primary().props.accessibilityState?.disabled).toBe(true);
     expect(messageShown()).toBe('   ');

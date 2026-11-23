@@ -6,7 +6,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../app/App';
-import { colors } from '@griever/tokens';
 import { ScreenHeader } from '../components/authForm';
 import { NOT_SAVED_NOTE_TEXT } from '../components/SavedNote';
 import { ACCENT, ACCENT_TINT, FIELD_BORDER, MUTED } from '../components/colors';
@@ -169,7 +168,7 @@ export function WhatYoullNeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1 },
   content: { padding: 24, paddingTop: 20 },
   backRow: { alignSelf: 'flex-start', marginBottom: 24 },
   subtitle: { fontSize: 13, color: MUTED, marginBottom: 24 },

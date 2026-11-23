@@ -469,7 +469,7 @@ function Field({ label, optional, accessibleName, placeholder, value, onChangeTe
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
   content: { padding: spacing[3], paddingTop: spacing[4] },
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
