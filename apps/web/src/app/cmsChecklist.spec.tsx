@@ -161,7 +161,7 @@ describe('checklist in the editor (#421)', () => {
   it('opens an item from the phone sheet, closes the sheet, and Back falls to the h1', async () => {
     const user = userEvent.setup();
     await openOverview();
-    await user.click(screen.getByRole('button', { name: "What you'll need" }));
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: "What you'll need" }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: ITEM }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -171,7 +171,7 @@ describe('checklist in the editor (#421)', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }));
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     expect(
-      screen.getByRole('button', { name: "What you'll need" }),
+      within(screen.getByRole('main')).getByRole('button', { name: "What you'll need" }),
     ).toHaveFocus();
   });
 

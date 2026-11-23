@@ -5,8 +5,6 @@
   "additionalProperties": false,
   "required": [
     "panelTitle",
-    "show",
-    "hide",
     "phoneButton",
     "previewLine",
     "previewLineMember",
@@ -32,12 +30,6 @@
   ],
   "properties": {
     "panelTitle": {
-      "$ref": "#/$defs/text"
-    },
-    "show": {
-      "$ref": "#/$defs/text"
-    },
-    "hide": {
       "$ref": "#/$defs/text"
     },
     "phoneButton": {
