@@ -243,7 +243,7 @@ test.describe('no sync while signed out (#520)', () => {
 test.describe('navigation (#566)', () => {
   test('the header shows the product name, and the side nav has Who you\'ve lost and no The person link or status words', async ({ page }) => {
     await startPerson(page);
-    await expect(page.getByRole('banner').getByRole('img', { name: 'Grievers Guidance' })).toBeVisible();
+    await expect(page.getByRole('banner').getByText('Grievers Guidance', { exact: true })).toBeVisible();
     await expect(nav(page).getByRole('button', { name: /^The person/ })).toHaveCount(0);
     await expect(nav(page).getByRole('link', { name: "Who you've lost" })).toBeVisible();
     await expect(nav(page).getByText('Not started')).toHaveCount(0);
