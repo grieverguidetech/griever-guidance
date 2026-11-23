@@ -64,6 +64,9 @@
       "path": "./libs/ui"
     },
     {
+      "path": "./libs/agent-workflow"
+    },
+    {
       "path": "./tools/factory-dashboard"
     }
   ]

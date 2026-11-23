@@ -193,7 +193,7 @@ ids only. It is not routed in production yet.
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
 | AG-1 | Stateless guided workflow (`start_workflow`, `next_step`). Inputs are enums and step ids only. Nothing is stored or logged. | Not started | #1015, #1016, #1017 |
-| AG-2 | Steps in the real C10 order from the shared checklist. Each step names who acts. Hand-off steps send the person to their own phone. | Not started | #1015, #1016, #1017 |
+| AG-2 | Steps in the real C10 order from the shared checklist. Each step names who acts. Hand-off steps send the person to their own phone. | In progress | #1015, #1016, #1017 |
 | AG-3 | One MCP Apps step card. | Not started | #1018 (slice 3) |
 
 ---
@@ -312,11 +312,14 @@ libs/
                     DELETE /members/:memberId) and the invite mailer; mounted by apps/gateway.
   gateway-places/   Place search proxy, POST /places/suggest and /places/details, to Google Places
                     API (New) with a server key; stores and logs nothing.
+  agent-workflow/   The guided-process logic behind apps/agent: the checklist steps in order, who acts
+                    (you or assistant) and the hand-off line. Pure functions over libs/shared and
+                    libs/copy. No MCP, no network, no storage.
   data-access/      The data function: the Lambda entry, POST /v1 and the service path, the access
                     rules (src/rules), and the item encoders. Deployed as the Lambda gg-app-data.
   data-aws/         AWS SDK clients and config, the local DynamoDB and SES stand-ins, and table
                     setup and seed.
-  copy/             User-facing copy shared by web and mobile.
+  copy/             User-facing copy shared by web, mobile and the agent interface (agent tool text is user-facing, C7).
   tokens/           Design tokens shared by web and mobile. v1 (web today) is flat; v2 has three layers in src/v2.
   ui/               Web UI components. Mobile must not import it (see "UI is per app").
 
@@ -330,6 +333,8 @@ infra/
   identity, gateway-messages, gateway-flows, and gateway-places each own their own Hono router and
   business logic, with no cross-imports between them — apps/gateway only composes their routers
   together. The only shared code is libs/gateway-auth (rule 2b below).
+  libs/agent-workflow imports only libs/shared and libs/copy, never libs/hooks, libs/api-client,
+  libs/identity or libs/gateway-*.
 ```
 
 ---
