@@ -2,11 +2,11 @@ import type { ComponentProps } from 'react';
 import { Platform, StyleSheet, Text, TextInput } from 'react-native';
 import { useSerifStyle } from './typography';
 
-// Sora has 300, 400 and 500 only, so every weight from 500 up is Sora 500.
+// Nunito Sans is registered at 400 and 600 only, so every weight from 500 up is Nunito Sans 600.
 const SEMIBOLD = new Set(['500', '600', '700', '800', '900', 'bold']);
 
 /**
- * Sora for the caller's weight (Sora has no italic, so italic text is upright). Does nothing if the caller chose its own family.
+ * Nunito Sans for the caller's weight (no italic is loaded, so italic text is upright). Does nothing if the caller chose its own family.
  * On native the face carries the weight, so the caller's fontWeight and fontStyle are cleared
  * (a "bold" must not stack on the medium face, and an italic must not be faked).
  */

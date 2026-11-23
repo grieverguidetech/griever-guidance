@@ -16,7 +16,7 @@ export interface HeaderChecklistToggle {
 /**
  * The bar across the top of the editor: the product wordmark and, from `lg`, one "What you'll need" button that
  * opens and closes the checklist panel (below `lg` the phone button in the page opens the sheet). The wordmark is a
- * SAMPLE (issue 583). It is inline, not an <img>, so the name is real text in the page font (Sora): an
+ * SAMPLE (issue 583). It is inline, not an <img>, so the name is real text in the page font (Nunito Sans): an
  * SVG loaded as an image cannot use the page's fonts. The mark is decorative; the text is the name.
  */
 export function AppHeader({ checklist }: { checklist?: HeaderChecklistToggle } = {}) {
@@ -37,7 +37,7 @@ export function AppHeader({ checklist }: { checklist?: HeaderChecklistToggle } =
           data-testid="wordmark-name"
           className="text-[17px] leading-6 text-[color:var(--color-v2-heading)]"
           style={{
-            fontFamily: 'var(--font-v2)',
+            fontFamily: 'var(--font-v2-body)',
             fontWeight: 'var(--v2-weight-regular)',
           }}
         >

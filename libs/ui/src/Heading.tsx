@@ -31,8 +31,8 @@ function headingProps(level: HeadingLevel): Record<string, unknown> {
 }
 
 export function Heading({ level, children, headingRef }: HeadingProps) {
-  // Web (Sora): h1 is light, the rest regular. Native keeps its semibold face.
-  const webWeight = level === 1 ? 'heading' : 'regular';
+  // Web (Fraunces): h1 is light, the rest regular. Native keeps its semibold face.
+  const webWeight = level === 1 ? 'heading' : 'headingRegular';
   const font = useSerifStyle(Platform.OS === 'web' ? webWeight : 'semibold');
   // On web the heading colour comes from the v2 var, so a brand change reaches every heading.
   const color = headingColor();

@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 /* Specs name classes and vars as plain test strings; Tailwind must not turn them into CSS. */
 @source not "./**/*.spec.{ts,tsx}";
-/* Sora (300, 400, 500) is loaded via <link> in index.html (keeps @import rules from
+/* Fraunces (300..400, SOFT 100) and Nunito Sans (400, 600) are loaded via <link> in index.html (keeps @import rules from
    tripping over Tailwind's injected layers). */
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -38,10 +38,10 @@
 body {
   background: var(--color-v2-page);
   color: var(--color-text);
-  font-family: var(--font-v2);
+  font-family: var(--font-v2-body);
   font-size: var(--v2-body-size);
   font-weight: var(--v2-weight-regular);
-  /* Sora has no italic: italics show upright, like mobile. */
+  /* No italic is loaded: italics show upright, like mobile. */
   font-synthesis-style: none;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -63,7 +63,8 @@ body::before {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-v2);
+  font-family: var(--font-v2-heading);
+  font-variation-settings: 'SOFT' var(--v2-heading-soft);
   font-weight: var(--v2-weight-regular);
   color: var(--color-v2-heading);
   line-height: 1.14;
@@ -162,7 +163,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     gap: 6px;
     min-height: 44px;
     padding: var(--space-2) calc(var(--space-3) * 1.2);
-    font-family: var(--font-v2);
+    font-family: var(--font-v2-body);
     font-weight: var(--v2-weight-medium);
     font-size: 14px;
     line-height: 1.2;
@@ -321,13 +322,15 @@ h1 { font-weight: var(--v2-heading-weight); }
   .gg-card-selectable { cursor: pointer; }
   .gg-card-selected { outline: 2px solid var(--color-v2-focus); outline-offset: -2px; }
   .gg-card-kicker {
+    font-family: var(--font-v2-eyebrow);
     font-size: var(--v2-eyebrow-size);
     letter-spacing: var(--v2-eyebrow-tracking);
     text-transform: uppercase;
     color: var(--color-v2-eyebrow);
   }
   .gg-card-title {
-    font-family: var(--font-v2);
+    font-family: var(--font-v2-heading);
+    font-variation-settings: 'SOFT' var(--v2-heading-soft);
     font-weight: var(--v2-weight-regular);
     font-size: 17px;
     line-height: 1.2;
@@ -493,6 +496,7 @@ h1 { font-weight: var(--v2-heading-weight); }
 
   /* — misc — */
   .gg-eyebrow {
+    font-family: var(--font-v2-eyebrow);
     font-size: var(--v2-eyebrow-size);
     letter-spacing: var(--v2-eyebrow-tracking);
     text-transform: uppercase;

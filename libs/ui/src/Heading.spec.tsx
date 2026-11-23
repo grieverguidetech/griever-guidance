@@ -36,5 +36,7 @@ describe('Heading', () => {
     );
     expect(getComputedStyle(screen.getByRole('heading', { level: 1 })).fontWeight).toBe(String(v2.roles.heading.weight));
     expect(getComputedStyle(screen.getByRole('heading', { level: 2 })).fontWeight).toBe(String(v2.primitives.font.weights.regular));
+    expect(getComputedStyle(screen.getByRole('heading', { level: 1 })).fontFamily).toContain('var(--font-v2-heading)');
+    expect(getComputedStyle(screen.getByRole('heading', { level: 2 })).fontFamily).toContain('var(--font-v2-heading)');
   });
 });

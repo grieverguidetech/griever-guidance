@@ -29,7 +29,7 @@ describe('mobile UI on native', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('uses the system font until the serif has loaded, then Sora 300 in the heading colour', () => {
+  it('uses the system font until the serif has loaded, then Fraunces 300 in the heading colour', () => {
     const family = () => StyleSheet.flatten(screen.getByRole('heading').props.style).fontFamily;
     const { rerender } = render(
       <SerifReadyContext.Provider value={false}>
@@ -42,15 +42,15 @@ describe('mobile UI on native', () => {
         <Heading level={1}>Title</Heading>
       </SerifReadyContext.Provider>,
     );
-    expect(family()).toBe('Sora_300Light');
+    expect(family()).toBe('Fraunces_300Light');
     expect(StyleSheet.flatten(screen.getByRole('heading').props.style).color).toBe(v2.roles.heading.color);
   });
 });
 
 describe('Heading weight on native', () => {
-  it.each([[2], [3]] as const)('level %i uses Sora 400, only level 1 is Sora 300', (level) => {
+  it.each([[2], [3]] as const)('level %i uses Fraunces 400, only level 1 is Fraunces 300', (level) => {
     render(<Heading level={level}>Title</Heading>);
-    expect(StyleSheet.flatten(screen.getByRole('heading').props.style).fontFamily).toBe('Sora_400Regular');
+    expect(StyleSheet.flatten(screen.getByRole('heading').props.style).fontFamily).toBe('Fraunces_400Regular');
   });
 });
 

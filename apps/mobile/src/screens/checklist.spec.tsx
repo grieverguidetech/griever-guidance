@@ -158,11 +158,11 @@ describe('top buttons', () => {
 });
 
 describe('old screens use the serif through SerifText', () => {
-  it('a person row on Home is in Sora 500 (its 500 weight)', () => {
+  it('a person row on Home is in Nunito Sans 600 (its emphasis weight)', () => {
     const anna = { id: 'a', flowId: 'f', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '', createdAt: '2026-01-01', lastOpenedAt: '2026-01-01', drafts: {}, serviceReady: false, recipientsNotified: {}, momentCompletedAt: {}, remindersScheduled: [] };
     render(<HomeScreen sessions={[anna as never]} canCreate onOpen={jest.fn()} onCreate={jest.fn()} />);
     const style = StyleSheet.flatten(screen.getByText('Anna').props.style) as Record<string, unknown>;
-    expect(style.fontFamily).toBe('Sora_500Medium');
+    expect(style.fontFamily).toBe('NunitoSans_600SemiBold');
     expect(style.fontWeight).toBeUndefined();
   });
 });

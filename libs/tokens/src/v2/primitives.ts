@@ -66,9 +66,13 @@ export const primitives = {
   gradients,
   shadows,
   font: {
-    family: 'Sora',
-    // No italic: italic text shows upright Sora.
-    weights: { light: 300, regular: 400, medium: 500 },
+    /** Headings and the eyebrow: Fraunces, with its SOFT axis at `headingSoft` where the platform can set it (web). */
+    headingFamily: 'Fraunces',
+    headingSoft: 100,
+    /** Body text, buttons, fields, labels and the nudge: Nunito Sans. */
+    bodyFamily: 'Nunito Sans',
+    // No italic is loaded: italic text shows upright. `medium` is the emphasis weight: Nunito Sans 600 (buttons, names, labels).
+    weights: { light: 300, regular: 400, medium: 600 },
   },
   size: {
     body: 15,

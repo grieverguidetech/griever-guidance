@@ -14,23 +14,23 @@ function styleOf(style: TextStyle, ready = true) {
 }
 
 describe('SerifText on native', () => {
-  it.each([['bold'], ['600'], ['500'], ['700']] as const)('fontWeight %s uses Sora 500 and clears the weight', (fontWeight) => {
+  it.each([['bold'], ['600'], ['500'], ['700']] as const)('fontWeight %s uses Nunito Sans 600 and clears the weight', (fontWeight) => {
     const s = styleOf({ fontWeight });
-    expect(s.fontFamily).toBe('Sora_500Medium');
+    expect(s.fontFamily).toBe('NunitoSans_600SemiBold');
     expect(s.fontWeight).toBeUndefined();
   });
 
-  it.each([[undefined], ['400'], ['normal']] as const)('fontWeight %s uses Sora 400', (fontWeight) => {
+  it.each([[undefined], ['400'], ['normal']] as const)('fontWeight %s uses Nunito Sans 400', (fontWeight) => {
     const s = styleOf({ fontWeight });
-    expect(s.fontFamily).toBe('Sora_400Regular');
+    expect(s.fontFamily).toBe('NunitoSans_400Regular');
     expect(s.fontWeight).toBeUndefined();
   });
 
-  it('italic text is upright Sora: no italic face, and fontStyle is cleared', () => {
+  it('italic text is upright Nunito Sans: no italic face, and fontStyle is cleared', () => {
     const regular = styleOf({ fontStyle: 'italic' });
-    expect(regular.fontFamily).toBe('Sora_400Regular');
+    expect(regular.fontFamily).toBe('NunitoSans_400Regular');
     expect(regular.fontStyle).toBeUndefined();
-    expect(styleOf({ fontStyle: 'italic', fontWeight: '600' }).fontFamily).toBe('Sora_500Medium');
+    expect(styleOf({ fontStyle: 'italic', fontWeight: '600' }).fontFamily).toBe('NunitoSans_600SemiBold');
   });
 
   it('keeps the caller weight and adds no family until the serif is ready', () => {

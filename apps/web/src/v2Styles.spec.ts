@@ -47,10 +47,15 @@ function contrast(a: string, b: string): number {
 }
 
 describe('index.html fonts', () => {
-  const sora = /family=Sora:wght@([0-9;]+)&display=swap/.exec(html);
+  const families = /family=Fraunces:opsz,wght,SOFT@9\.\.144,300\.\.400,100&family=Nunito\+Sans:wght@400;600&display=swap/;
 
-  it('loads Sora at 300, 400 and 500 only, with display=swap', () => {
-    expect(sora?.[1]).toBe('300;400;500');
+  it('loads Fraunces (opsz, wght 300..400, SOFT 100) and Nunito Sans (400, 600) only, with display=swap', () => {
+    expect(families.test(html)).toBe(true);
+    expect(html.match(/family=/g)).toHaveLength(2);
+  });
+
+  it('has no Sora link', () => {
+    expect(html).not.toMatch(/Sora/i);
   });
 
   it('has no Source Serif link', () => {
@@ -59,9 +64,9 @@ describe('index.html fonts', () => {
 });
 
 describe('styles.css type roles', () => {
-  it('sets the body to Sora regular at the body size, with no font synthesis', () => {
+  it('sets the body to Nunito Sans regular at the body size, with no font synthesis', () => {
     const body = rule('body');
-    expect(body).toContain('font-family: var(--font-v2)');
+    expect(body).toContain('font-family: var(--font-v2-body)');
     expect(body).toContain('font-size: var(--v2-body-size)');
     expect(body).toContain('font-weight: var(--v2-weight-regular)');
     expect(body).toContain('font-synthesis-style: none');
@@ -71,6 +76,31 @@ describe('styles.css type roles', () => {
     expect(rule('h1, h2, h3, h4, h5, h6')).toContain('font-weight: var(--v2-weight-regular)');
     expect(rule('h1, h2, h3, h4, h5, h6')).toContain('color: var(--color-v2-heading)');
     expect(rule('h1')).toContain('font-weight: var(--v2-heading-weight)');
+  });
+
+  it('sets headings, card titles and eyebrows in Fraunces with the SOFT axis, and buttons in the body family', () => {
+    for (const selector of ['h1, h2, h3, h4, h5, h6', '.gg-card-title']) {
+      expect(rule(selector), selector).toContain('font-family: var(--font-v2-heading)');
+      expect(rule(selector), selector).toContain("font-variation-settings: 'SOFT' var(--v2-heading-soft)");
+    }
+    expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*\{[^}]*font-family: var\(--font-v2-body\)/);
+  });
+
+  it('sets both eyebrow classes from the eyebrow role var, which is the body family', () => {
+    for (const selector of ['.gg-card-kicker', '.gg-eyebrow']) {
+      expect(rule(selector), selector).toContain('font-family: var(--font-v2-eyebrow)');
+    }
+    expect(v2.roles.eyebrow.family).toBe(v2.primitives.font.bodyFamily);
+    expect(theme).toContain(`--font-v2-eyebrow: '${v2.roles.eyebrow.family}'`);
+  });
+
+  it('has no --font-v2 alias left in the theme or the styles', () => {
+    expect(theme).not.toMatch(/--font-v2:/);
+    expect(css).not.toMatch(/var\(--font-v2\)/);
+  });
+
+  it('has no Sora left in the styles', () => {
+    expect(css).not.toMatch(/Sora/i);
   });
 
   it.each(['.gg-eyebrow', '.gg-card-kicker'])('%s uses the eyebrow size, tracking and colour, uppercase', (selector) => {

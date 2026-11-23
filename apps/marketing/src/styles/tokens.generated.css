@@ -6,7 +6,9 @@
   --gg-glow-sun: #fcefd6;
   --gg-glow-sky: #ddebf4;
   --gg-ink: #1b2433;
-  --gg-font: 'Sora';
+  --gg-font-heading: 'Fraunces';
+  --gg-font-body: 'Nunito Sans';
+  --gg-heading-soft: 100;
   --gg-heading: #114465;
   --gg-heading-weight: 300;
   --gg-eyebrow: #67625a;
@@ -17,7 +19,7 @@
   --gg-divider: rgba(32,30,29,0.16);
   --gg-primary-bg: linear-gradient(120deg, #f9d697, #f7cd94, #f9d9bd);
   --gg-primary-text: #2a1f12;
-  --gg-primary-weight: 500;
+  --gg-primary-weight: 600;
   --gg-primary-border: 1px solid #a7774b;
   --gg-primary-shadow: 0px 2px 12px rgba(150,90,30,0.12);
   --gg-primary-radius: 8px;

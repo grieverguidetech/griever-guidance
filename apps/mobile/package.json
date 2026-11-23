@@ -45,13 +45,14 @@
   },
   "dependencies": {
     "@clerk/expo": "4.13.0",
-    "@griever/shared": "workspace:*",
-    "@griever/hooks": "workspace:*",
+    "@expo-google-fonts/fraunces": "0.4.1",
+    "@expo-google-fonts/nunito-sans": "0.4.2",
     "@griever/api-client": "workspace:*",
     "@griever/contacts": "workspace:*",
     "@griever/copy": "workspace:*",
+    "@griever/hooks": "workspace:*",
+    "@griever/shared": "workspace:*",
     "@griever/tokens": "workspace:*",
-    "@expo-google-fonts/sora": "0.4.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.2.1",
     "@react-navigation/native": "^6.1.18",
@@ -73,18 +74,18 @@
     "metro-config": "0.87.1",
     "metro-resolver": "0.87.1",
     "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-native": "0.88.0",
     "react-native-safe-area-context": "5.10.1",
     "react-native-screens": "4.30.0",
     "react-native-svg": "15.16.0",
     "react-native-svg-transformer": "1.5.3",
-    "react-native-web": "0.21.4",
-    "react-dom": "19.3.0"
+    "react-native-web": "0.21.4"
   },
   "devDependencies": {
     "@jest/globals": "30.5.2",
+    "@react-native/jest-preset": "0.88.0",
     "jest": "30.5.2",
-    "react-test-renderer": "19.3.0",
-    "@react-native/jest-preset": "0.88.0"
+    "react-test-renderer": "19.3.0"
   }
 }

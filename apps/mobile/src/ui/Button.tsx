@@ -147,7 +147,7 @@ export function Button({
     extra['aria-haspopup'] = 'dialog';
   }
 
-  // Weight by the typography helper: the regular face for secondary, semibold (Sora 500 once #972 lands) for the rest.
+  // Weight by the typography helper: the regular face for secondary, semibold (Nunito Sans 600) for the rest.
   const font = useSerifStyle(variant === 'secondary' ? 'regular' : 'semibold');
   // Said once when the work starts. On native, a state change alone is not spoken.
   const working = showBusy;

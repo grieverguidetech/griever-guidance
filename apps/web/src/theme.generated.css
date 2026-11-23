@@ -2,7 +2,9 @@
    Change libs/tokens, then run: pnpm nx run tokens:generate-css */
 
 @theme {
-  --font-v2: 'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-v2-heading: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-v2-body: 'Nunito Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-v2-eyebrow: 'Nunito Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --color-text: #1b2433;
   --color-v2-page: #f8f7f4;
   --color-v2-glow-sun: #fcefd6;
@@ -65,9 +67,10 @@
   --v2-eyebrow-size: 13px;
   --v2-eyebrow-tracking: 0.08em;
   --v2-heading-weight: 300;
+  --v2-heading-soft: 100;
   --v2-weight-light: 300;
   --v2-weight-regular: 400;
-  --v2-weight-medium: 500;
+  --v2-weight-medium: 600;
   --v2-drift-ms: 9000ms;
   --v2-settle-ms: 4500ms;
   --v2-spin-ms: 12000ms;
