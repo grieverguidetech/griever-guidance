@@ -70,4 +70,12 @@ describe('libs/ui reads v2 roles (#1007)', () => {
       .map((path) => path.slice(srcRoot.length + 1));
     expect(offenders).toEqual([]);
   });
+
+  it('no source file in libs/ui hard-codes a hex colour; colours come from v2', () => {
+    const offenders = listFiles(srcRoot)
+      .filter((path) => !/\.spec\.tsx?$/.test(path))
+      .filter((path) => /['"]#[0-9a-fA-F]{3,8}['"]/.test(readFileSync(path, 'utf8')))
+      .map((path) => path.slice(srcRoot.length + 1));
+    expect(offenders).toEqual([]);
+  });
 });

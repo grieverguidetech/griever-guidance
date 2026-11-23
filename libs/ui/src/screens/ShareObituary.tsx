@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   // Last, so an invalid field keeps its error border while it has focus.
-  inputInvalid: { borderColor: '#b91c1c', borderWidth: 2 },
+  inputInvalid: { borderColor: v2.roles.error, borderWidth: 2 },
   // Native focus cue (web draws its own ring through data-gg-field).
   inputFocused: { borderColor: v2.roles.link, borderWidth: 2 },
 });

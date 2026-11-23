@@ -303,7 +303,7 @@ export function WhoShouldKnow({
   );
 }
 
-const DANGER = '#b91c1c';
+const DANGER = v2.roles.error;
 
 /** "Add another person": a button that opens a small form. Holds only what is typed. */
 function AddByHand({
