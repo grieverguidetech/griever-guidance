@@ -31,6 +31,14 @@ function token(name: string): string {
   return match[1];
 }
 
+/** A `--color-<name>: rgba(r,g,b,a)` token as an opaque hex and its alpha. */
+function rgbaToken(name: string): { hex: string; alpha: number } {
+  const match = THEME.match(new RegExp(`--color-${name}:\\s*rgba\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*([\\d.]+)\\)`));
+  if (!match) throw new Error(`rgba token --color-${name} not found in theme.generated.css`);
+  const hex = '#' + [match[1], match[2], match[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('');
+  return { hex, alpha: Number(match[4]) };
+}
+
 /** WCAG 2.x relative luminance and contrast ratio. */
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -123,8 +131,9 @@ describe('visible focus (#162)', () => {
     expect(declarations).not.toMatch(/outline:\s*none/);
     const ring = token(colourIn(declarations, 'outline'));
     expect(colourIn(declarations, 'border-color')).toBe(colourIn(declarations, 'outline'));
-    // The unfocused border is --color-v2-divider: ink at 16% over the field surface.
-    const unfocusedBorder = over(token('text'), 0.16, backgrounds.surface);
+    // The unfocused border is --color-v2-divider (ink at 16%) over the field surface.
+    const divider = rgbaToken('v2-divider');
+    const unfocusedBorder = over(divider.hex, divider.alpha, backgrounds.surface);
     for (const [name, bg] of Object.entries({ ...backgrounds, 'unfocused border': unfocusedBorder })) {
       expect({ name, ratio: contrast(ring, bg) >= 3 }).toEqual({ name, ratio: true });
     }
@@ -149,7 +158,7 @@ describe('visible focus (#162)', () => {
     const glassFill = THEME.match(/--color-v2-card-fill:\s*rgba\(\s*255,\s*255,\s*255,\s*([\d.]+)\s*\)/);
     const glassAlpha = Number(glassFill?.[1]);
     const glassOver = (ground: string) => over('#ffffff', glassAlpha, ground);
-    const ink = token('ink');
+    const ink = token('text');
     // The row and chip fill under the pointer: 7% (hover) or 14% (active) of the text colour, over glass.
     const washes = [0.07, 0.14];
     const datebox = CSS.match(/\.gg-datebox-trigger:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
@@ -202,7 +211,7 @@ describe('visible focus (#162)', () => {
 
   it('computes contrast the WCAG way', () => {
     expect(contrast('#000000', '#ffffff')).toBeCloseTo(21, 5);
-    // Matches the measured value noted in styles.css for the base accent on the page.
-    expect(contrast(token('accent'), token('bg'))).toBeCloseTo(3.65, 2);
+    // The focus colour on the page, the value noted in styles.css.
+    expect(contrast(token('v2-focus'), token('v2-page'))).toBeCloseTo(5.97, 2);
   });
 });

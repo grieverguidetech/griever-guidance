@@ -121,7 +121,7 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
           rows={12}
         />
         {error && (
-          <p className="text-[13px] m-0" style={{ color: 'var(--color-v2-heading)' }}>
+          <p role="alert" className="text-[13px] m-0" style={{ color: 'var(--color-v2-error)' }}>
             {error}
           </p>
         )}
@@ -205,7 +205,7 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
       </div>
 
       {error && (
-        <p className="text-[13px] m-0" style={{ color: 'var(--color-v2-heading)' }}>
+        <p role="alert" className="text-[13px] m-0" style={{ color: 'var(--color-v2-error)' }}>
           {error}
         </p>
       )}

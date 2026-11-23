@@ -773,6 +773,37 @@ describe('styles.css done mark (#1004)', () => {
   });
 });
 
+describe('colours that moved off v1 (#1006)', () => {
+  const mixOver = (fg: string, pct: number, bg: string) => {
+    const top = toRgb(fg);
+    const base = toRgb(bg);
+    return toHex(top.map((c, i) => (c * pct) / 100 + base[i] * (1 - pct / 100)));
+  };
+
+  it('keeps the Home person-card border at 3:1 or more on the page and both glows', () => {
+    const source = readFileSync(join(__dirname, 'screens/Home.tsx'), 'utf8');
+    const found = /color-mix\(in srgb, var\(--color-text\) (\d+)%, var\(--color-v2-page\)\)/.exec(source);
+    expect(found, 'Home border is a text/page mix').not.toBeNull();
+    const pct = Number(found?.[1]);
+    const ink = themeVar('--color-text');
+    for (const ground of grounds) {
+      const ratio = contrast(mixOver(ink, pct, themeVar('--color-v2-page')), themeVar(ground));
+      expect({ ground, ok: ratio >= 3 }).toEqual({ ground, ok: true });
+    }
+  });
+
+  it('sets selected text to the ink colour, 4.5:1 or more on the selection tint over every ground', () => {
+    expect(rule('::selection')).toContain('color: var(--color-text)');
+    const pct = Number(/color-mix\(in srgb, var\(--color-v2-focus\) (\d+)%/.exec(rule('::selection'))?.[1]);
+    expect(pct).toBeGreaterThan(0);
+    for (const ground of [...grounds, ...grounds.map(glassOver)]) {
+      const base = ground.startsWith('#') ? ground : themeVar(ground);
+      const tint = mixOver(themeVar('--color-v2-focus'), pct, base);
+      expect(contrast(themeVar('--color-text'), tint), ground).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
 describe('done mark swirl contrast (#1004)', () => {
   const stops = () => [...themeVar('--v2-done-mark-swirl').matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
   const behind = (): Array<[string, string]> => [

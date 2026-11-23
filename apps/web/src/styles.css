@@ -21,7 +21,7 @@
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
 
   /* Every text tone clears WCAG AA 4.5:1 on the page, the field fill and the wash
-     (v2-page, v2-field-fill, v2-wash). Measured on the old values: 72% is 5.9:1+, 68% is 5.25:1 on the
+     (v2-page, v2-field-fill, v2-wash). Measured on the v1 values: 72% is 5.9:1+, 68% is 5.25:1 on the
      darkest of them (the field fill). Below ~62% fails. Error text uses --color-v2-error (#b3261e). */
   --text-muted: color-mix(in srgb, var(--color-text) 72%, transparent);
   --text-hint: color-mix(in srgb, var(--color-text) 68%, transparent);
@@ -69,23 +69,24 @@ h1, h2, h3, h4, h5, h6 {
 }
 h1 { font-weight: var(--v2-heading-weight); }
 
-::selection { background: color-mix(in srgb, var(--color-v2-focus) 30%, transparent); }
+/* Selected text takes the ink colour, so link-coloured text does not fall under 4.5:1 on the tint. */
+::selection { color: var(--color-text); background: color-mix(in srgb, var(--color-v2-focus) 30%, transparent); }
 :focus { outline: none; }
 /* #1005 focus colour: the global ring, the selected card's focus ring and the datebox trigger use
    --color-v2-focus (#006786: 5.26:1 or more on the page, both glows and glass, 4.50:1 on the 14% pressed
-   wash). Deliberate exceptions, unchanged: swirl buttons pin accent-700 (see below); the phone nudge takes
-   script focus with no ring; fields keep their accent-700 field ring; the selected card's second ring
-   stays accent-700 on a page gap (#1000); an unfocused selected card keeps its accent selection ring
+   wash). Deliberate exceptions, unchanged: swirl buttons pin --color-v2-link (see below); the phone nudge takes
+   script focus with no ring; fields keep their link-colour field ring; the selected card's second ring
+   stays link-coloured on a page gap (#1000); an unfocused selected card keeps its focus-colour selection ring
    (.gg-card-selected in @layer components). Guarded by focusStyles.spec.ts. */
 :focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 2px; }
 /* Segmented control: .gg-seg clips its children (overflow: hidden), so an outset ring would be cut, and
-   on the active option (accent-700 fill, the same colour as the ring) it would vanish. Draw it inset:
-   the focus colour on an inactive option, the page colour on the active one (5.97:1 on accent-700). */
+   on the active option (link-colour fill, the same colour as the ring) it would vanish. Draw it inset:
+   the focus colour on an inactive option, the page colour on the active one (5.97:1 on the link colour). */
 .gg-seg-opt:focus-visible { outline-offset: -4px; }
 .gg-seg-opt-active:focus-visible { outline-color: var(--color-v2-page); }
 /* Anything focused by script (a heading after navigation, a confirm group, a status note) is
    not a keyboard stop: a quiet left bar instead of the ring, so the keyboard user still sees
-   where focus went (WCAG 2.4.7). The bar is the link colour, which is 5.72:1 on the old page colour,
+   where focus went (WCAG 2.4.7). The bar is the link colour, which is 5.97:1 on the page,
    5.28:1 on the field fill and 5.89:1 on the wash (non-text 3:1, WCAG 1.4.11).
    Unlayered on purpose, like the reset above, so no component class can hide it.
    The transparent outline shows in forced-colors mode, which drops box-shadow.
@@ -98,7 +99,7 @@ h1 { font-weight: var(--v2-heading-weight); }
 .gg-phone-nudge:focus,
 .gg-phone-nudge:focus-visible { outline: 2px solid transparent; box-shadow: var(--v2-nudge-shadow); }
 /* Fields: a 2px link-colour ring (the 1px border plus a 1px outline right outside it).
-   The link colour is 5.28:1 on the field fill and 5.72:1 on the old page colour. Against the unfocused
+   The link colour is 5.28:1 on the field fill and 5.97:1 on the page. Against the unfocused
    v2 field edge it is only 1.49:1, so the change of state is the extra width (1px to 2px), which AA
    allows. Unlayered so the global :focus-visible ring can't win; this also covers panel inputs. */
 .gg-input:focus-visible {
@@ -118,7 +119,7 @@ h1 { font-weight: var(--v2-heading-weight); }
    it visible while focused too. */
 .gg-card-selected:focus { outline: 2px solid var(--color-v2-focus); outline-offset: -2px; }
 /* Keyboard focus on a selected card must still change its look (WCAG 2.4.7): the selection ring stays,
-   and a second accent-700 ring sits 2px outside it, on a page-coloured gap (5.26:1 or more on page and glows). */
+   and a second link-colour ring sits 2px outside it, on a page-coloured gap (5.26:1 or more on page and glows). */
 .gg-card-selected:focus-visible {
   box-shadow: 0 0 0 2px var(--color-v2-page), 0 0 0 4px var(--color-v2-link);
 }
@@ -281,8 +282,8 @@ h1 { font-weight: var(--v2-heading-weight); }
       to { background-position: 100% 50%; }
     }
   }
-  /* A link-style button: underlined. Contrast of the text on its own tints (computed): the link colour on the 10% hover tint is 5.08 on the old page colour;
-     the 18% active tint uses the heading colour, because the link colour falls to 4.30 on the field fill. Rows and toggles opt out with .gg-btn-ghost-plain. */
+  /* A link-style button: underlined. Contrast of the text on its own tints (computed): the link colour clears 4.5:1 on the 10% hover tint over the page;
+     the 18% active tint uses the heading colour, because the link colour falls under 4.5:1 on the field fill. Rows and toggles opt out with .gg-btn-ghost-plain. */
   .gg-btn-ghost {
     color: var(--color-v2-link);
     padding-inline: var(--space-1);
@@ -462,6 +463,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     border-radius: calc(var(--radius-md) * 0.75);
   }
   .gg-tag-accent { background: var(--color-v2-wash); color: var(--color-v2-heading); }
+  /* Same look as .gg-tag-accent since v1 left (#1006): v2 has no second accent. */
   .gg-tag-accent-2 { background: var(--color-v2-wash); color: var(--color-v2-heading); }
 
   /* — switch (flowers toggle) — */
@@ -655,7 +657,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     background: var(--color-v2-wash);
     box-shadow: inset 0 0 0 2px var(--color-v2-link);
   }
-  /* Mark as ready: a visible outline. the muted colour is 5.83:1 on the old page colour and 5.38:1 on the field fill
+  /* Mark as ready: a visible outline. the muted colour is 6.09:1 on the page and 5.38:1 on the field fill
      (computed; non-text needs 3:1). Pressed keeps the link-colour inset ring, so the border turns link-coloured too. */
   .gg-chip-outlined {
     gap: 12px;
@@ -720,7 +722,7 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
 }
 
-/* Swirl buttons: the focus ring is pinned to accent-700 (at least 5.26:1 on the page, both glows and glass), so it holds on
+/* Swirl buttons: the focus ring is pinned to --color-v2-link (at least 5.26:1 on the page, both glows and glass), so it holds on
    the swirl whatever the focus role becomes. Today it equals --color-v2-focus. Unlayered so it beats nothing it should not,
    and cannot lose to the component layer. */
 .gg-btn-primary:focus-visible,

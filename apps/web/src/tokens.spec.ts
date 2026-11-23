@@ -4,13 +4,15 @@ import { colors, fontSerifStack, radius, spacing, toGeneratedFile, v2 } from '@g
 
 const read = (name: string) => readFileSync(join(import.meta.dirname, name), 'utf8');
 
-/** A v1 colour custom property, e.g. `--color-accent-700` or `--color-bg`. v2 names (`--color-v2-*`) never match. */
+/** A v1 colour custom property: the `--color-` prefix with a v1 family name (accent, neutral, success, surface, bg, white, ink, error, divider). v2 names (`--color-v2-*`) never match. */
 const V1_VAR = /--color-(accent|neutral|success|surface|bg|white|ink|error|divider)(?![a-z])/;
-/** A v1 Tailwind colour utility (text, bg, border and the like, with accent, neutral, surface, ink and so on). */
-const V1_UTILITY = /\b(bg|text|border|ring|fill|stroke|outline|divide|placeholder|caret|decoration|from|to|via)-(accent|neutral|success|surface|ink|bg|white)(-[0-9]+)?\b/;
+/** A v1 Tailwind colour utility: a colour prefix (border sides, ring-offset, inset-ring, shadow, accent and so on) with a v1 family name. */
+const V1_UTILITY = /\b(bg|text|border(-[xytrbl])?|ring(-offset)?|inset-ring|shadow|accent|fill|stroke|outline|divide|placeholder|caret|decoration|from|to|via)-(accent|neutral|success|surface|ink|bg|white)(-[0-9]+)?\b/;
+/** A web spec reading a v1 token by name, e.g. token('ink') or token('accent-700'). */
+const V1_TOKEN_CALL = /\btoken\('(ink|bg|surface|white|error|divider|(accent|accent-2|neutral|success)(-[0-9]+)?)'\)/;
 
 function usesV1Colour(source: string): boolean {
-  return V1_VAR.test(source) || V1_UTILITY.test(source);
+  return V1_VAR.test(source) || V1_UTILITY.test(source) || V1_TOKEN_CALL.test(source);
 }
 
 function sourceFiles(dir: string): string[] {
@@ -52,11 +54,19 @@ describe('tokens match the web theme', () => {
 /** v1 is deleted (#981): web reads colour only through the v2 roles and --color-text. */
 describe('no v1 colour in web source (#1006)', () => {
   it('flags a v1 var and a v1 utility', () => {
-    expect(usesV1Colour('color: var(--color-accent-700)')).toBe(true);
-    expect(usesV1Colour('x: var(--color-bg)')).toBe(true);
-    expect(usesV1Colour('--color-success-700')).toBe(true);
-    // Built from parts so Tailwind does not emit these dead classes into the app CSS.
+    // Built from parts so Tailwind does not scan these strings and keep the v1 vars or classes in the app CSS.
+    const v = (name: string) => ['-', '-color-', name].join('');
+    expect(usesV1Colour(`color: var(${v('accent-700')})`)).toBe(true);
+    expect(usesV1Colour(`x: var(${v('bg')})`)).toBe(true);
+    expect(usesV1Colour(v('success-700'))).toBe(true);
+    expect(usesV1Colour(`token('${['in', 'k'].join('')}')`)).toBe(true);
+    expect(usesV1Colour(`token('${['accent', '700'].join('-')}')`)).toBe(true);
     const utility = (...parts: string[]) => parts.join('-');
+    expect(usesV1Colour(utility('border', 't', 'neutral', '600'))).toBe(true);
+    expect(usesV1Colour(utility('ring', 'offset', 'surface'))).toBe(true);
+    expect(usesV1Colour(utility('shadow', 'accent', '700'))).toBe(true);
+    expect(usesV1Colour(utility('inset', 'ring', 'success', '700'))).toBe(true);
+    expect(usesV1Colour(utility('accent', 'accent', '700'))).toBe(true);
     expect(usesV1Colour(`className="${utility('text', 'accent', '700')}"`)).toBe(true);
     expect(usesV1Colour(`hover:${utility('bg', 'surface')}`)).toBe(true);
     expect(usesV1Colour(utility('border', 'neutral', '600'))).toBe(true);
@@ -66,6 +76,7 @@ describe('no v1 colour in web source (#1006)', () => {
     expect(usesV1Colour('color: var(--color-v2-link)')).toBe(false);
     expect(usesV1Colour('background: var(--color-v2-field-fill)')).toBe(false);
     expect(usesV1Colour('color: var(--color-text)')).toBe(false);
+    expect(usesV1Colour("token('text') token('v2-focus')")).toBe(false);
     expect(usesV1Colour('className="bg-v2-wash text-v2-success"')).toBe(false);
   });
 
