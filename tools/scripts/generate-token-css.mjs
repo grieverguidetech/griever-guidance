@@ -9,7 +9,7 @@ import { colors, fontSerifStack, radius, spacing, toGeneratedFile, toMarketingFi
 
 const root = join(import.meta.dirname, '../..');
 const files = [
-  ['apps/web/src/theme.generated.css', toGeneratedFile({ colors, fontSerifStack, spacing, radius })],
+  ['apps/web/src/theme.generated.css', toGeneratedFile({ colors, fontSerifStack, spacing, radius, v2 })],
   ['apps/marketing/src/styles/tokens.generated.css', toMarketingFile(v2)],
 ];
 

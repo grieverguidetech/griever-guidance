@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { colors, fontSerifStack, radius, spacing, toGeneratedFile } from '@griever/tokens';
+import { colors, fontSerifStack, radius, spacing, toGeneratedFile, v2 } from '@griever/tokens';
 
 const read = (name: string) => readFileSync(join(import.meta.dirname, name), 'utf8');
 
@@ -8,8 +8,8 @@ const read = (name: string) => readFileSync(join(import.meta.dirname, name), 'ut
 describe('tokens match the web theme', () => {
   const generated = read('theme.generated.css');
 
-  it('theme.generated.css equals toGeneratedFile of the v1 tokens, header included', () => {
-    expect(generated).toBe(toGeneratedFile({ colors, fontSerifStack, spacing, radius }));
+  it('theme.generated.css equals toGeneratedFile of the v1 and v2 tokens, header included', () => {
+    expect(generated).toBe(toGeneratedFile({ colors, fontSerifStack, spacing, radius, v2 }));
   });
 
   it('styles.css imports the generated file and declares no token of its own', () => {

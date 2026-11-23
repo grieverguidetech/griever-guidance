@@ -82,7 +82,9 @@ export {
   toMarketingCss,
   toMarketingFile,
   toWebThemeCss,
+  webFontStack,
   type MarketingInput,
   type WebThemeInput,
+  type WebV2Input,
 } from './css.js';
 export { v2 } from './v2/index.js';

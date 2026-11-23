@@ -1,4 +1,4 @@
-import type { buildRecipes, buildRoles, Gradient, Shadow } from './v2/index.js';
+import type { buildRecipes, buildRoles, Gradient, Primitives, Shadow } from './v2/index.js';
 
 /** The v1 values the web theme is built from. */
 export interface WebThemeInput {
@@ -8,6 +8,15 @@ export interface WebThemeInput {
   spacing: Readonly<Record<string, number>>;
   /** Pixels, keyed like the `--radius-*` custom properties. */
   radius: Readonly<Record<string, number>>;
+  /** When given, the v2 role and recipe vars are added after the v1 ones. Leaves v1 text unchanged. */
+  v2?: WebV2Input;
+}
+
+/** The parts of v2 the web theme reads. */
+export interface WebV2Input {
+  primitives: Pick<Primitives, 'font' | 'border'>;
+  roles: ReturnType<typeof buildRoles>;
+  recipes: ReturnType<typeof buildRecipes>;
 }
 
 /** Top of every generated token CSS file (web theme and marketing vars). */
@@ -58,7 +67,9 @@ export function block(selector: string, lines: readonly string[]): string {
  * the plain custom properties it does not turn into utilities.
  */
 export function toWebThemeCss(input: WebThemeInput): string {
-  return `${block('@theme', themeLines(input))}\n${block(':root', rootLines(input))}`;
+  const theme = input.v2 ? [...themeLines(input), '', ...webV2ThemeLines(input.v2)] : themeLines(input);
+  const root = input.v2 ? [...rootLines(input), '', ...webV2RootLines(input.v2)] : rootLines(input);
+  return `${block('@theme', theme)}\n${block(':root', root)}`;
 }
 
 /** The whole text of theme.generated.css: header plus theme. */
@@ -129,4 +140,71 @@ export function toMarketingCss(v2: MarketingInput): string {
 /** The whole text of apps/marketing/src/styles/tokens.generated.css. */
 export function toMarketingFile(v2: MarketingInput): string {
   return generatedHeader + toMarketingCss(v2);
+}
+
+/** The web font stack for the v2 family: the brand font, then system fonts. */
+export function webFontStack(p: Pick<Primitives, 'font'>): string {
+  return `'${p.font.family}', system-ui, -apple-system, 'Segoe UI', sans-serif`;
+}
+
+/** `--font-v2` and the v2 colours (Tailwind reads these). Every name starts `v2`, so none meets a v1 name. Ink waits for the page ticket. */
+export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): string[] {
+  const { primary, secondary } = recipes.button;
+  const { card, nudge, field } = recipes;
+  const lines: Array<[string, string]> = [
+    ['font-v2', webFontStack(primitives)],
+    ['color-v2-heading', roles.heading.color],
+    ['color-v2-eyebrow', roles.eyebrow.color],
+    ['color-v2-link', roles.link],
+    ['color-v2-wash', roles.wash],
+    ['color-v2-muted', roles.muted],
+    ['color-v2-muted-strong', roles.mutedStrong],
+    ['color-v2-divider', roles.divider],
+    ['color-v2-error', roles.error],
+    ['color-v2-success', roles.success],
+    ['color-v2-focus', roles.focus],
+    ['color-v2-field-fill', field.fill],
+    ['color-v2-field-edge', field.edge],
+    ['color-v2-field-focus', field.focusRing],
+    ['color-v2-primary-text', primary.text.color],
+    ['color-v2-primary-border', primary.border.color],
+    ['color-v2-secondary-text', secondary.text.color],
+    ['color-v2-secondary-border', secondary.border.color],
+    ['color-v2-card-fill', card.fill],
+    ['color-v2-card-border', card.border.color],
+    ['color-v2-nudge-text', nudge.text.color],
+    ['color-v2-nudge-border', nudge.border.color],
+    ['color-v2-open-ring', roles.doneMark.openRing],
+  ];
+  return lines.map(([name, value]) => `  --${name}: ${value};`);
+}
+
+/** The v2 gradients, shadows, radius, border widths and motion times, as plain custom properties. */
+export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): string[] {
+  const { primary, secondary } = recipes.button;
+  const { card, nudge } = recipes;
+  const lines: Array<[string, string]> = [
+    ['primary-bg', gradientCss(primary.swirl)],
+    ['secondary-bg', gradientCss(secondary.swirl)],
+    ['nudge-bg', gradientCss(nudge.swirl)],
+    ['primary-shadow', shadowCss(primary.shadow)],
+    ['secondary-shadow', shadowCss(secondary.shadow)],
+    ['card-shadow', shadowCss(card.shadow)],
+    ['nudge-shadow', shadowCss(nudge.shadow)],
+    ['radius', `${card.radius}px`],
+    ['border-thin', `${primitives.border.thin}px`],
+    ['border-medium', `${primitives.border.medium}px`],
+    ['body-size', `${roles.body.size}px`],
+    ['eyebrow-size', `${roles.eyebrow.size}px`],
+    ['eyebrow-tracking', `${roles.eyebrow.tracking}em`],
+    ['heading-weight', String(roles.heading.weight)],
+    ['weight-light', String(primitives.font.weights.light)],
+    ['weight-regular', String(primitives.font.weights.regular)],
+    ['weight-medium', String(primitives.font.weights.medium)],
+    // JS should read these times from @griever/tokens: the minifier rewrites 4500ms to 4.5s.
+    ['drift-ms', `${primary.driftMs}ms`],
+    ['settle-ms', `${primary.settleMs}ms`],
+    ['spin-ms', `${roles.doneMark.spinMs}ms`],
+  ];
+  return lines.map(([name, value]) => `  --v2-${name}: ${value};`);
 }
