@@ -21,7 +21,7 @@ export type { AnnounceCopy, AnnounceProps } from './screens/Announce';
 export { Hub } from './screens/Hub';
 export type { HubCopy, HubMomentKey, HubProps, HubRow } from './screens/Hub';
 export { SerifText, SerifTextInput } from './SerifText';
-export { SerifReadyContext, useSerifStyle } from './typography';
+export { useSerifStyle } from './typography';
 export { WhoShouldKnow, PersonRow, SelectedCount } from './screens/WhoShouldKnow';
 export type { WhoPerson, WhoShouldKnowCopy, WhoShouldKnowProps } from './screens/WhoShouldKnow';
 export { Review } from './screens/Review';

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { colors, v2 } from './index.js';
+import { v2 } from './index.js';
 import { buildRecipes } from './v2/recipes.js';
 import { buildRoles } from './v2/roles.js';
 import { primitives } from './v2/primitives.js';
@@ -97,28 +97,9 @@ describe('v2 tokens: layers', () => {
     expect(Object.keys(v2.recipes.button).sort()).toEqual(['primary', 'secondary']);
   });
 
-  it('leaves the v1 colours alone', () => {
-    expect(colors.bg).toBe('#f3f2f2');
-  });
 });
 
-describe('v2 tokens: copied from the v1 look', () => {
-  it('copies the v1 value for each control and state role', () => {
-    const table: [string, string, string][] = [
-      ['accent-700', colors['accent-700'], v2.roles.link],
-      ['accent-100', colors['accent-100'], v2.roles.wash],
-      ['neutral-700', colors['neutral-700'], v2.roles.muted],
-      ['neutral-800', colors['neutral-800'], v2.roles.mutedStrong],
-      ['neutral-600', colors['neutral-600'], v2.recipes.field.edge],
-      ['surface', colors.surface, v2.recipes.field.fill],
-      ['accent-700 (ring)', colors['accent-700'], v2.recipes.field.focusRing],
-      ['success-700', colors['success-700'], v2.roles.success],
-    ];
-    for (const [name, v1, v2Value] of table) {
-      expect(v2Value, name).toBe(v1);
-    }
-  });
-
+describe('v2 tokens: web values', () => {
   it('uses the web error and success values (D2), not the mobile ones', () => {
     expect(v2.roles.error).toBe('#b3261e');
     expect(v2.roles.success).toBe('#2a7048');
@@ -213,9 +194,16 @@ describe('v2 tokens: contrast on the field fill', () => {
     expect(contrast(edge, fill)).toBeGreaterThanOrEqual(3);
   });
 
-  it('gives muted, link and error text at least 4.5:1 on the fill', () => {
-    for (const [role, color] of Object.entries({ muted: v2.roles.muted, link: v2.roles.link, error: v2.roles.error })) {
+  it('gives muted, link, error and success text at least 4.5:1 on the fill', () => {
+    const roles = { muted: v2.roles.muted, link: v2.roles.link, error: v2.roles.error, success: v2.roles.success };
+    for (const [role, color] of Object.entries(roles)) {
       expect(contrast(color, fill), `${role} on fill`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('gives error and success at least 4.5:1 on the page colour', () => {
+    for (const [role, color] of Object.entries({ error: v2.roles.error, success: v2.roles.success })) {
+      expect(contrast(color, v2.roles.page.color), `${role} on page`).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

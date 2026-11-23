@@ -6,5 +6,5 @@ export { buildRecipes } from './recipes.js';
 export { buildRoles } from './roles.js';
 export type { Gradient, Primitives, Shadow } from './primitives.js';
 
-/** Design tokens v2: primitives, then roles, then recipes. Mobile reads this; web reads v1 until its own ticket. */
+/** Design tokens v2: primitives, then roles, then recipes. Web and mobile read this. */
 export const v2 = { primitives, roles, recipes };

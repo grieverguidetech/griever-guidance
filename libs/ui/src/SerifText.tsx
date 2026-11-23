@@ -1,27 +1,21 @@
 import type { ComponentProps } from 'react';
-import { Platform, StyleSheet, Text, TextInput } from 'react-native';
+import { StyleSheet, Text, TextInput } from 'react-native';
 import { useSerifStyle } from './typography';
 
 // Sora loads only up to 500, so 500 and heavier map to medium.
 const SEMIBOLD = new Set(['500', '600', '700', '800', '900', 'bold']);
 
 /**
- * The serif for the caller's weight and slant. Does nothing if the caller chose its own family.
- * On native the face carries weight and slant, so the caller's fontWeight and fontStyle are cleared
- * (a "bold" must not stack on the semibold face).
+ * The app font for the caller's weight. Does nothing if the caller chose its own family.
  */
 function useFontFor(style: ComponentProps<typeof Text>['style']) {
   const flat = StyleSheet.flatten(style);
   const weight = flat?.fontWeight;
-  const font = useSerifStyle(
-    weight !== undefined && SEMIBOLD.has(String(weight)) ? 'semibold' : 'regular',
-    flat?.fontStyle === 'italic',
-  );
-  if (flat?.fontFamily || !font.fontFamily) {
+  const font = useSerifStyle(weight !== undefined && SEMIBOLD.has(String(weight)) ? 'semibold' : 'regular');
+  if (flat?.fontFamily) {
     return style;
   }
-  const native = Platform.OS !== 'web';
-  return [font, style, native ? { fontWeight: undefined, fontStyle: undefined } : { fontWeight: font.fontWeight }];
+  return [font, style, { fontWeight: font.fontWeight }];
 }
 
 /**

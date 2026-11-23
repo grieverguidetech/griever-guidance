@@ -5,11 +5,11 @@
 // With --check it writes nothing and exits 1 when a file on disk differs (stale or hand-edited).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { colors, fontSerifStack, radius, spacing, toGeneratedFile, toMarketingFile, v2 } from '../../libs/tokens/dist/index.js';
+import { spacing, toGeneratedFile, toMarketingFile, v2 } from '../../libs/tokens/dist/index.js';
 
 const root = join(import.meta.dirname, '../..');
 const files = [
-  ['apps/web/src/theme.generated.css', toGeneratedFile({ colors, fontSerifStack, spacing, radius, v2 })],
+  ['apps/web/src/theme.generated.css', toGeneratedFile({ spacing, v2 })],
   ['apps/marketing/src/styles/tokens.generated.css', toMarketingFile(v2)],
 ];
 

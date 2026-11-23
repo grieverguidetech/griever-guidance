@@ -87,20 +87,20 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone, draft, onDr
           }}
         />
         {error && (
-          <p className="text-[12px] m-0" style={{ color: 'var(--color-danger, #b91c1c)' }}>
+          <p className="text-[12px] m-0" style={{ color: 'var(--color-v2-error)' }}>
             {error}
           </p>
         )}
       </div>
 
-      <label className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md">
+      <label className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-[var(--v2-radius)]">
         <input
           type="checkbox"
           className="peer absolute inset-0 w-full h-full m-0 appearance-none opacity-0 cursor-pointer"
           checked={hearsFirst}
           onChange={(e) => setHearsFirst(e.target.checked)}
         />
-        <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-v2-focus)]">
+        <span className="flex items-center gap-3 rounded-[2px] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-v2-focus)]">
           {hearsFirst ? (
             <CheckCircle
               aria-hidden="true"

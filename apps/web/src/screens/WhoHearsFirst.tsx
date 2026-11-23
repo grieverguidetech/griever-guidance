@@ -49,7 +49,7 @@ export function WhoHearsFirst({ contacts, onBack, onSave, initialFirstIds, onTic
           return (
             <label
               key={contact.contactId}
-              className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-md"
+              className="relative flex items-center gap-3 min-h-[44px] cursor-pointer rounded-[var(--v2-radius)]"
             >
               <input
                 type="checkbox"
@@ -59,7 +59,7 @@ export function WhoHearsFirst({ contacts, onBack, onSave, initialFirstIds, onTic
                 checked={checked}
                 onChange={() => toggle(contact.contactId)}
               />
-              <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-v2-focus)]">
+              <span className="flex items-center gap-3 rounded-[2px] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-v2-focus)]">
                 {checked ? (
                   <CheckCircle
                     aria-hidden="true"

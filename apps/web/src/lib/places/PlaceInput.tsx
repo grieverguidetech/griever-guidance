@@ -302,7 +302,7 @@ export function PlaceInput({ id, labelledBy, describedBy, maxLength, fillMessage
             aria-label={copy.placesListLabel}
             hidden={!listVisible}
             aria-busy={searching || picking}
-            className="absolute left-0 right-0 z-10 m-0 mt-1 max-h-72 list-none overflow-auto rounded-md border border-v2-field-edge bg-v2-page p-0"
+            className="absolute left-0 right-0 z-10 m-0 mt-1 max-h-72 list-none overflow-auto rounded-[var(--v2-radius)] border border-v2-field-edge bg-v2-page p-0"
           >
             {searching && (
               <li role="option" aria-disabled="true" aria-selected={false} className="gg-hint flex min-h-[44px] items-center px-3 py-2">

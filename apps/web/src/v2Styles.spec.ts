@@ -7,6 +7,10 @@ const css = readFileSync(resolve(__dirname, 'styles.css'), 'utf8');
 
 const theme = readFileSync(resolve(__dirname, 'theme.generated.css'), 'utf8');
 
+// Built from parts so Tailwind does not scan the names into the app CSS.
+const SERIF_CLASS = ['font', 'serif'].join('-');
+const SERIF_VAR = `--${SERIF_CLASS}`;
+
 /** The declarations of every rule whose selector matches exactly, joined. */
 function rule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -79,7 +83,8 @@ describe('styles.css type roles', () => {
 
   it('uses no weight above 500 and no serif var', () => {
     expect(css).not.toMatch(/font-weight:\s*(6|7|8|9)00/);
-    expect(css).not.toContain('var(--font-serif)');
+    expect(css).not.toContain(SERIF_VAR);
+    expect(theme).not.toContain(SERIF_VAR);
   });
 
   it('defines every var the type rules use (theme.generated.css or the :root block)', () => {
@@ -91,8 +96,8 @@ describe('styles.css type roles', () => {
     }
   });
 
-  it('has no font-serif class anywhere in apps/web/src', () => {
-    const offenders = sourceFiles(__dirname).filter((file) => /font-serif/.test(readFileSync(file, 'utf8')) && !file.endsWith('v2Styles.spec.ts'));
+  it('has no serif class anywhere in apps/web/src', () => {
+    const offenders = sourceFiles(__dirname).filter((file) => readFileSync(file, 'utf8').includes(SERIF_CLASS) && !file.endsWith('v2Styles.spec.ts'));
     expect(offenders).toEqual([]);
   });
 

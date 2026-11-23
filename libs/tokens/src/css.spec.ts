@@ -2,19 +2,18 @@ import {
   block,
   generatedHeader as generatedHeaderText,
   rootLines,
-  themeLines,
   toGeneratedFile,
   toMarketingCss,
   toMarketingFile,
   toWebThemeCss,
   webFontStack,
 } from './css.js';
-import { colors, fontSerifStack, radius, spacing } from './index.js';
+import { spacing } from './index.js';
 import { v2 } from './v2/index.js';
 import { buildRecipes } from './v2/recipes.js';
 import { buildRoles } from './v2/roles.js';
 
-const input = { colors, fontSerifStack, spacing, radius };
+const input = { spacing, v2 };
 
 /** Every `--name: value;` declaration inside the block that starts at `opener`. */
 function declarations(css: string, opener: string): Record<string, string> {
@@ -33,101 +32,43 @@ function declarations(css: string, opener: string): Record<string, string> {
 describe('toWebThemeCss', () => {
   const css = toWebThemeCss(input);
 
-  it('writes every colour and the serif stack into @theme, in key order', () => {
-    const theme = declarations(css, '@theme {');
-    expect(Object.keys(theme)).toEqual([
-      '--font-serif',
-      ...Object.keys(colors).map((n) => `--color-${n}`),
-    ]);
-    expect(theme['--font-serif']).toBe(fontSerifStack);
-    for (const [name, value] of Object.entries(colors)) {
-      expect(theme[`--color-${name}`]).toBe(value);
-    }
-  });
-
-  it('writes spacing and radius into :root in pixels, in key order', () => {
+  it('writes spacing into :root in pixels, in key order, before the v2 vars', () => {
     const root = declarations(css, ':root {');
-    expect(Object.keys(root)).toEqual([
-      ...Object.keys(spacing).map((n) => `--space-${n}`),
-      ...Object.keys(radius).map((n) => `--radius-${n}`),
-    ]);
+    const names = Object.keys(root);
+    expect(names.slice(0, Object.keys(spacing).length)).toEqual(
+      Object.keys(spacing).map((n) => `--space-${n}`),
+    );
     for (const [name, value] of Object.entries(spacing)) {
       expect(root[`--space-${name}`]).toBe(`${value}px`);
     }
-    for (const [name, value] of Object.entries(radius)) {
-      expect(root[`--radius-${name}`]).toBe(`${value}px`);
-    }
+    expect(names[Object.keys(spacing).length]).toMatch(/^--v2-/);
+  });
+
+  it('puts --space-* in :root only, never in @theme', () => {
+    expect(Object.keys(declarations(css, ':root {')).filter((n) => n.startsWith('--space-'))).toHaveLength(
+      Object.keys(spacing).length,
+    );
+    expect(Object.keys(declarations(css, '@theme {')).filter((n) => n.startsWith('--space-'))).toEqual([]);
+  });
+
+  it('holds no v1 var: no --radius-*, --font-serif or v1 colour', () => {
+    expect(css).not.toMatch(/--radius-|--font-serif/);
+    expect(css).not.toMatch(/--color-(accent|neutral|success|surface|bg|white|ink)/);
   });
 
   it('is deterministic', () => {
     expect(toWebThemeCss(input)).toBe(css);
   });
 
-  it('shows a changed value in the output', () => {
-    const changed = toWebThemeCss({
-      ...input,
-      colors: { ...colors, accent: '#123456' },
-    });
-    expect(changed).not.toBe(css);
-    expect(declarations(changed, '@theme {')['--color-accent']).toBe('#123456');
-    expect(changed).toContain('--color-accent: #123456;');
-  });
-
-  it('shows a changed spacing or radius value in the output', () => {
-    const changed = toWebThemeCss({
-      ...input,
-      spacing: { ...spacing, 1: 7 },
-      radius: { ...radius, sm: 3 },
-    });
+  it('shows a changed spacing value in the output', () => {
+    const changed = toWebThemeCss({ ...input, spacing: { ...spacing, 1: 7 } });
     expect(changed).toContain('--space-1: 7px;');
-    expect(changed).toContain('--radius-sm: 3px;');
   });
 
-  it('puts a blank line between colour families and writes exact text', () => {
-    const small = {
-      colors: {
-        bg: '#111111',
-        ink: '#222222',
-        'neutral-100': '#333333',
-        'accent-100': '#444444',
-        'accent-2-100': '#555555',
-        'success-700': '#666666',
-      },
-      fontSerifStack: 'Serif',
-      spacing: { 1: 5 },
-      radius: { sm: 1 },
-    };
-    expect(toWebThemeCss(small)).toBe(
-      [
-        '@theme {',
-        '  --font-serif: Serif;',
-        '',
-        '  --color-bg: #111111;',
-        '  --color-ink: #222222;',
-        '',
-        '  --color-neutral-100: #333333;',
-        '',
-        '  --color-accent-100: #444444;',
-        '',
-        '  --color-accent-2-100: #555555;',
-        '',
-        '  --color-success-700: #666666;',
-        '}',
-        '',
-        ':root {',
-        '  --space-1: 5px;',
-        '',
-        '  --radius-sm: 1px;',
-        '}',
-        '',
-      ].join('\n'),
-    );
-  });
-
-  it('builds from themeLines, rootLines and block', () => {
-    expect(toWebThemeCss(input)).toBe(
-      `${block('@theme', themeLines(input))}\n${block(':root', rootLines(input))}`,
-    );
+  it('starts @theme with the v2 font and :root with the rootLines', () => {
+    expect(css.startsWith('@theme {\n  --font-v2: ')).toBe(true);
+    expect(css).toContain(`:root {\n${rootLines(input).join('\n')}\n\n  --v2-`);
+    expect(block('.x', ['  a: b;'])).toBe('.x {\n  a: b;\n}\n');
   });
 
   it('toGeneratedFile starts with the do-not-edit header', () => {
@@ -228,15 +169,6 @@ describe('toWebThemeCss with v2', () => {
   const theme = declarations(css, '@theme {');
   const root = declarations(css, ':root {');
 
-  it('keeps the v1 text as an exact prefix of each block', () => {
-    const v1 = toWebThemeCss(input);
-    const v1Theme = v1.slice(0, v1.indexOf('}\n'));
-    const v1Root = v1.slice(v1.indexOf(':root {'), v1.lastIndexOf('}'));
-    expect(css).toContain(v1Theme);
-    expect(css).toContain(v1Root);
-    expect(css.indexOf(v1Theme)).toBe(0);
-  });
-
   it('puts colours and the font in @theme, and gradients, shadows, radius and ms in :root', () => {
     expect(theme['--color-v2-error']).toBe('#b3261e');
     expect(theme['--color-v2-success']).toBe('#2a7048');
@@ -274,30 +206,23 @@ describe('toWebThemeCss with v2', () => {
     expect(theme['--color-v2-glow-sky']).toBe(v2.roles.page.glows.bottomLeft);
   });
 
-  it('no v2 name collides with a v1 name, and every v2 name starts with v2', () => {
-    const v1 = {
-      ...declarations(toWebThemeCss(input), '@theme {'),
-      ...declarations(toWebThemeCss(input), ':root {'),
-    };
-    const added = [...Object.keys(theme), ...Object.keys(root)].filter(
-      (n) => !(n in v1),
-    );
-    expect(added.length).toBeGreaterThan(30);
+  it('every name is a v2 name, --color-text or a --space-* layout var', () => {
     const all = [...Object.keys(theme), ...Object.keys(root)];
+    expect(all.length).toBeGreaterThan(30);
     expect(new Set(all).size).toBe(all.length);
-    for (const name of added) {
+    for (const name of all) {
       if (name === '--color-text') {
         continue;
       }
-      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2$)/);
+      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2$|space-\d+$)/);
     }
-    expect(all.length - added.length).toBe(Object.keys(v1).length);
   });
 
   it('declares no name twice, within a block or across both', () => {
     const themeNames = rawNames(css, '@theme {');
     const rootNames = rawNames(css, ':root {');
-    expect(themeNames.length).toBeGreaterThan(40);
+    // A sanity floor: the v1 names (about 50) were counted here before #1010; v2 alone has 31.
+    expect(themeNames.length).toBeGreaterThan(25);
     expect(repeated(themeNames)).toEqual([]);
     expect(repeated(rootNames)).toEqual([]);
     expect(repeated([...themeNames, ...rootNames])).toEqual([]);

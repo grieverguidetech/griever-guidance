@@ -31,7 +31,7 @@ const colors = {
   nudgeBorder: 'rgba(30,123,184,0.35)',
   openRing: '#6f6a62',
 
-  // Controls and states, copied value for value from today's look (v1 tokens, mobile colors.ts, web styles.css).
+  // Controls and states, copied value for value from the old look (the v1 tokens, deleted in #1010, mobile colors.ts and web styles.css).
   link: '#006786', // accent-700
   wash: '#e9f8ff', // accent-100, the selected-row fill
   muted: '#605d5d', // neutral-700
