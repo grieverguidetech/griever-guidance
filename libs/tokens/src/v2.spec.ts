@@ -86,7 +86,7 @@ describe('v2 tokens: layers', () => {
 
   it('has the roles and recipes the ticket names', () => {
     expect(Object.keys(v2.roles).sort()).toEqual(
-      ['body', 'doneMark', 'eyebrow', 'heading', 'ink', 'loud', 'nudge', 'page', 'soft'],
+      ['body', 'doneMark', 'eyebrow', 'focus', 'heading', 'ink', 'loud', 'nudge', 'page', 'soft'],
     );
     expect(Object.keys(v2.recipes).sort()).toEqual(['button', 'card', 'doneMark', 'nudge']);
     expect(Object.keys(v2.recipes.button).sort()).toEqual(['primary', 'secondary']);
@@ -129,7 +129,7 @@ describe('v2 tokens: contrast', () => {
   // The glass and nudge card borders are decorative edges, not controls, so they are not held to 3:1.
   it('gives control borders and the open ring at least 3:1 on every ground', () => {
     for (const [name, ground] of Object.entries(grounds)) {
-      for (const border of [c.primaryBorder, c.secondaryBorder, c.openRing]) {
+      for (const border of [c.primaryBorder, c.secondaryBorder, c.openRing, v2.roles.focus]) {
         expect(contrast(border, ground), `${border} on ${name}`).toBeGreaterThanOrEqual(3);
       }
     }

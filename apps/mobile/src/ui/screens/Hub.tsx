@@ -1,8 +1,9 @@
-import { useId, useRef } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
+import { colors, minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { Button } from '../Button';
+import { glassCard } from '../Card';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
 import { Phrasing } from '../phrasing';
@@ -146,6 +147,9 @@ const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
 function SendCard(props: { row: HubRow; title: string; stateWord: string; continueWord: string; onPress: () => void }) {
   const { row } = props;
   const semibold = useSerifStyle('semibold');
+  // The ring shows for Android keyboard or D-pad and web. iOS Full Keyboard Access, Switch Control and VoiceOver draw their
+  // own system indicator and do not fire onFocus.
+  const [focused, setFocused] = useState(false);
   // The "Needs ..." line replaces the summary. The check is decorative, so it is not in the name.
   const line = row.meta ?? row.summary;
   // The visible words in reading order. Continue is last, and only on the next card.
@@ -156,7 +160,9 @@ function SendCard(props: { row: HubRow; title: string; stateWord: string; contin
       testID={row.lit ? 'hub-next-card' : undefined}
       accessibilityLabel={label}
       onPress={props.onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={({ pressed }) => [styles.card, focused && styles.cardFocused, pressed && styles.cardPressed]}
     >
       {row.lit ? <View testID="next-bar" style={styles.nextBar} /> : null}
       <Phrasing>
@@ -189,24 +195,21 @@ function Meta({ meta }: { meta?: string }) {
   );
 }
 
-/** `base` with `amount` of `over` mixed in, as a hex colour. */
-function mixHex(base: string, over: string, amount: number): string {
-  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
-  return `#${[1, 3, 5].map((at) => Math.round(channel(base, at) * (1 - amount) + channel(over, at) * amount).toString(16).padStart(2, '0')).join('')}`;
-}
-
-/** The card colour while pressed: surface with 7% ink over it (web's hover). Muted text keeps 4.5:1 on it (hub.spec checks). */
-const PRESSED_SURFACE = mixHex(colors.surface, colors.ink, 0.07);
+export const PRESSED_OPACITY = 0.9;
+const FOCUS_RING = 2;
 
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   rows: { gap: spacing[2] },
-  // Web's gg-panel card: surface fill, no border, full width, at least 44 pt.
-  card: { minHeight: minTouchTarget, padding: spacing[3], gap: 2, backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden' },
-  // Web's hover mix: ink 7% over surface. Muted text keeps 4.5:1 on it (hub.spec checks).
-  cardPressed: { backgroundColor: PRESSED_SURFACE },
+  // The v2 glass card (shared with Card), full width, at least 44 pt.
+  card: { ...glassCard, minHeight: minTouchTarget, padding: spacing[3] + glassCard.borderWidth, gap: 2, overflow: 'hidden' },
+  // The glass edge is decorative (about 1:1), so focus gets a 2 pt ring in the v2 focus colour (3:1 on every ground).
+  // The ring is 1 pt thicker, so the padding gives 1 pt back and the card does not move.
+  cardFocused: { borderWidth: FOCUS_RING, borderColor: v2.roles.focus, padding: spacing[3] },
+  // Glass is see-through, so a press dims the whole card. 0.9 keeps muted and accent text at 4.5:1 (hub.spec checks; 0.87 is the floor).
+  cardPressed: { opacity: PRESSED_OPACITY },
   // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
   nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors['accent-700'] },
   top: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
