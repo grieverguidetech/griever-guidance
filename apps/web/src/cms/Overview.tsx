@@ -164,7 +164,7 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
             <span>{fill(checklist.onTheChecklist, { item: ITEM_COPY[item] })}</span>
           </button>
         ) : (
-          <h2 className="font-semibold">{fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}</h2>
+          <p className="font-semibold">{fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}</p>
         )
       ) : null}
 

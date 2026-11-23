@@ -204,7 +204,8 @@ describe('Overview', () => {
 
   it('without onOpenItem the phase shows and the next-item button does not', () => {
     render(<Overview session={{}} checklist={{}} onOpen={vi.fn()} />);
-    expect(screen.getByRole('heading', { level: 2, name: 'Now: Right away (first 24 to 48 hours)' })).toBeInTheDocument();
+    expect(screen.getByText('Now: Right away (first 24 to 48 hours)').tagName).toBe('P');
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
     expect(screen.queryByRole('button', { name: /On the checklist:/ })).toBeNull();
   });
 

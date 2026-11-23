@@ -77,6 +77,22 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
   const sheetButton = useRef<HTMLButtonElement>(null);
   const asideTitleId = useId();
   const panelId = useId();
+  const showButton = useRef<HTMLButtonElement>(null);
+  const hideButton = useRef<HTMLButtonElement>(null);
+  const firstRender = useRef(true);
+
+  // Show and Hide each unmount themselves, so focus goes to the other one rather than to <body>.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (panelShown) {
+      hideButton.current?.focus();
+    } else {
+      showButton.current?.focus();
+    }
+  }, [panelShown]);
 
   // From `lg` the phone button is hidden, so close the sheet rather than return focus to it.
   useEffect(() => {
@@ -120,7 +136,7 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
 
   return (
     <>
-    <AppHeader checklist={aside ? { open: panelShown, onToggle: togglePanel, panelId } : undefined} />
+    <AppHeader checklist={aside ? { open: panelShown, onToggle: togglePanel, panelId, buttonRef: showButton } : undefined} />
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
       <SideNav personName={personName} section={section} onSelect={select} statuses={statuses} noCurrent={noCurrent} hrefFor={hrefFor} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
@@ -158,7 +174,7 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
           <div className="flex items-center justify-between gap-2">
             <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
             {/* The name flips Hide/Show; no aria-expanded, so there is one signal. */}
-            <button type="button" className="gg-btn gg-btn-ghost" onClick={togglePanel}>{copy.hide}</button>
+            <button ref={hideButton} type="button" className="gg-btn gg-btn-ghost" onClick={togglePanel}>{copy.hide}</button>
           </div>
           {renderAside(false)}
         </aside>

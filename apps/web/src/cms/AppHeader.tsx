@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { PRODUCT_NAME } from '@griever/shared';
 import { screenCopy } from '@griever/copy';
 
@@ -9,6 +10,8 @@ export interface HeaderChecklistToggle {
   onToggle: () => void;
   /** The id of the panel the button opens. */
   panelId: string;
+  /** Lets the shell move focus here when the panel closes. */
+  buttonRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -44,6 +47,7 @@ export function AppHeader({ checklist }: { checklist?: HeaderChecklistToggle } =
       </span>
       {checklist && !checklist.open ? (
         <button
+          ref={checklist.buttonRef}
           type="button"
           className="gg-btn gg-btn-primary hidden lg:inline-flex"
           aria-expanded={false}

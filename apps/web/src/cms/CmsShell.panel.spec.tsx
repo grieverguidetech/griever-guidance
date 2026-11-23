@@ -61,11 +61,13 @@ describe('CmsShell checklist panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
     const show = screen.getByRole('button', { name: 'Show checklist' });
     expect(show).toHaveAttribute('aria-expanded', 'false');
+    expect(show).toHaveFocus();
     const panelId = show.getAttribute('aria-controls') ?? '';
     expect(panelId).not.toBe('');
     await userEvent.click(show);
     const aside = screen.getByRole('complementary', { name: "What you'll need" });
     expect(aside).toHaveAttribute('id', panelId);
+    expect(within(aside).getByRole('button', { name: 'Hide checklist' })).toHaveFocus();
     expect(screen.queryByRole('button', { name: 'Show checklist' })).not.toBeInTheDocument();
   });
 
