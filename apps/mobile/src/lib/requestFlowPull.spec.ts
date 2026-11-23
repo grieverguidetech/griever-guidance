@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { onFlowPullRequest, requestFlowPull } from './requestFlowPull';
+import { canPullNow, onFlowPullRequest, pullNow, registerManualPull, requestFlowPull } from './requestFlowPull';
 
 describe('requestFlowPull', () => {
   it('tells a listener about each request', () => {
@@ -20,5 +20,22 @@ describe('requestFlowPull', () => {
 
   it('does nothing with no listeners', () => {
     expect(() => requestFlowPull()).not.toThrow();
+  });
+});
+
+describe('pullNow', () => {
+  it('is false and offers nothing with no pull registered', async () => {
+    expect(canPullNow()).toBe(false);
+    await expect(pullNow()).resolves.toBe(false);
+  });
+
+  it('returns what the registered pull says, and false if it throws', async () => {
+    const pull = jest.fn(async () => true);
+    const stop = registerManualPull(pull);
+    await expect(pullNow()).resolves.toBe(true);
+    pull.mockRejectedValueOnce(new Error('x'));
+    await expect(pullNow()).resolves.toBe(false);
+    stop();
+    expect(canPullNow()).toBe(false);
   });
 });

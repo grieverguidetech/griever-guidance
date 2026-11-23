@@ -14,6 +14,7 @@ import { copyText, pasteText } from '../lib/clipboard';
 import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
 import { isMarkedReady } from '../lib/isMarkedReady';
 import { requestFlowPull } from '../lib/requestFlowPull';
+import { usePullToRefresh } from '../lib/usePullToRefresh';
 import { obituaryShareTextFor, obituaryTextFor } from '../lib/obituaryText';
 
 const shareCopy = screenCopy('shareObituary');
@@ -45,6 +46,7 @@ type Props = {
  * Back and the sheet. It passes no drafting handler, so the drafting card is not shown.
  */
 export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onContinue, onEmailed }: Props) {
+  const refresh = usePullToRefresh('obituary-refresh-status');
   const heading = useRef<ComponentRef<typeof Text>>(null);
   const checklistButton = useRef<ButtonNode>(null);
   // The Android focus return waits one tick; an unmount before it runs cancels it.
@@ -271,6 +273,8 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ShareObituary
+          refreshControl={refresh.refreshControl}
+          refreshNotice={refresh.notice}
           copy={copy}
           nudge={nudgeAtOpen && !isMarkedReady(session, 'obituary') ? { title: nudgeCopy.obituaryTitle, line: nudgeCopy.obituaryLine, button: nudgeCopy.gotIt, onGotIt: () => leave(onBack) } : undefined}
           eyebrow={fill(copy.forName, { name })}

@@ -4,10 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import type { SyncAuth } from './AccountProvider';
 import { announceLeftFamily } from './leftFamily';
-import { requestFlowPull } from './requestFlowPull';
+import { canPullNow, pullNow, requestFlowPull } from './requestFlowPull';
 import { useMobileFlowSync } from './useMobileFlowSync';
 
-const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null }));
+const mockPullNow = jest.fn(async () => true);
+const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null, pulled: false, pullNow: mockPullNow }));
 jest.mock('@griever/hooks', () => ({
   FLOW_QUEUE_STORAGE_KEY: 'gg.flowQueue.v1',
   flowQueueKey: (id: string) => `gg.flowQueue.v1:${id}`,
@@ -59,6 +60,19 @@ beforeEach(() => {
 });
 
 describe('useMobileFlowSync', () => {
+  it('registers a pull a screen can wait for only while sync is allowed (#959)', async () => {
+    const view = await mount({ auth: true, sync: true }, signedIn);
+    expect(canPullNow()).toBe(true);
+    await expect(pullNow()).resolves.toBe(true);
+    expect(mockPullNow).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(canPullNow()).toBe(false);
+    await mount({ auth: true, sync: false }, signedIn);
+    expect(canPullNow()).toBe(false);
+    await mount({ auth: true, sync: true }, { ...signedIn, status: 'signed_out', userId: null });
+    expect(canPullNow()).toBe(false);
+  });
+
   it('passes moveFlowId through to the sync, so a squatted id can move (#942)', async () => {
     mockAuth = signedIn;
     const moveFlowId = jest.fn();

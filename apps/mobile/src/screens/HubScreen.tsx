@@ -17,6 +17,7 @@ import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { NEW_OBITUARY_KEYS } from '../lib/obituaryText';
 import type { SentNoteText } from '../lib/sendNote';
 import { barMoment, nextMoment } from '../lib/nextMoment';
+import { usePullToRefresh } from '../lib/usePullToRefresh';
 
 const copy = screenCopy('pathLanding');
 const paywallCopy = screenCopy('paywall');
@@ -174,6 +175,7 @@ export type HubScreenProps = {
 export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, onStart, onSetItem, onEditPerson, note, paymentsEnabled = PAYMENTS_ENABLED }: HubScreenProps) {
   // The account name counts as the sender name for the card status only. It is never saved to the person (DS-7).
   const statusSession = useSessionWithAccountName(session);
+  const refresh = usePullToRefresh('hub-refresh-status');
   const moments = usePathMoments(statusSession);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -267,7 +269,8 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={refresh.refreshControl}>
+      {refresh.notice}
       <Hub
         copy={hubCopy}
         eyebrow={fill(copy.forName, { name: session.personName })}

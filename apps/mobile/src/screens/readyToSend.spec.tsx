@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { AccessibilityInfo, Linking, Share, StyleSheet } from 'react-native';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { AccessibilityInfo, Linking, ScrollView, Share, StyleSheet } from 'react-native';
+import { screenCopy } from '@griever/copy';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import type { SectionFields, SessionDetails } from '@griever/shared';
 import { ReadyToSendScreen } from './ReadyToSendScreen';
 import { SendingScreen } from './SendingScreen';
 import { onFlowPullRequest } from '../lib/requestFlowPull';
+import { registerManualPull } from '../lib/requestFlowPull';
 
 const session = { personName: 'Margaret Hayes', dateOfPassing: '', senderName: 'Peter', obituaryUrl: '', obituaryPublisher: '', serviceDate: '',
   // The family has marked every step Ready on the web (without it the phone shows the nudge, #824, #949).
@@ -527,6 +529,38 @@ describe('Ready to send with nothing written on the web (#824)', () => {
     render(<Harness web={EMPTY} />);
     expect(heard).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/sync|pull|refresh/i)).toBeNull();
+    stop();
+  });
+});
+
+describe('pull to refresh on the send screen (#959)', () => {
+  const failed = screenCopy('phoneHub').refreshFailed;
+  const control = () => screen.UNSAFE_getAllByType(ScrollView)[0].props.refreshControl as { props: { refreshing: boolean; onRefresh: () => void } } | undefined;
+
+  it('offers no pull when sync is not allowed', () => {
+    render(<Harness />);
+    expect(control()).toBeUndefined();
+    expect(screen.queryByText(failed)).toBeNull();
+  });
+
+  it('shows the spinner until the pull ends, then nothing when it worked', async () => {
+    let finish: (ok: boolean) => void = () => undefined;
+    const stop = registerManualPull(() => new Promise<boolean>((resolve) => (finish = resolve)));
+    render(<Harness />);
+    act(() => control()?.props.onRefresh());
+    expect(control()?.props.refreshing).toBe(true);
+    await act(async () => finish(true));
+    expect(control()?.props.refreshing).toBe(false);
+    expect(screen.queryByText(failed)).toBeNull();
+    stop();
+  });
+
+  it('stops the spinner and shows the calm line, announced, when the pull fails', async () => {
+    const stop = registerManualPull(async () => false);
+    render(<Harness />);
+    await act(async () => control()?.props.onRefresh());
+    expect(control()?.props.refreshing).toBe(false);
+    expect(screen.getByText(failed).props.accessibilityLiveRegion).toBe('polite');
     stop();
   });
 });

@@ -19,3 +19,46 @@ export function requestFlowPull(): void {
     listener();
   }
 }
+
+/**
+ * A pull someone waits for (pull to refresh, #959). The sync hook registers one while sync is allowed;
+ * screens offer a refresh only while one is registered. The answer is true when the pull worked.
+ */
+type ManualPull = () => Promise<boolean>;
+
+let manualPull: ManualPull | null = null;
+const manualListeners = new Set<Listener>();
+
+export function registerManualPull(pull: ManualPull): () => void {
+  manualPull = pull;
+  manualListeners.forEach((listener) => listener());
+  return () => {
+    if (manualPull === pull) {
+      manualPull = null;
+      manualListeners.forEach((listener) => listener());
+    }
+  };
+}
+
+export function canPullNow(): boolean {
+  return manualPull !== null;
+}
+
+export function subscribeCanPullNow(listener: Listener): () => void {
+  manualListeners.add(listener);
+  return () => {
+    manualListeners.delete(listener);
+  };
+}
+
+/** False when no pull is registered or it failed. Never rejects. */
+export async function pullNow(): Promise<boolean> {
+  if (!manualPull) {
+    return false;
+  }
+  try {
+    return await manualPull();
+  } catch {
+    return false;
+  }
+}

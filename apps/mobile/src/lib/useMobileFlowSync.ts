@@ -6,7 +6,7 @@ import { useSyncAuth } from './AccountProvider';
 import { createDeviceCache } from './deviceCache';
 import { AUTH_ENABLED, SYNC_ENABLED } from './features';
 import { onLeftFamily } from './leftFamily';
-import { onFlowPullRequest } from './requestFlowPull';
+import { onFlowPullRequest, registerManualPull } from './requestFlowPull';
 
 /** The phone's wake source: the app coming back to the foreground. Returns the unsubscribe. */
 export function subscribeAppActive(onWake: () => void): () => void {
@@ -115,7 +115,7 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, stor
     });
   }, [allowed]);
 
-  useFlowSync({
+  const { pullNow } = useFlowSync({
     sessions,
     userId,
     enabled: allowed && queue !== null && readyQueue === queue,
@@ -125,4 +125,12 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, stor
     applyRemoteFlows,
     moveFlowId,
   });
+
+  // Lets a screen pull to refresh and wait for the result (#959). Offered only while sync is allowed.
+  useEffect(() => {
+    if (!allowed) {
+      return;
+    }
+    return registerManualPull(pullNow);
+  }, [allowed, pullNow]);
 }

@@ -9,5 +9,6 @@
   "stateNotStarted": "Not started",
   "summarySentOne": "Sent to 1 person",
   "summarySentMany": "Sent to {count} people",
-  "summaryEmailed": "Emailed to the paper"
+  "summaryEmailed": "Emailed to the paper",
+  "refreshFailed": "The latest could not be loaded. This screen shows what is on your phone."
 }

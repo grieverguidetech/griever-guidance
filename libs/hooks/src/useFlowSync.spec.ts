@@ -1438,3 +1438,62 @@ describe('useFlowSync and a flowId someone else took first (#942)', () => {
     expect(saved().conflicted).toEqual([]);
   });
 });
+
+describe('useFlowSync pullNow (pull to refresh)', () => {
+  it('resolves true and applies the answer when the pull works', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const { result, applyRemoteFlows } = setup([session()]);
+    await advance(10);
+    const before = gets(requests).length;
+    applyRemoteFlows.mockClear();
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.pullNow();
+    });
+    expect(ok).toBe(true);
+    expect(gets(requests).length).toBe(before + 1);
+    expect(applyRemoteFlows).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves false, applies nothing and throws nothing when the pull fails', async () => {
+    let offline = false;
+    mockFetch((req) => (offline && req.method === 'GET' ? 'offline' : serverWithFlow(req)));
+    const { result, applyRemoteFlows } = setup([session()]);
+    await advance(10);
+    offline = true;
+    applyRemoteFlows.mockClear();
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.pullNow();
+    });
+    expect(ok).toBe(false);
+    expect(applyRemoteFlows).not.toHaveBeenCalled();
+    expect(result.current.lastError).toBe('offline');
+  });
+
+  it('tells applyRemoteFlows which keys are still unsent edits, so phone-typed text is kept (#958)', async () => {
+    mockFetch((req) => (req.method === 'GET' ? serverWithFlow(req) : 'offline'));
+    const base = session();
+    const { result, rerender, applyRemoteFlows } = setup([base]);
+    await advance(10);
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(EDIT_DEBOUNCE_MS + 10);
+    applyRemoteFlows.mockClear();
+    await act(async () => {
+      await result.current.pullNow();
+    });
+    expect(applyRemoteFlows).toHaveBeenCalledTimes(1);
+    expect(applyRemoteFlows.mock.calls[0][2]).toEqual({ [FLOW]: expect.arrayContaining(['serviceDate']) });
+  });
+
+  it('resolves false and makes no request when sync is off', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const { result } = setup([session()], { enabled: false });
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.pullNow();
+    });
+    expect(ok).toBe(false);
+    expect(requests).toHaveLength(0);
+  });
+});

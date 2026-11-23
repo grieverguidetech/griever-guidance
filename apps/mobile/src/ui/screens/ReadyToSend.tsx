@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import type { ComponentRef, ReactNode, Ref } from 'react';
+import type { ComponentRef, ReactElement, ReactNode, Ref } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
-import type { Text as RNText } from 'react-native';
+import type { RefreshControlProps, Text as RNText } from 'react-native';
 import { colors, radius, spacing } from '@griever/tokens';
 import { ActionBar } from '../ActionBar';
 import { Button } from '../Button';
@@ -39,6 +39,9 @@ export interface ReadyToSendCopy {
 }
 
 export interface ReadyToSendProps {
+  /** Pull to refresh: the ScrollView's control and the failure line. Both absent when sync is not allowed. */
+  refreshControl?: ReactElement<RefreshControlProps>;
+  refreshNotice?: ReactNode;
   /** Nothing is written on the web for this step: the nudge replaces the message and the send controls. Back and the heading stay. */
   nudge?: WebNudgeProps;
   copy: ReadyToSendCopy;
@@ -97,7 +100,7 @@ export const TOGETHER_TEST_ID = 'ready-share-change';
  * button. Mobile's own screen (apps/mobile/src/ui). The message and tone live in the app; only
  * what is open lives here.
  */
-export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, changePeople, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef, nudge }: ReadyToSendProps) {
+export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, onMessageChange, edited, onUseSuggested, tone, onToneChange, greeting, details, changePeople, hasRecipients, sendLabel, chooseLabel, note, blockedReason, onBack, onSend, onChoose, share, peopleButtonRef, nudge, refreshControl, refreshNotice }: ReadyToSendProps) {
   const [detailsOpen, setDetailsOpen] = useState(details?.startOpen ?? false);
   const detailsShown = details !== undefined && (details.label === undefined || detailsOpen);
   const [focusDetails, setFocusDetails] = useState(false);
@@ -188,7 +191,8 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
   if (nudge) {
     return (
       <View style={styles.screen}>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} refreshControl={refreshControl}>
+          {refreshNotice}
           <View style={styles.topBar}>
             <Button label={copy.back} variant="header" onPress={onBack} />
           </View>
@@ -203,7 +207,8 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={refreshControl}>
+        {refreshNotice}
         <View style={styles.topBar}>
           <Button label={copy.back} variant="header" onPress={onBack} />
         </View>

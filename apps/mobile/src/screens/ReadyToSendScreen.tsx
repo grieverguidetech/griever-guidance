@@ -13,6 +13,7 @@ import type { FlowProps } from '../app/App';
 import { DetailsRow, isMissing } from '../components/DetailsRow';
 import { isMarkedReady } from '../lib/isMarkedReady';
 import { requestFlowPull } from '../lib/requestFlowPull';
+import { usePullToRefresh } from '../lib/usePullToRefresh';
 import { shareMessage } from '../lib/shareSheet';
 
 const copy = screenCopy('review');
@@ -40,6 +41,7 @@ const momentOf = (category: FlowProps['flow']['templateCategory']): MomentKey =>
 /** The screen is the ReadyToSend in apps/mobile/src/ui; this holds what is mobile only: the share sheet and focus. */
 export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, focusPeopleButton }: Props) {
   const { selectedTemplate, composedMessage, selectedContactIds, prevStep, startSendJob, setMessageOverride } = flow;
+  const refresh = usePullToRefresh('ready-refresh-status');
   const [shareFailed, setShareFailed] = useState(false);
   // Set when the person types in a Share the service field, for this person and template. It keeps the field on screen
   // after the last missing detail is typed, so the field (and the keyboard) do not vanish mid-typing.
@@ -158,6 +160,8 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}>
       <ReadyToSend
+        refreshControl={refresh.refreshControl}
+        refreshNotice={refresh.notice}
         nudge={nudge}
         copy={{ ...copy, messageCaption: ready.messageCaption }}
         heading={moments[momentOf(flow.templateCategory)].title}

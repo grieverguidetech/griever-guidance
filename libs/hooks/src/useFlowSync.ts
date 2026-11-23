@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createFlow, listFlows, parseSyncedPatch, patchFlow } from '@griever/api-client';
 import type {
   FlowsFailureReason,
@@ -47,6 +47,11 @@ export interface UseFlowSyncResult {
   lastError: FlowsFailureReason | null;
   /** True once the first pull of this sign-in has been applied. The editor's landing waits for it, briefly. */
   pulled: boolean;
+  /**
+   * Asks the server for the latest now, for a pull to refresh. Resolves true once the answer is applied
+   * (the same path as an automatic pull), false when it could not be loaded. Never rejects. False when sync is off.
+   */
+  pullNow: () => Promise<boolean>;
 }
 
 export const FLOW_QUEUE_STORAGE_KEY = 'gg.flowQueue.v1';
@@ -381,6 +386,9 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
   const stateRef = useRef<SyncState | null>(null);
   // Set by the effect below; lets the sessions effect ask for a flush.
   const kickRef = useRef<(delayMs: number) => void>(() => undefined);
+  // Set by the effect below; runs one pull for the caller and says whether it worked.
+  const pullNowRef = useRef<() => Promise<boolean>>(async () => false);
+  const pullNow = useCallback(() => pullNowRef.current(), []);
 
   const { enabled, userId, sessions } = options;
   const active = enabled && userId !== '';
@@ -660,6 +668,33 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
       }
       arm(delayMs);
     };
+    // A manual pull. It does not wait for a running cycle; the answer goes through the same pull() and apply path.
+    // 'stale' (a wake asked while it was out) is tried once more, then counted as failed.
+    pullNowRef.current = async () => {
+      try {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const accessToken = await token();
+          if (!alive) {
+            return false;
+          }
+          if (!accessToken) {
+            fail('signed_out');
+            return false;
+          }
+          const pulled = await pull(accessToken);
+          if (pulled === 'done') {
+            needPull = false;
+            return true;
+          }
+          if (pulled === 'failed') {
+            return false;
+          }
+        }
+      } catch {
+        // Never thrown to the app.
+      }
+      return false;
+    };
     let unsubscribe: () => void = () => undefined;
     try {
       unsubscribe = latest.current.subscribe(() => {
@@ -682,6 +717,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     return () => {
       alive = false;
       kickRef.current = () => undefined;
+      pullNowRef.current = async () => false;
       if (timer !== undefined) clearTimeout(timer);
       clearInterval(interval);
       // Abort every request still in flight; `alive` is false, so their results are ignored.
@@ -694,7 +730,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     };
   }, [active, userId]);
 
-  return { lastError, pulled: active && pulledFor === userId };
+  return { lastError, pulled: active && pulledFor === userId, pullNow };
 }
 
 function markKnown(state: SyncState, flows: readonly FlowRecord[], userId: string): void {
