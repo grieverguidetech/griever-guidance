@@ -74,9 +74,10 @@ export interface ShareObituaryCopy {
   editLabel?: string;
   /** The Edit and Done toggle (phoneReady.json). Without all four the box is always editable. */
   messageEdit?: string;
-  messageEditName?: string;
   messageDone?: string;
-  messageDoneName?: string;
+  /** What a screen reader says for the toggle (phoneObituary.json). */
+  textEditName?: string;
+  textDoneName?: string;
   editPlaceholder?: string;
   /** The optional publisher address field in step 1 (mobile, from phoneObituary.json). */
   publisherEmailLabel?: string;
@@ -202,7 +203,9 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const reason = empty ? copy.needLink : undefined;
   const blockedBy = reason ?? (linkValid ? undefined : copy.invalidLink);
 
-  const showDone = Boolean(emailed && onDone && copy.doneButton);
+  // While the text box is being edited its own Done shows, so this one waits: only one Done at a time.
+  const [textEditing, setTextEditing] = useState(false);
+  const showDone = Boolean(emailed && onDone && copy.doneButton && !textEditing);
 
   return (
     <>
@@ -222,7 +225,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         <Body tone="muted">{copy.intro}</Body>
       </View>
       {/* The nudge takes the text card's place and hides Step 2. */}
-      {nudge ? <WebNudge {...nudge} /> : textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
+      {nudge ? <WebNudge {...nudge} /> : textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} onEditingChange={setTextEditing} /> : null}
       {!nudge && publisherEmail && copy.emailButton ? (
         <Card>
           {copy.emailTitle ? <Heading level={2}>{copy.emailTitle}</Heading> : null}
@@ -369,9 +372,9 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   );
 }
 
-function TextCard({ copy, editor }: { copy: ShareObituaryCopy; editor: ObituaryTextEditor }) {
-  const { messageEdit, messageEditName, messageDone, messageDoneName } = copy;
-  const toggle = messageEdit && messageEditName && messageDone && messageDoneName ? { edit: messageEdit, editName: messageEditName, done: messageDone, doneName: messageDoneName } : undefined;
+function TextCard({ copy, editor, onEditingChange }: { copy: ShareObituaryCopy; editor: ObituaryTextEditor; onEditingChange: (editing: boolean) => void }) {
+  const { messageEdit, textEditName, messageDone, textDoneName } = copy;
+  const toggle = messageEdit && textEditName && messageDone && textDoneName ? { edit: messageEdit, editName: textEditName, done: messageDone, doneName: textDoneName } : undefined;
   return (
     <Card>
       <Heading level={2}>{copy.textTitle}</Heading>
@@ -384,6 +387,7 @@ function TextCard({ copy, editor }: { copy: ShareObituaryCopy; editor: ObituaryT
         placeholder={copy.editPlaceholder}
         boxStyle={styles.textInput}
         toggle={toggle}
+        onEditingChange={onEditingChange}
       />
       {editor.memorial ? <Body>{editor.memorial}</Body> : null}
     </Card>

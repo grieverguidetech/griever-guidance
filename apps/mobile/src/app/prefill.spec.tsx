@@ -106,6 +106,7 @@ describe('send flow starts from the planned details', () => {
     await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(getMessage('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
     expect(queryMessage(/Anna loved the garden/)).toBeNull();
+    expect(screen.queryByText(/Anna loved the garden/)).toBeNull();
   });
 
   // The obituary moment opens on its own screen (the link is on the person), then the contacts step.
@@ -131,6 +132,7 @@ describe('send flow starts from the planned details', () => {
     await screen.findByRole('heading', { name: 'Share the obituary' });
     expect(getMessage('We wanted to share the obituary for Anna:\n\nhttps://legacy.com/anna\n\nThank you for your love and support.')).toBeTruthy();
     expect(queryMessage('Anna loved the garden.')).toBeNull();
+    expect(screen.queryByText('Anna loved the garden.')).toBeNull();
   });
 
   it('keeps a hand edit on the obituary message through to Confirm', async () => {

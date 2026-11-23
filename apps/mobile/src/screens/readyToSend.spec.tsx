@@ -233,6 +233,7 @@ describe('Ready to send (Share the service)', () => {
       // The field and the message both show the new day.
       expect(messageShown()).toMatch(/June 20/);
       expect(messageShown()).not.toMatch(/June 14/);
+      expect(screen.queryByText(/June 14/)).toBeNull();
     });
 
     it('opens on its own, blocks the button and says why while a required field is empty', () => {

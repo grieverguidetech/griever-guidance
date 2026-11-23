@@ -18,10 +18,18 @@
     "doneButton",
     "doneHint",
     "emailOpened",
-    "emailShared"
+    "emailShared",
+    "textEditName",
+    "textDoneName"
   ],
   "properties": {
     "textTitle": {
+      "$ref": "#/$defs/text"
+    },
+    "textEditName": {
+      "$ref": "#/$defs/text"
+    },
+    "textDoneName": {
       "$ref": "#/$defs/text"
     },
     "editLabel": {

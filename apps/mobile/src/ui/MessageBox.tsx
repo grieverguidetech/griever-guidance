@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ComponentRef, ReactNode } from 'react';
 import { Keyboard, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { StyleProp, TextStyle } from 'react-native';
@@ -29,6 +29,8 @@ export interface MessageBoxProps {
   maxLength?: number;
   /** Size and font size of the box. Reading and editing share them, so the text does not jump. */
   boxStyle: StyleProp<TextStyle>;
+  /** Told when editing starts and ends, so a screen can hide a competing button (the obituary's Done) while the box is open. */
+  onEditingChange?: (editing: boolean) => void;
   /** Drawn between the label row and the box (for example the first-name line). */
   children?: ReactNode;
 }
@@ -41,18 +43,35 @@ const webFieldHook: Record<string, unknown> = { dataSet: { ggField: 'true' } };
  * never opens the keyboard. Done, or leaving the box, goes back to reading. The words are the
  * caller's state, so nothing is lost across the toggle.
  */
-export function MessageBox({ label, caption, value, onChangeText, toggle, placeholder, maxLength, boxStyle, children }: MessageBoxProps) {
+export function MessageBox({ label, caption, value, onChangeText, toggle, placeholder, maxLength, boxStyle, onEditingChange, children }: MessageBoxProps) {
   const font = useSerifStyle('regular');
   const labelId = useId();
   const captionId = useId();
   const input = useRef<ComponentRef<typeof TextInput> | null>(null);
   const toggleRef = useRef<ButtonNode>(null);
+  const readingRef = useRef<ComponentRef<typeof Text>>(null);
+  // Set when a blur ends editing: the screen reader's cursor then moves to the reading text, once it is drawn.
+  const [refocusText, setRefocusText] = useState(false);
   const [editing, setEditing] = useState(toggle === undefined);
   const [focused, setFocused] = useState(false);
   // Set once, when editing starts, so the cursor lands at the end. Typing moves it from there.
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   // On web, pressing Done blurs the box first. Without this the blur would end editing and the same click would start it again.
   const donePressed = useRef(false);
+
+  useEffect(() => {
+    onEditingChange?.(editing);
+    return () => onEditingChange?.(false);
+    // Only when editing changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing]);
+
+  useEffect(() => {
+    if (refocusText && !editing) {
+      focusNode(readingRef.current);
+      setRefocusText(false);
+    }
+  }, [refocusText, editing]);
 
   const startEditing = () => {
     donePressed.current = false;
@@ -75,6 +94,20 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
     }
   };
 
+  const empty = value === '';
+  // Web: the text has no role, so a label on it is ignored or read twice; the words are simply read. Native: label, then the words.
+  // Android reads the label and may drop the value, so there the words go into the label itself. An empty box says what it is for, not its placeholder as a value.
+  let readingProps: Record<string, unknown> = {};
+  if (Platform.OS !== 'web') {
+    const hint = empty ? (placeholder ?? caption) : caption;
+    readingProps =
+      Platform.OS === 'android' && !empty
+        ? { accessibilityLabel: `${label}, ${value}`, accessibilityHint: hint }
+        : { accessibilityLabel: label, accessibilityValue: { text: value }, accessibilityHint: hint };
+    if (caption) {
+      readingProps['aria-describedby'] = captionId;
+    }
+  }
   const captionProps = caption ? { 'aria-describedby': captionId } : {};
   return (
     <View style={styles.field}>
@@ -100,12 +133,17 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
         <TextInput
           ref={input}
           style={[styles.box, font, boxStyle, focused && Platform.OS !== 'web' && styles.boxFocused]}
-          onFocus={() => setFocused(true)}
+          onFocus={() => {
+            donePressed.current = false;
+            setFocused(true);
+          }}
           onBlur={() => {
             setFocused(false);
             if (toggle && !donePressed.current) {
               setEditing(false);
               setSelection(undefined);
+              // Not on web: a click elsewhere must keep the focus it went to.
+              setRefocusText(Platform.OS !== 'web');
             }
           }}
           {...webFieldHook}
@@ -127,17 +165,8 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
           onChangeText={onChangeText}
         />
       ) : (
-        <Text
-          style={[styles.box, font, boxStyle, value === '' && placeholder ? styles.placeholder : undefined]}
-          accessible
-          // Read as the label, then the words, like the box it stands in for.
-          accessibilityLabel={label}
-          accessibilityValue={{ text: value === '' ? (placeholder ?? '') : value }}
-          accessibilityHint={caption}
-          aria-labelledby={labelId}
-          {...captionProps}
-        >
-          {value === '' ? placeholder : value}
+        <Text ref={readingRef} style={[styles.box, font, boxStyle, empty && placeholder ? styles.placeholder : undefined]} accessible {...readingProps}>
+          {empty ? placeholder : value}
         </Text>
       )}
       {caption ? (

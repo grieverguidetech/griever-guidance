@@ -187,14 +187,14 @@ describe('ShareObituary text box (#823, #968)', () => {
     editLabel: 'Obituary text',
     editPlaceholder: 'Write the obituary here.',
     messageEdit: 'Edit',
-    messageEditName: 'Edit message',
+    textEditName: 'Edit obituary text',
     messageDone: 'Done',
-    messageDoneName: 'Done editing',
+    textDoneName: 'Done editing',
   };
   const editor = (over = {}) => ({ value: 'Anna loved the garden.', onValueChange: jest.fn(), ...over });
   const draw = (e: ReturnType<typeof editor>, extra = {}) =>
     render(<ShareObituary copy={{ ...copy, ...editorCopy, ...extra }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={e} />);
-  const edit = () => fireEvent.press(screen.getByRole('button', { name: 'Edit message' }));
+  const edit = () => fireEvent.press(screen.getByRole('button', { name: 'Edit obituary text' }));
 
   it('shows no card without textEditor, as the web does', () => {
     setup();
@@ -207,7 +207,7 @@ describe('ShareObituary text box (#823, #968)', () => {
     const text = screen.getByLabelText('Obituary text');
     expect(text.props.accessibilityValue).toEqual({ text: 'Anna loved the garden.' });
     expect(screen.getByText('Anna loved the garden.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Edit message' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit obituary text' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Done editing' })).toBeNull();
     expect(screen.getByText('Read it one last time and make any last changes.')).toBeTruthy();
   });
@@ -236,16 +236,19 @@ describe('ShareObituary text box (#823, #968)', () => {
     edit();
     fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     expect(dismiss).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: 'Edit message' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit obituary text' })).toBeTruthy();
     edit();
     fireEvent(screen.getByLabelText('Obituary text'), 'blur');
-    expect(screen.getByRole('button', { name: 'Edit message' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit obituary text' })).toBeTruthy();
     dismiss.mockRestore();
   });
 
-  it('shows the placeholder as text when there is no text yet, and the box when editing', () => {
+  it('shows the placeholder as text when there is no text yet, but does not read it as the value', () => {
     draw(editor({ value: '' }));
     expect(screen.getByText('Write the obituary here.')).toBeTruthy();
+    const reading = screen.getByLabelText('Obituary text');
+    expect(reading.props.accessibilityValue).toEqual({ text: '' });
+    expect(reading.props.accessibilityHint).toBe('Write the obituary here.');
     edit();
     expect(screen.getByLabelText('Obituary text').props.value).toBe('');
     expect(screen.getByPlaceholderText('Write the obituary here.')).toBeTruthy();
@@ -266,6 +269,15 @@ describe('ShareObituary text box (#823, #968)', () => {
     expect(StyleSheet.flatten(screen.getByLabelText('Obituary text').props.style)).toMatchObject({ minHeight: 200, fontSize: 16 });
     edit();
     expect(StyleSheet.flatten(screen.getByLabelText('Obituary text').props.style)).toMatchObject({ minHeight: 200, fontSize: 16 });
+  });
+
+  it('hides the bar Done while the text is edited, so only one Done shows, and brings it back', () => {
+    render(<ShareObituary copy={{ ...copy, ...editorCopy }} eyebrow="For Margaret" link="" linkValid={false} publisher="" onBack={jest.fn()} onWhatYoullNeed={jest.fn()} onLinkChange={jest.fn()} onPublisherChange={jest.fn()} onContinue={jest.fn()} textEditor={editor()} emailed onDone={jest.fn()} />);
+    expect(screen.getByTestId('obituary-done-bar')).toBeTruthy();
+    edit();
+    expect(screen.queryByTestId('obituary-done-bar')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.getByTestId('obituary-done-bar')).toBeTruthy();
   });
 
   it('lets a scroll close the keyboard', () => {
@@ -308,6 +320,6 @@ describe('ShareObituary text box (#823, #968)', () => {
   it('stays an always-editable box when the toggle words are missing', () => {
     draw(editor(), { messageEdit: undefined });
     expect(screen.getByLabelText('Obituary text').props.multiline).toBe(true);
-    expect(screen.queryByRole('button', { name: 'Edit message' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit obituary text' })).toBeNull();
   });
 });

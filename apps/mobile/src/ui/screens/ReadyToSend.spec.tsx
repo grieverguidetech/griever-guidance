@@ -2,9 +2,10 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { useState } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { AccessibilityInfo, Keyboard, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { AccessibilityInfo, Keyboard, Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { Text } from 'react-native';
+import { MessageBox } from '../MessageBox';
 import { ReadyToSend } from './ReadyToSend';
 import type { ReadyToSendProps } from './ReadyToSend';
 
@@ -205,7 +206,6 @@ describe('ReadyToSend: the message box reads until Edit is tapped (#968)', () =>
     const text = screen.getByLabelText('Your message');
     expect(text.props.accessible).toBe(true);
     expect(text.props.accessibilityValue).toEqual({ text: SUGGESTED });
-    expect(text.props['aria-labelledby']).toBeTruthy();
   });
 
   it('does not open an editor when the text or the label is tapped', () => {
@@ -277,6 +277,65 @@ describe('ReadyToSend: the message box reads until Edit is tapped (#968)', () =>
     expect(screen.getByRole('button', doneName)).toBeTruthy();
     fireEvent.press(screen.getByRole('button', doneName));
     expect(screen.UNSAFE_queryByType(TextInput)).toBeNull();
+  });
+
+  it('releases the cursor after the first selection change, so typing moves it', () => {
+    render(<Harness />);
+    edit();
+    const box = screen.getByLabelText('Your message');
+    expect(box.props.selection).toEqual({ start: SUGGESTED.length, end: SUGGESTED.length });
+    fireEvent(box, 'selectionChange', { nativeEvent: { selection: { start: SUGGESTED.length, end: SUGGESTED.length } } });
+    expect(screen.getByLabelText('Your message').props.selection).toBeUndefined();
+  });
+
+  it('moves the screen reader to the Edit button after Done', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<Harness />);
+    edit();
+    focus.mockClear();
+    fireEvent.press(screen.getByRole('button', doneName));
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenLastCalledWith(handleForButton('Edit message'));
+    focus.mockRestore();
+  });
+
+  it('moves the screen reader to the reading text when a blur ends editing (a scroll closing the keyboard)', () => {
+    const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+    render(<Harness />);
+    edit();
+    focus.mockClear();
+    fireEvent(screen.getByLabelText('Your message'), 'blur');
+    expect(focus).toHaveBeenCalledTimes(1);
+    expect(focus).toHaveBeenLastCalledWith(handleForText(SUGGESTED));
+    focus.mockRestore();
+  });
+
+  it('on Android the words are in the label, so TalkBack cannot drop them', () => {
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    try {
+      render(<Harness />);
+      const text = screen.getByLabelText(`Your message, ${SUGGESTED}`);
+      expect(text.props.accessibilityValue).toBeUndefined();
+    } finally {
+      Platform.OS = original;
+    }
+  });
+
+  it('on web the role-less reading text carries no label of its own', () => {
+    const toggle = { edit: 'Edit', editName: 'Edit message', done: 'Done', doneName: 'Done editing' };
+    const box = (value: string) => <MessageBox label="Your message" caption="Caption" toggle={toggle} value={value} onChangeText={jest.fn()} boxStyle={{}} />;
+    // The Button's web code needs a DOM, so it mounts as native; only the text is then drawn as on web.
+    const { rerender } = render(box(SUGGESTED));
+    const original = Platform.OS;
+    Platform.OS = 'web';
+    try {
+      rerender(box('Another line.'));
+      expect(screen.getByText('Another line.').props.accessibilityLabel).toBeUndefined();
+      expect(screen.getByText('Another line.').props['aria-labelledby']).toBeUndefined();
+    } finally {
+      Platform.OS = original;
+    }
   });
 
   it('keeps the typed words across the toggle, as the message that goes on', () => {

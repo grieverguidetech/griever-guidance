@@ -421,7 +421,7 @@ const boxShown = (): string => {
 };
 /** Types into the box: one tap on Edit first when it is still reading (#968). */
 const typeBox = (text: string) => {
-  const edit = screen.queryByRole('button', { name: 'Edit message' });
+  const edit = screen.queryByRole('button', { name: 'Edit obituary text' });
   if (edit) {
     fireEvent.press(edit);
   }
@@ -433,7 +433,7 @@ describe('ShareObituaryScreen shows the obituary text as read-only text with an 
   it('shows the saved text read-only, with the caption and an Edit message button, and no Write, Save or Cancel button', () => {
     setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
     expect(boxShown()).toBe('Anna loved the garden.');
-    expect(screen.getByRole('button', { name: 'Edit message' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit obituary text' })).toBeTruthy();
     expect(screen.getByText(CAPTION)).toBeTruthy();
     for (const name of ['Edit the text', 'Write the text', 'Save the text', 'Cancel']) {
       expect(screen.queryByRole('button', { name })).toBeNull();
@@ -443,7 +443,7 @@ describe('ShareObituaryScreen shows the obituary text as read-only text with an 
   it('is not an input on arrival, so no keyboard opens; Edit message opens it focused', () => {
     setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
     expect(screen.getByLabelText(BOX).props.multiline).toBeUndefined();
-    fireEvent.press(screen.getByRole('button', { name: 'Edit message' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Edit obituary text' }));
     expect(screen.getByLabelText(BOX).props.autoFocus).toBe(true);
   });
 
@@ -459,7 +459,7 @@ describe('ShareObituaryScreen shows the obituary text as read-only text with an 
     setup(linked);
     expect(screen.getByText('Write it above, or on the web.')).toBeTruthy();
     expect(screen.getByText('Write the obituary here.')).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Edit message' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Edit obituary text' }));
     expect(boxShown()).toBe('');
   });
 
@@ -532,7 +532,7 @@ describe('ShareObituaryScreen shows the obituary text as read-only text with an 
 
   it('the box has the caption as its hint and a 10000 character limit', () => {
     setup({ ...base, obituaryText: 'Old text.' } as Session);
-    fireEvent.press(screen.getByRole('button', { name: 'Edit message' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Edit obituary text' }));
     const box = screen.getByLabelText(BOX);
     expect(box.props.maxLength).toBe(10000);
     expect(box.props.accessibilityHint).toBe(CAPTION);
@@ -849,6 +849,8 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
     typeBox('Typed words.');
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await screen.findByText(OPENED);
+    // The text box is still open, so the bar's Done is hidden until its own Done editing is tapped.
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
     fireEvent.press(doneAction());
     expect(onPatch).toHaveBeenCalledTimes(1);
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
@@ -909,13 +911,17 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
     expect(screen.queryByRole('button', DONE)).toBeNull();
   });
 
-  it('keeps Done on screen while the user types in the text box', async () => {
+  it('shows only one Done while the text box is open: the bar Done waits, and returns in reading mode', async () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     setup(withText);
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await screen.findByText(OPENED);
+    expect(screen.getByTestId('obituary-done-bar')).toBeTruthy();
     typeBox('More words.');
-    expect(doneAction()).toBeTruthy();
+    expect(screen.queryByTestId('obituary-done-bar')).toBeNull();
+    expect(screen.getAllByRole('button', DONE)).toHaveLength(1);
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.getByTestId('obituary-done-bar')).toBeTruthy();
   });
 });
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { findMessage, queryMessage } from '../testing/messageBox';
+import { findMessage, queryMessage, typeMessage } from '../testing/messageBox';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
@@ -112,8 +112,8 @@ describe('the web Ready status and the announcement send screen (#949)', () => {
 
   it('keeps the send screen when the words were edited on the phone, even after Ready is removed', async () => {
     await open(anna({ sectionStatus: { announcement: 'ready' } }));
-    const box = await screen.findByLabelText('Your message');
-    fireEvent.changeText(box, 'My own words.');
+    await screen.findByLabelText('Your message');
+    typeMessage('My own words.');
     webUnmarks();
     expect(await findMessage('My own words.')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: NUDGE })).toBeNull();

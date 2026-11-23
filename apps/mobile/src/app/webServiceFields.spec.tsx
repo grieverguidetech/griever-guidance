@@ -117,6 +117,8 @@ describe('service form fields follow the web until typed on the phone (#958)', (
     expect(await findMessage(/4:00 PM/)).toBeTruthy();
     expect(getMessage(/Our home/)).toBeTruthy();
     expect(queryMessage(/River Park/)).toBeNull();
+    expect(screen.queryByDisplayValue(/River Park/)).toBeNull();
+    expect(screen.queryByText(/River Park/)).toBeNull();
   });
 
   it('fills the service details of an old saved draft that has only the name filled', async () => {

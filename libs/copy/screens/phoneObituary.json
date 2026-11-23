@@ -13,5 +13,7 @@
   "doneHint": "Marks the obituary done",
   "emailOpened": "Opened in your email app. Tap Done when you have sent it.",
   "emailShared": "Shared from your phone. Tap Done when you have sent it.",
-  "textCaption": "Read it one last time and make any last changes."
+  "textCaption": "Read it one last time and make any last changes.",
+  "textEditName": "Edit obituary text",
+  "textDoneName": "Done editing"
 }

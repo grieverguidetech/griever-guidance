@@ -30,9 +30,7 @@ const copy = {
   // Last, so the phone's own words win (emailNoText points at the box above, instead of mobileEmailNoText).
   ...textCopy,
   messageEdit: readyCopy.messageEdit,
-  messageEditName: readyCopy.messageEditName,
   messageDone: readyCopy.messageDone,
-  messageDoneName: readyCopy.messageDoneName,
 };
 
 type Props = {
