@@ -1,11 +1,17 @@
 import {
   block,
+  generatedHeader as generatedHeaderText,
   rootLines,
   themeLines,
   toGeneratedFile,
+  toMarketingCss,
+  toMarketingFile,
   toWebThemeCss,
 } from './css.js';
 import { colors, fontSerifStack, radius, spacing } from './index.js';
+import { v2 } from './v2/index.js';
+import { buildRecipes } from './v2/recipes.js';
+import { buildRoles } from './v2/roles.js';
 
 const input = { colors, fontSerifStack, spacing, radius };
 
@@ -127,5 +133,64 @@ describe('toWebThemeCss', () => {
     const file = toGeneratedFile(input);
     expect(file.startsWith('/* GENERATED')).toBe(true);
     expect(file.endsWith(css)).toBe(true);
+  });
+});
+
+describe('toMarketingCss', () => {
+  const primitives = v2.primitives;
+  const css = toMarketingCss(v2);
+
+  it('is one :root block of --gg-* declarations', () => {
+    expect(css.startsWith(':root {\n')).toBe(true);
+    const vars = declarations(css, ':root {');
+    expect(Object.keys(vars).length).toBeGreaterThan(20);
+    for (const name of Object.keys(vars)) {
+      expect(name.startsWith('--gg-')).toBe(true);
+    }
+  });
+
+  it('writes plain colours, CSS gradients at the v2 angle and CSS shadows', () => {
+    const vars = declarations(css, ':root {');
+    const { colors: c, gradients, shadows } = primitives;
+    expect(vars['--gg-page']).toBe(c.page);
+    expect(vars['--gg-glow-sun']).toBe(c.glowSun);
+    expect(vars['--gg-glow-sky']).toBe(c.glowSky);
+    expect(vars['--gg-ink']).toBe(c.ink);
+    expect(vars['--gg-heading']).toBe(c.heading);
+    expect(vars['--gg-font']).toBe("'Sora'");
+    expect(vars['--gg-primary-bg']).toBe(
+      `linear-gradient(${gradients.sunset.angle}deg, ${gradients.sunset.stops.join(', ')})`,
+    );
+    expect(vars['--gg-secondary-bg']).toContain('linear-gradient(120deg, #a5cbe3');
+    expect(vars['--gg-primary-text']).toBe(c.primaryText);
+    expect(vars['--gg-primary-border']).toBe(`1px solid ${c.primaryBorder}`);
+    expect(vars['--gg-primary-shadow']).toBe(`0px 2px 12px ${shadows.sunset.color}`);
+    expect(vars['--gg-card-bg']).toBe(c.glassFill);
+    expect(vars['--gg-card-border']).toBe(`1px solid ${c.glassBorder}`);
+    expect(vars['--gg-card-shadow']).toBe(`0px 1px 9px ${shadows.glass.color}`);
+    expect(vars['--gg-card-radius']).toBe('8px');
+    expect(vars['--gg-drift-ms']).toBe('9000ms');
+  });
+
+  it('is deterministic and toMarketingFile adds the header', () => {
+    expect(toMarketingCss(v2)).toBe(css);
+    expect(toMarketingFile(v2)).toBe(generatedHeaderText + css);
+  });
+
+  it('a primitive change cascades to every var that uses it', () => {
+    const p = structuredClone(primitives) as unknown as Parameters<typeof buildRoles>[0];
+    p.colors.page = '#010203';
+    p.colors.heading = '#0a0b0c';
+    p.colors.primaryBorder = '#112233';
+    p.gradients.sunset.stops = ['#aaaaaa', '#bbbbbb', '#cccccc'];
+    p.radius = 3;
+    const roles = buildRoles(p);
+    const vars = declarations(toMarketingCss({ roles, recipes: buildRecipes(roles, p) }), ':root {');
+    expect(vars['--gg-page']).toBe('#010203');
+    expect(vars['--gg-heading']).toBe('#0a0b0c');
+    expect(vars['--gg-primary-border']).toBe('1px solid #112233');
+    expect(vars['--gg-primary-bg']).toBe('linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)');
+    expect(vars['--gg-primary-radius']).toBe('3px');
+    expect(vars['--gg-card-radius']).toBe('3px');
   });
 });

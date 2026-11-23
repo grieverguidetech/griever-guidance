@@ -32,7 +32,8 @@
           "{workspaceRoot}/tools/scripts/generate-token-css.mjs"
         ],
         "outputs": [
-          "{workspaceRoot}/apps/web/src/theme.generated.css"
+          "{workspaceRoot}/apps/web/src/theme.generated.css",
+          "{workspaceRoot}/apps/marketing/src/styles/tokens.generated.css"
         ]
       }
     }

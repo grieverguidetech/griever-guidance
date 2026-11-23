@@ -1,4 +1,7 @@
 ---
+import '../styles/tokens.generated.css';
+import '../styles/page.css';
+
 const webUrl = import.meta.env.PUBLIC_WEB_URL ?? 'https://web.grieversguidance.com/';
 ---
 <!doctype html>
@@ -7,101 +10,54 @@ const webUrl = import.meta.env.PUBLIC_WEB_URL ?? 'https://web.grieversguidance.c
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Grievers Guidance</title>
-    <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background: #fff;
-        color: #1a1a1a;
-      }
-      a {
-        color: inherit;
-        text-decoration: none;
-      }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <!-- Hero -->
-    <section style="max-width: 640px; margin: 0 auto; padding: 80px 24px 64px;">
-      <h1
-        style="font-size: 2.5rem; font-weight: 600; color: #111827; line-height: 1.2; margin-bottom: 16px;"
-      >
-        Grievers Guidance
-      </h1>
-      <p
-        style="font-size: 1.125rem; color: #6b7280; margin-bottom: 40px; max-width: 480px;"
-      >
+    <section class="section hero">
+      <h1>Grievers Guidance</h1>
+      <p>
         When you lose someone, the last thing you should have to manage is
         logistics. Send funeral and service details to the people who need to
         know, from your phone, in minutes.
       </p>
-      <a
-        href={webUrl}
-        style="display: inline-block; background: #6B7FD4; color: #fff; padding: 14px 28px; border-radius: 10px; font-size: 15px; font-weight: 500;"
-      >
-        Download the app
-      </a>
+      <a class="button" href={webUrl}>Download the app</a>
     </section>
 
-    <!-- Divider -->
-    <hr style="border: none; border-top: 1px solid #f3f4f6;" />
-
     <!-- How it works -->
-    <section style="max-width: 640px; margin: 0 auto; padding: 64px 24px;">
-      <h2
-        style="font-size: 1.25rem; font-weight: 600; color: #111827; margin-bottom: 40px;"
-      >
-        How it works
-      </h2>
-      <ol
-        style="list-style: none; display: flex; flex-direction: column; gap: 32px;"
-      >
-        <li style="display: flex; gap: 20px; align-items: flex-start;">
-          <span
-            style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: #eef0fb; color: #6B7FD4; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;"
-            >1</span
-          >
+    <section class="section steps">
+      <h2>How it works</h2>
+      <ol>
+        <li class="step">
+          <span class="step-number">1</span>
           <div>
-            <strong style="font-size: 15px; color: #111827;"
-              >Choose a template</strong
-            >
-            <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">
+            <strong>Choose a template</strong>
+            <p>
               Select from funeral service details, a passing announcement, or a
               celebration of life.
             </p>
           </div>
         </li>
-        <li style="display: flex; gap: 20px; align-items: flex-start;">
-          <span
-            style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: #eef0fb; color: #6B7FD4; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;"
-            >2</span
-          >
+        <li class="step">
+          <span class="step-number">2</span>
           <div>
-            <strong style="font-size: 15px; color: #111827;"
-              >Fill in the details</strong
-            >
-            <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">
+            <strong>Fill in the details</strong>
+            <p>
               Enter the name, date, time, and location. We fill in the rest of
               the message.
             </p>
           </div>
         </li>
-        <li style="display: flex; gap: 20px; align-items: flex-start;">
-          <span
-            style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: #eef0fb; color: #6B7FD4; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;"
-            >3</span
-          >
+        <li class="step">
+          <span class="step-number">3</span>
           <div>
-            <strong style="font-size: 15px; color: #111827;"
-              >Send to your contacts</strong
-            >
-            <p style="font-size: 14px; color: #6b7280; margin-top: 4px;">
+            <strong>Send to your contacts</strong>
+            <p>
               Choose who needs to know and send. Everyone receives a clear,
               compassionate text message.
             </p>
@@ -111,12 +67,8 @@ const webUrl = import.meta.env.PUBLIC_WEB_URL ?? 'https://web.grieversguidance.c
     </section>
 
     <!-- Footer -->
-    <footer
-      style="border-top: 1px solid #f3f4f6; padding: 32px 24px; text-align: center;"
-    >
-      <p style="font-size: 13px; color: #9ca3af;">
-        Grievers Guidance &mdash; Built with care.
-      </p>
+    <footer class="footer">
+      <p>Grievers Guidance &mdash; Built with care.</p>
     </footer>
   </body>
 </html>

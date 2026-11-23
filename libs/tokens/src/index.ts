@@ -77,8 +77,12 @@ export {
   generatedHeader,
   rootLines,
   themeLines,
+  marketingLines,
   toGeneratedFile,
+  toMarketingCss,
+  toMarketingFile,
   toWebThemeCss,
+  type MarketingInput,
   type WebThemeInput,
 } from './css.js';
 export { v2 } from './v2/index.js';
