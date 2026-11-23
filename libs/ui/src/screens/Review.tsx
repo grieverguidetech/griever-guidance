@@ -122,9 +122,9 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={onBack} />
+        <Button label={copy.back} variant="secondary" onPress={onBack} />
         {onWhatYoullNeed ? (
-          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button label={copy.checklist} opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
         ) : null}
       </View>
       <View style={styles.head}>
@@ -151,7 +151,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
           <Button label={editing ? copy.doneEditing : copy.edit} variant="secondary" buttonRef={editRef} onPress={toggleEditing} />
           <Button
             label={copy.softer}
-            variant="ghost"
+            variant="tertiary"
             pressed={tone === 'softer'}
             ariaDisabled={edited}
             announceDisabled
@@ -166,7 +166,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
           <Status id={toneReasonId} message={edited ? copy.toneKept : undefined} />
         </View>
       ) : null}
-      {edited ? <Button label={copy.useSuggested} variant="ghost" onPress={onUseSuggested} /> : null}
+      {edited ? <Button label={copy.useSuggested} variant="tertiary" onPress={onUseSuggested} /> : null}
       {share?.only ? null : (
         <>
           <Button

@@ -38,7 +38,7 @@ describe('one font for all text', () => {
       <>
         <Eyebrow>Eyebrow text</Eyebrow>
         <Body>Body text</Body>
-        <Button label="Go" onPress={vi.fn()} variant="tinted" />
+        <Button label="Go" onPress={vi.fn()} variant="secondary" />
       </>,
     );
     for (const text of ['Body text', 'Go']) {

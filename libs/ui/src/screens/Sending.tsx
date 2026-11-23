@@ -140,7 +140,7 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
     <View style={styles.screen}>
       {onWhatYoullNeed ? (
         <View style={styles.topBar}>
-          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button label={copy.checklist} opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
         </View>
       ) : null}
       <View style={styles.head}>
@@ -180,18 +180,18 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
             <View style={styles.actions}>
               <Button label={confirmSent.yes} hint={confirmSent.hint} buttonRef={yesRef} onPress={confirmSent.onYes} />
               <Button label={confirmSent.notYet} variant="secondary" onPress={confirmSent.onNotYet} />
-              <Button label={copy.skip} variant="ghost" onPress={onSkip} />
+              <Button label={copy.skip} variant="tertiary" onPress={onSkip} />
             </View>
           ) : handOff ? (
             <View style={styles.actions}>
               <Button label={current.isLast ? copy.done : copy.next} buttonRef={nextRef} hint={handOff.note} onPress={onNext} />
-              <Button label={handOff.again} variant="ghost" onPress={handOff.onAgain} />
+              <Button label={handOff.again} variant="tertiary" onPress={handOff.onAgain} />
             </View>
           ) : (
             <View style={styles.actions}>
               <Button label={openLabel ?? copy.openMessages} buttonRef={openRef} onPress={onOpenMessages} />
               {share ? <Button label={share.label} variant="secondary" onPress={share.onPress} /> : null}
-              <Button label={copy.skip} variant="ghost" onPress={onSkip} />
+              <Button label={copy.skip} variant="tertiary" onPress={onSkip} />
             </View>
           )}
           <Status id={statusId} message={error ?? (confirmSent ? undefined : handOff?.note)} tone={error ? 'danger' : 'muted'} />

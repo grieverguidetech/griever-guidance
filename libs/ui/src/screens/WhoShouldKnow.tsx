@@ -169,11 +169,10 @@ export function WhoShouldKnow({
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={onBack} />
+        <Button label={copy.back} variant="secondary" onPress={onBack} />
         {onWhatYoullNeed ? (
           <Button
             label={copy.checklist}
-            variant="header"
             opensDialog
             onPress={onWhatYoullNeed}
             buttonRef={checklistRef}
