@@ -119,14 +119,6 @@ export function RemoveMember({ members, message, onRemove, headingLevel = 2 }: P
                     </p>
                     <button
                       type="button"
-                      className="gg-btn gg-btn-secondary gg-btn-block"
-                      aria-disabled={pending}
-                      onClick={() => void remove(m)}
-                    >
-                      Remove
-                    </button>
-                    <button
-                      type="button"
                       className="gg-btn gg-btn-primary gg-btn-block"
                       aria-disabled={pending}
                       onClick={() => {
@@ -134,6 +126,14 @@ export function RemoveMember({ members, message, onRemove, headingLevel = 2 }: P
                       }}
                     >
                       Keep
+                    </button>
+                    <button
+                      type="button"
+                      className="gg-btn gg-btn-secondary gg-btn-block"
+                      aria-disabled={pending}
+                      onClick={() => void remove(m)}
+                    >
+                      Remove
                     </button>
                   </div>
                 ) : (

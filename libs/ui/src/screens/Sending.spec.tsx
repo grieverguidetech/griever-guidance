@@ -54,6 +54,13 @@ describe('Sending', () => {
     expect(screen.queryByLabelText('Add a line for Carol (optional)')).toBeNull();
   });
 
+  it('sets the tiers: Open Messages is the primary action, Share is secondary, Skip is a tertiary suggestion', () => {
+    render(<Sending {...base()} share={{ label: 'Share', onPress: vi.fn() }} />);
+    expect(screen.getByRole('button', { name: 'Open Messages' })).toHaveAttribute('data-gg-btn', 'primary');
+    expect(screen.getByRole('button', { name: 'Share' })).toHaveAttribute('data-gg-btn', 'secondary');
+    expect(screen.getByRole('button', { name: 'Skip' })).toHaveAttribute('data-gg-btn', 'tertiary');
+  });
+
   it('moves focus to Next after a hand-off', () => {
     const view = render(<Sending {...base()} />);
     view.rerender(<Sending {...base()} handOff={{ note: 'n', again: 'Open Messages again', onAgain: vi.fn() }} />);

@@ -20,6 +20,13 @@ describe('ObituaryScreen date fields', () => {
   });
 });
 
+describe('ObituaryScreen tiers', () => {
+  it('makes "Write the obituary" the primary action', () => {
+    render(<ObituaryScreen session={null} onBack={() => undefined} onDone={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Write the obituary' })).toHaveClass('gg-btn-primary');
+  });
+});
+
 describe('ObituaryScreen error', () => {
   it('announces a failed draft as an alert in the error colour, and shows none before', async () => {
     mocks.generateObituary.mockRejectedValue(new Error('nope'));

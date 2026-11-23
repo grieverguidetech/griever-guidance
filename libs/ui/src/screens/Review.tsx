@@ -151,7 +151,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
           <Button label={editing ? copy.doneEditing : copy.edit} variant="secondary" buttonRef={editRef} onPress={toggleEditing} />
           <Button
             label={copy.softer}
-            variant="tertiary"
+            variant="secondary"
             pressed={tone === 'softer'}
             ariaDisabled={edited}
             announceDisabled

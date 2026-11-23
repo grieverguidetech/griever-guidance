@@ -180,7 +180,8 @@ describe('Button colours', () => {
     ['secondary: the link edge on the page (non-text, 3:1)', v2.roles.link, page, 3],
     ['tertiary: link on the page', v2.roles.link, page],
     ['tertiary pressed: link on wash', v2.roles.link, v2.roles.wash],
-    ['tertiary unavailable: muted on the page', v2.roles.muted, page],
+    ['tertiary unavailable (web: muted text, opacity 1, no fade): muted on the page', v2.roles.muted, page],
+    ['tertiary unavailable: muted on a field fill', v2.roles.muted, v2.recipes.field.fill],
   ])('%s is at least its minimum ratio', (_name, foreground, background, minimum = 4.5) => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(minimum);
   });

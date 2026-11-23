@@ -473,8 +473,8 @@ describe('styles.css swirl buttons', () => {
     expect(decls(`.gg-btn-primary${enabled}:active`)).toMatch(/color-mix\(in srgb, var\(--color-v2-page\) 15%, transparent\)/);
     // The outline washes with the focus colour (10% hover, 18% pressed), see the outline contrast test below.
     const secondaryNotPressed = `.gg-btn-secondary${enabled}:not([aria-pressed='true'])`;
-    expect(decls(`${secondaryNotPressed}:hover`, hover)).toMatch(/background-color: color-mix\(in srgb, var\(--color-v2-focus\) 10%, transparent\)/);
-    expect(decls(`${secondaryNotPressed}:active`)).toMatch(/background-color: color-mix\(in srgb, var\(--color-v2-focus\) 18%, transparent\)/);
+    expect(decls(`${secondaryNotPressed}:hover`, hover)).toMatch(/background-image: linear-gradient\(color-mix\(in srgb, var\(--color-v2-focus\) 10%, transparent\)/);
+    expect(decls(`${secondaryNotPressed}:active`)).toMatch(/background-image: linear-gradient\(color-mix\(in srgb, var\(--color-v2-focus\) 18%, transparent\)/);
     expect(decls(`${secondaryNotPressed}:active`)).toContain('color: var(--color-v2-heading)');
     expect(css.replace(hover, '')).not.toMatch(/\.gg-btn-(?:primary|secondary)[^{}]*:hover/);
     expect(css).not.toMatch(/\.gg-btn-(?:primary|secondary)[^{}]*\{[^}]*opacity:\s*0\.\d+/);
@@ -543,12 +543,45 @@ describe('styles.css swirl buttons', () => {
   it('keeps the tertiary label at 4.5:1 on the page, both glows and glass, at rest and hover (link colour) and pressed (heading colour)', () => {
     expect(decls('.gg-btn-tertiary')).toContain('color: var(--color-v2-link)');
     expect(decls('.gg-btn-tertiary')).toContain('text-decoration: underline');
-    expect(decls(`.gg-btn-tertiary:not(:disabled):active`)).toContain('color: var(--color-v2-heading)');
+    expect(decls(`.gg-btn-tertiary${enabled}:active`)).toContain('color: var(--color-v2-heading)');
     for (const ground of [...grounds, ...glassOver]) {
       for (const wash of [0, 10]) {
         expect(contrast(hexVar('--color-v2-link'), washed(ground, wash)), `link on ${ground} wash ${wash}`).toBeGreaterThanOrEqual(4.5);
       }
       expect(contrast(hexVar('--color-v2-heading'), washed(ground, 18)), `heading on ${ground} wash 18`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('makes an unavailable tertiary the muted text colour with opacity 1, and keeps that label at 4.5:1 on the page, both glows and glass', () => {
+    for (const selector of ['.gg-btn-tertiary:disabled', ".gg-btn-tertiary[aria-disabled='true']", "[data-gg-btn='tertiary']:disabled", "[data-gg-btn='tertiary'][aria-disabled='true']"]) {
+      const decl = decls(selector);
+      expect(decl, selector).toContain('opacity: 1');
+      expect(decl, selector).toContain('color: var(--color-v2-muted)');
+      expect(decl, selector).toContain('background-image: none');
+    }
+    for (const ground of [...grounds, ...glassOver]) {
+      expect(contrast(hexVar('--color-v2-muted'), ground), `muted on ${ground}`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(hexVar('--color-v2-muted'), hexVar('--color-v2-wash'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // react-native-web's unlayered reset and the unlayered `background-color: transparent` rule beat any layered background-color, so the
+  // libs/ui secondary and tertiary wash must be a background-image (which neither resets). This fails if it goes back to background-color.
+  it('draws the data-gg-btn secondary and tertiary hover and pressed wash as a background-image, never a background-color', () => {
+    const unlayered = css.replace(block('@layer components'), '');
+    expect(unlayered).toMatch(/button\[data-gg-btn='secondary'\]\s*\{[^}]*background-color:\s*transparent/);
+    expect(unlayered).toMatch(/button\[data-gg-btn='tertiary'\]\s*\{[^}]*background-color:\s*transparent/);
+    const hover = block('@media (hover: hover)');
+    const washes = [
+      [`[data-gg-btn='secondary']${enabled}:not([aria-pressed='true']):hover`, hover],
+      [`[data-gg-btn='secondary']${enabled}:not([aria-pressed='true']):active`, css],
+      [`[data-gg-btn='tertiary']${enabled}:hover`, css],
+      [`[data-gg-btn='tertiary']${enabled}:active`, css],
+    ] as const;
+    for (const [selector, source] of washes) {
+      const decl = decls(selector, source);
+      expect(decl, selector).toMatch(/background-image:\s*linear-gradient\(color-mix/);
+      expect(decl, selector).not.toMatch(/background(?:-color)?:/);
     }
   });
 
