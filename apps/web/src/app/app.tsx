@@ -27,7 +27,6 @@ import { fill, screenCopy } from '@griever/copy';
 import { AUTH_ENABLED, SHARING_ENABLED } from '../lib/features';
 import { CMS_ENABLED } from '../lib/cmsFlag';
 import { SYNC_ENABLED } from '../lib/syncFlag';
-import { AppHeader } from '../cms/AppHeader';
 import { CmsShell } from '../cms/CmsShell';
 import { AccountSection, AccountSettingsSection } from '../cms/AccountSection';
 import type { PersonalDetails } from '../cms/PersonalDetailsForm';
@@ -146,13 +145,12 @@ function Shell({
 }: {
   children: React.ReactNode;
   notice?: ReactNode;
-  /** The editor lays out nav, editor and panel side by side; its own top space replaces the padding. */
+  /** The editor lays out nav, editor and panel side by side; its own top space replaces the padding. CmsShell draws the header. */
   wide?: boolean;
 }) {
   return (
     <div className="min-h-screen flex justify-center">
       <div className={wide ? 'w-full px-5 md:px-8 pb-8' : 'w-full max-w-[420px] px-5 py-8'}>
-        {wide ? <AppHeader /> : null}
         {notice}
         {children}
       </div>

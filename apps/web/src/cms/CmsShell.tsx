@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { SectionKey, SectionStatus } from '@griever/shared';
 import { screenCopy } from '@griever/copy';
 import { Heading, Sheet } from '@griever/ui';
+import { AppHeader } from './AppHeader';
 import { SideNav, navTitle } from './SideNav';
 import type { CmsNavKey } from './SideNav';
 
@@ -75,6 +76,7 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
   const [sheetOpen, setSheetOpen] = useState(false);
   const sheetButton = useRef<HTMLButtonElement>(null);
   const asideTitleId = useId();
+  const panelId = useId();
 
   // From `lg` the phone button is hidden, so close the sheet rather than return focus to it.
   useEffect(() => {
@@ -117,6 +119,8 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
   }
 
   return (
+    <>
+    <AppHeader checklist={aside ? { open: panelShown, onToggle: togglePanel, panelId } : undefined} />
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
       <SideNav personName={personName} section={section} onSelect={select} statuses={statuses} noCurrent={noCurrent} hrefFor={hrefFor} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
@@ -133,10 +137,6 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
             >
               {copy.phoneButton}
             </button>
-            {/* After the h1 in DOM order so Tab from the heading moves forward; justify-between keeps it top right. */}
-            {panelShown ? null : (
-              <button type="button" className="gg-btn gg-btn-ghost hidden lg:inline-flex" onClick={togglePanel}>{copy.show}</button>
-            )}
           </div>
         ) : (
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
@@ -151,6 +151,7 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
       {aside && panelShown && !sheetOpen ? (
         // Scrolling is keyboard reachable because the Hide button inside is focusable.
         <aside
+          id={panelId}
           aria-labelledby={asideTitleId}
           className="hidden lg:sticky lg:top-4 lg:block lg:w-96 lg:shrink-0 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto"
         >
@@ -174,5 +175,6 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
         </Sheet>
       ) : null}
     </div>
+    </>
   );
 }

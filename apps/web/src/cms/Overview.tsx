@@ -153,6 +153,21 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
 
   return (
     <div className="flex flex-col gap-6">
+      {/* First in the content, so it reads straight after the shell's h1. */}
+      {phase ? (
+        item && onOpenItem ? (
+          <button type="button" data-checklist-item={item} className={CARD} onClick={() => onOpenItem(item)}>
+            <span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
+              {fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}
+            </span>
+            {' '}
+            <span>{fill(checklist.onTheChecklist, { item: ITEM_COPY[item] })}</span>
+          </button>
+        ) : (
+          <h2 className="font-semibold">{fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}</h2>
+        )
+      ) : null}
+
       <p>{shell.overviewIntro}</p>
 
       <ul role="list" className="flex flex-col gap-2 list-none p-0 m-0">
@@ -201,20 +216,6 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
           );
         })}
       </ul>
-
-      {phase ? (
-        item && onOpenItem ? (
-          <button type="button" data-checklist-item={item} className={CARD} onClick={() => onOpenItem(item)}>
-            <span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-              {fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}
-            </span>
-            {' '}
-            <span>{fill(checklist.onTheChecklist, { item: ITEM_COPY[item] })}</span>
-          </button>
-        ) : (
-          <h2 className="font-semibold">{fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}</h2>
-        )
-      ) : null}
     </div>
   );
 }

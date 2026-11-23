@@ -50,10 +50,28 @@ describe('CmsShell checklist panel', () => {
     expect(screen.getByRole('heading', { level: 1 }).parentElement).not.toContainElement(hide);
     await userEvent.click(hide);
     const show = screen.getByRole('button', { name: 'Show checklist' });
-    expect(show).toHaveClass('gg-btn-ghost'); expect(show).not.toHaveClass('gg-btn-ghost-plain');
-    expect(screen.getByRole('main')).toContainElement(show);
-    const h1 = screen.getByRole('heading', { level: 1 });
-    expect(h1.compareDocumentPosition(show) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(show).toHaveClass('gg-btn-primary');
+    expect(within(screen.getByRole('banner')).getByRole('button', { name: 'Show checklist' })).toBe(show);
+    expect(within(screen.getByRole('banner')).getByTestId('wordmark-name')).toBeInTheDocument();
+    expect(screen.getByRole('main')).not.toContainElement(show);
+  });
+
+  it('Show checklist in the header has the aria attributes and opens the panel', async () => {
+    render(shell());
+    await userEvent.click(screen.getByRole('button', { name: 'Hide checklist' }));
+    const show = screen.getByRole('button', { name: 'Show checklist' });
+    expect(show).toHaveAttribute('aria-expanded', 'false');
+    const panelId = show.getAttribute('aria-controls') ?? '';
+    expect(panelId).not.toBe('');
+    await userEvent.click(show);
+    const aside = screen.getByRole('complementary', { name: "What you'll need" });
+    expect(aside).toHaveAttribute('id', panelId);
+    expect(screen.queryByRole('button', { name: 'Show checklist' })).not.toBeInTheDocument();
+  });
+
+  it('draws no Show checklist button when there is no panel', () => {
+    render(shell({ aside: false }));
+    expect(screen.queryByRole('button', { name: 'Show checklist' })).not.toBeInTheDocument();
   });
 
   it('makes the aside sticky and scrollable, with a focusable first child', () => {

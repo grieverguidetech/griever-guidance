@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderApp } from '../test/renderApp';
 import { PRODUCT_NAME } from '@griever/shared';
 import { AppHeader } from './AppHeader';
@@ -58,6 +59,33 @@ describe('AppHeader layout', () => {
     expect(cls).toContain('border-[color:var(--color-v2-divider)]');
     expect(cls).toContain('py-3');
     expect(cls).toContain('mb-6');
+  });
+
+  it('wraps with a gap so it cannot overflow at 320px', () => {
+    renderApp(<AppHeader />);
+    const cls = screen.getByRole('banner').className;
+    expect(cls).toContain('flex-wrap');
+    expect(cls).toContain('gap-y-2');
+    expect(cls).toContain('justify-between');
+  });
+});
+
+describe('AppHeader checklist button', () => {
+  it('is a primary button in the banner, with aria attributes, that calls onToggle', async () => {
+    const onToggle = vi.fn();
+    renderApp(<AppHeader checklist={{ open: false, onToggle, panelId: 'panel-1' }} />);
+    const button = within(screen.getByRole('banner')).getByRole('button', { name: 'Show checklist' });
+    expect(button).toHaveClass('gg-btn', 'gg-btn-primary');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveAttribute('aria-controls', 'panel-1');
+    expect(button.className).toContain('hidden lg:inline-flex');
+    await userEvent.click(button);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('is left out while the panel is open', () => {
+    renderApp(<AppHeader checklist={{ open: true, onToggle: vi.fn(), panelId: 'panel-1' }} />);
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });
 
