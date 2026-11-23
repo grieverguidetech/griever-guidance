@@ -1,8 +1,9 @@
 import { useId, useRef } from 'react';
 import type { ReactNode, Ref } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
+import { colors, minTouchTarget, spacing } from '@griever/tokens';
 import { Button } from '../Button';
+import { glassCard } from '../Card';
 import { Icon } from '../Icon';
 import type { ButtonNode } from '../Button';
 import { Phrasing } from '../phrasing';
@@ -189,24 +190,15 @@ function Meta({ meta }: { meta?: string }) {
   );
 }
 
-/** `base` with `amount` of `over` mixed in, as a hex colour. */
-function mixHex(base: string, over: string, amount: number): string {
-  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
-  return `#${[1, 3, 5].map((at) => Math.round(channel(base, at) * (1 - amount) + channel(over, at) * amount).toString(16).padStart(2, '0')).join('')}`;
-}
-
-/** The card colour while pressed: surface with 7% ink over it (web's hover). Muted text keeps 4.5:1 on it (hub.spec checks). */
-const PRESSED_SURFACE = mixHex(colors.surface, colors.ink, 0.07);
-
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   rows: { gap: spacing[2] },
-  // Web's gg-panel card: surface fill, no border, full width, at least 44 pt.
-  card: { minHeight: minTouchTarget, padding: spacing[3], gap: 2, backgroundColor: colors.surface, borderRadius: radius.lg, overflow: 'hidden' },
-  // Web's hover mix: ink 7% over surface. Muted text keeps 4.5:1 on it (hub.spec checks).
-  cardPressed: { backgroundColor: PRESSED_SURFACE },
+  // The v2 glass card (shared with Card), full width, at least 44 pt.
+  card: { ...glassCard, minHeight: minTouchTarget, padding: spacing[3], gap: 2, overflow: 'hidden' },
+  // Glass is see-through, so a press dims the whole card instead of mixing a colour in.
+  cardPressed: { opacity: 0.8 },
   // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
   nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors['accent-700'] },
   top: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },

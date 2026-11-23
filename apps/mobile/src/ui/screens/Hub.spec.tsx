@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { screenCopy } from '@griever/copy';
+import { v2 } from '@griever/tokens';
 import { Hub } from './Hub';
 import type { HubProps, HubRow } from './Hub';
 
@@ -85,5 +86,19 @@ describe('Hub cards', () => {
     expect(screen.getByText('Needs the obituary link')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Announce the passing, Sent' }));
     expect(onStart).toHaveBeenCalledWith('announce');
+  });
+
+  it('draws each card with the v2 glass recipe and 8 pt corners, and the next card keeps its bar', () => {
+    setup([row('announce', { lit: true }), row('service')]);
+    const recipe = v2.recipes.card;
+    for (const card of screen.getAllByRole('button', { name: /Announce|Share the service/ })) {
+      const style = StyleSheet.flatten(card.props.style);
+      expect(style.backgroundColor).toBe(recipe.fill);
+      expect(style.borderColor).toBe(recipe.border.color);
+      expect(style.borderWidth).toBe(recipe.border.width);
+      expect(style.borderRadius).toBe(8);
+      expect(style.boxShadow).toBeTruthy();
+    }
+    expect(StyleSheet.flatten(screen.getByTestId('next-bar').props.style).width).toBe(3);
   });
 });
