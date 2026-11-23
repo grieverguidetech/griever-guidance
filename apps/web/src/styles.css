@@ -144,6 +144,8 @@ h1 { font-weight: var(--v2-heading-weight); }
   .gg-tooltip:focus-within .gg-tooltip-text { opacity: 1; }
 
   /* — buttons — */
+  /* For the libs/ui Button ([data-gg-btn]), display, min-height and padding here lose to react-native-web's unlayered reset; the Button sets
+     its own min size and padding. */
   .gg-btn,
   [data-gg-btn] {
     display: inline-flex;
@@ -634,8 +636,9 @@ h1 { font-weight: var(--v2-heading-weight); }
 [data-gg-btn='secondary']:focus-visible { outline-color: var(--color-accent-700); }
 
 /* The libs/ui Button (react-native-web) resets border, border style and background colour with unlayered classes, which beat the
-   @layer components rules above whatever their specificity. These repeat only those properties, unlayered, on button[...] (0,2,1)
-   so they win; the values are the same vars the layered rules use. Padding and min size come from the Button's own styles. */
+   @layer components rules above whatever their specificity. These repeat only those properties, unlayered, on button[...] (0,1,1; 0,2,1 with a state),
+   so they win; the values are the same vars the layered rules use (v2Styles.spec checks they match). Padding and min size come from the
+   Button's own styles. The states use [aria-disabled='true'] only because the libs/ui Button never sets native disabled. */
 button[data-gg-btn='primary'] { border: var(--v2-border-thin) solid var(--color-v2-primary-border); }
 button[data-gg-btn='secondary'] { border: var(--v2-border-medium) solid var(--color-v2-secondary-border); }
 button[data-gg-btn='secondary'][aria-pressed='true'] { background-color: var(--color-accent-100); }
@@ -643,9 +646,10 @@ button[data-gg-btn='primary'][aria-disabled='true'],
 button[data-gg-btn='secondary'][aria-disabled='true'] { border-style: dashed; background-color: var(--color-v2-page); }
 
 /* Reduced motion: gg-* transitions and animations become near-instant. Unlayered so it beats
-   the component layer; it only matches gg-* classes, so nothing else changes. */
+   the component layer; it only matches gg-* classes and the data-gg-btn buttons, so nothing else changes. */
 @media (prefers-reduced-motion: reduce) {
-  [class*='gg-'], [class*='gg-']::before, [class*='gg-']::after {
+  [class*='gg-'], [class*='gg-']::before, [class*='gg-']::after,
+  [data-gg-btn], [data-gg-btn]::before, [data-gg-btn]::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import type { ComponentRef, Ref } from 'react';
-import type { GestureResponderEvent } from 'react-native';
+import type { GestureResponderEvent, TextStyle } from 'react-native';
 import { Platform, Pressable, StyleSheet, Text } from 'react-native';
 import { colors, minTouchTarget, spacing } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
@@ -21,6 +21,9 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
 export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
 
 const BUTTON_RADIUS = 10;
+
+// react-native-web passes 'inherit' through; the native types only allow numbers and fixed weights.
+const WEB_INHERIT_FONT = { fontWeight: 'inherit', fontSize: 'inherit' } as unknown as TextStyle;
 
 export interface ButtonProps {
   label: string;
@@ -178,8 +181,8 @@ const styles = StyleSheet.create({
   labelPrimary: { fontSize: 15 },
   labelLink: { fontSize: 14 },
   labelOnFill: { color: colors.bg },
-  // Web swirl: the label takes the button's own text colour from styles.css.
-  labelSwirl: { color: 'inherit' },
+  // Web swirl: the label takes the button's own text colour and font (family, weight, size) from styles.css.
+  labelSwirl: { color: 'inherit', fontFamily: 'inherit', ...WEB_INHERIT_FONT },
   labelTertiary: { textDecorationLine: 'underline' },
   labelAccent: { color: colors['accent-700'] },
   labelUnavailable: { color: colors['neutral-700'] },

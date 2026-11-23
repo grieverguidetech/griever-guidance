@@ -353,6 +353,32 @@ describe('styles.css swirl buttons', () => {
     expect(css).toMatch(/\[data-gg-btn\]\s*\{/);
   });
 
+  it('repeats the edge and state fills unlayered on button[data-gg-btn] with the same vars as the layered rules, so react-native-web resets cannot win', () => {
+    const unlayered = css.replace(block('@layer components'), '');
+    const primary = decls("button[data-gg-btn='primary']", unlayered);
+    expect(primary).toMatch(/border:[^;]*var\(--v2-border-thin\)[^;]*solid[^;]*var\(--color-v2-primary-border\)/);
+    expect(decls('.gg-btn-primary')).toContain('border-width: var(--v2-border-thin)');
+    expect(decls('.gg-btn-primary')).toContain('border-color: var(--color-v2-primary-border)');
+
+    const secondary = decls("button[data-gg-btn='secondary']", unlayered);
+    expect(secondary).toMatch(/border:[^;]*var\(--v2-border-medium\)[^;]*solid[^;]*var\(--color-v2-secondary-border\)/);
+    expect(decls('.gg-btn-secondary')).toContain('border-width: var(--v2-border-medium)');
+    expect(decls('.gg-btn-secondary')).toContain('border-color: var(--color-v2-secondary-border)');
+
+    const pressed = decls("button[data-gg-btn='secondary'][aria-pressed='true']", unlayered);
+    expect(pressed).toContain('background-color: var(--color-accent-100)');
+    expect(decls(".gg-btn-secondary[aria-pressed='true']")).toContain('background-color: var(--color-accent-100)');
+
+    for (const variant of ['primary', 'secondary']) {
+      const disabled = decls(`button[data-gg-btn='${variant}'][aria-disabled='true']`, unlayered);
+      expect(disabled).toContain('border-style: dashed');
+      expect(disabled).toContain('background-color: var(--color-v2-page)');
+      const layered = decls(`.gg-btn-${variant}[aria-disabled='true']`);
+      expect(layered).toContain('border-style: dashed');
+      expect(layered).toContain('background-color: var(--color-v2-page)');
+    }
+  });
+
   it('declares every animation that touches a button, and the swirl keyframes, only inside a no-preference block', () => {
     const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
     const noPrefBlocks = [...bare.matchAll(/@media \(prefers-reduced-motion: no-preference\)/g)].map((m) => block(m[0]));

@@ -214,8 +214,8 @@ describe('Button swirl hook on web', () => {
   it('drops the v1 fill on a swirl button, and keeps the tinted fill on the others', () => {
     const { unmount } = render(<Button label="Go" onPress={vi.fn()} variant="primary" ariaDisabled />);
     const swirl = getComputedStyle(screen.getByRole('button', { name: 'Go' }));
-    expect(swirl.backgroundColor).not.toBe(colors['accent-700']);
-    expect(swirl.backgroundColor).not.toBe(colors['neutral-700']);
+    // jsdom reports rgb(), so assert the empty or transparent fill rather than comparing to hex tokens.
+    expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(swirl.backgroundColor);
     unmount();
     render(<Button label="Go" onPress={vi.fn()} variant="tinted" />);
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).not.toContain(getComputedStyle(screen.getByRole('button', { name: 'Go' })).backgroundColor);
@@ -224,7 +224,12 @@ describe('Button swirl hook on web', () => {
   it('lets the label inherit the swirl text colour instead of the v1 page-colour label', () => {
     render(<Button label="Go" onPress={vi.fn()} variant="primary" />);
     const label = getComputedStyle(screen.getByText('Go'));
-    expect(label.color).not.toBe(colors.bg);
+    expect(label.color).toBe(getComputedStyle(screen.getByRole('button', { name: 'Go' })).color);
+    expect(label.color).not.toBe('rgb(243, 242, 242)');
+    expect(label.color).not.toBe('rgb(0, 103, 134)');
+    expect(label.fontFamily).toBe('inherit');
+    expect(label.fontWeight).toBe('inherit');
+    expect(['inherit', '']).toContain(label.fontSize);
   });
 
   it('keeps aria-disabled, focus and onPress on a swirl button that is unavailable', async () => {
