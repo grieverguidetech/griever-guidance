@@ -10,7 +10,7 @@ export function AccountDeleted({ cleared = true }: { cleared?: boolean }) {
     heading.current?.focus();
   }, []);
   return (
-    <main className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
+    <main className="min-h-screen flex justify-center">
       <div className="w-full max-w-[420px] px-5 py-8 flex flex-col gap-3">
         <h1 ref={heading} tabIndex={-1} className="m-0">
           {copy.deletedHeading}

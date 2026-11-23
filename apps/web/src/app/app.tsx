@@ -150,7 +150,7 @@ function Shell({
   wide?: boolean;
 }) {
   return (
-    <div className="min-h-screen flex justify-center" style={{ background: 'var(--color-bg)' }}>
+    <div className="min-h-screen flex justify-center">
       <div className={wide ? 'w-full px-5 md:px-8 pb-8' : 'w-full max-w-[420px] px-5 py-8'}>
         {wide ? <AppHeader /> : null}
         {notice}

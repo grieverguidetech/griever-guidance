@@ -135,6 +135,14 @@ describe('styles.css page ground and glows', () => {
     expect(rule('body')).not.toMatch(/z-index|transform|filter|isolation|will-change|position/);
   });
 
+  it('lets the glow show: no full-page wrapper paints an opaque background over it', () => {
+    const offenders = sourceFiles(__dirname).filter((file) => {
+      const text = readFileSync(file, 'utf8');
+      return /min-h-screen[^>]*background/.test(text) && !file.endsWith('v2Styles.spec.ts');
+    });
+    expect(offenders).toEqual([]);
+  });
+
   it('uses no literal colours in the page and glow rules, and defines every var they use', () => {
     const rules = `${rule('body')}\n${glow}`;
     expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
