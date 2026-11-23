@@ -31,10 +31,9 @@ const UNAVAILABLE_FILL = v2.roles.ink;
 
 type Recipe = (typeof RECIPES)[keyof typeof RECIPES];
 
-/** The recipe's shadow as a boxShadow string. react-native-web 0.21 warns on the old shadow* props; RN 0.88 reads this natively. */
-function recipeShadow(recipe: Recipe) {
-  const { x, y, blur, color } = recipe.shadow[0];
-  return { boxShadow: `${x}px ${y}px ${blur}px ${color}` };
+/** The whole recipe shadow list as one boxShadow string. react-native-web 0.21 warns on the old shadow* props; RN 0.88 reads this natively. */
+export function recipeShadow(recipe: Recipe): string {
+  return recipe.shadow.map(({ x, y, blur, color }) => `${x}px ${y}px ${blur}px ${color}`).join(', ');
 }
 
 /** The recipe's border, radius and shadow as one outer style. */
@@ -43,11 +42,14 @@ function recipeFrame(recipe: Recipe) {
     borderWidth: recipe.border.width,
     borderColor: recipe.border.color,
     borderRadius: recipe.radius,
-    // Shows only if the swirl has not drawn yet.
+    // Behind the swirl; only a sliver at the edge could show it, so the inner radius is recipe.radius - border.width.
     backgroundColor: recipe.swirl.stops[0],
-    ...recipeShadow(recipe),
+    boxShadow: recipeShadow(recipe),
   };
 }
+
+/** Pressed swirl buttons dim to this. At 0.7 the secondary label fell to about 3.6:1; 0.85 stays above 4.5:1 (see Button.spec). */
+const SWIRL_PRESSED_OPACITY = 0.85;
 
 export interface ButtonProps {
   label: string;
@@ -162,7 +164,9 @@ export function Button({
   }, [working]);
   const unavailableFill = ariaDisabled && variant === 'primary';
   const recipe = variant === 'primary' || variant === 'secondary' ? RECIPES[variant] : undefined;
-  const swirled = recipe !== undefined && !unavailableFill;
+  const swirled = recipe !== undefined && !ariaDisabled;
+  // An unavailable secondary has no swirl: a flat page fill with a dashed border, so it reads as different yet keeps its text colour.
+  const unavailableOutline = ariaDisabled && variant === 'secondary';
   // The recipe colour in every state: the muted neutral-700 was under 4.5:1 on the soft ocean swirl.
   const labelColor = unavailableFill ? PAGE : recipe?.text.color;
   const text = (
@@ -209,13 +213,14 @@ export function Button({
         recipe && recipeFrame(recipe),
         swirled && styles.swirlFrame,
         unavailableFill && styles.unavailableFill,
+        unavailableOutline && styles.unavailableOutline,
         minHeight !== undefined && { minHeight },
-        pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : styles.pressed),
+        pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : recipe ? styles.pressedSwirl : styles.pressed),
       ]}
       {...extra}
     >
       {swirled ? (
-        <LinearSwirl stops={[...recipe.swirl.stops]} angle={recipe.swirl.angle} driftMs={recipe.driftMs} style={styles.swirl}>
+        <LinearSwirl stops={[...recipe.swirl.stops]} angle={recipe.swirl.angle} driftMs={recipe.driftMs} style={[styles.swirl, { borderRadius: recipe.radius - recipe.border.width }]}>
           {body}
         </LinearSwirl>
       ) : (
@@ -272,14 +277,16 @@ const styles = StyleSheet.create({
   // accent-600 on the page is 3.74:1, above the 3:1 non-text minimum.
   header: { borderColor: colors['accent-600'] },
   pressed: { opacity: 0.7 },
+  pressedSwirl: { opacity: SWIRL_PRESSED_OPACITY },
   // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
   pressedWash: { backgroundColor: colors['accent-100'] },
   // Unavailable is a solid look, not a fade: opacity would drop the label below 4.5:1.
-  // Primary: page-coloured text on ink. Others: neutral-700 text.
+  // Primary: page-coloured text on ink. Secondary: flat page, dashed border, recipe text. The rest: neutral-700 text.
   unavailableFill: { backgroundColor: UNAVAILABLE_FILL },
+  unavailableOutline: { backgroundColor: PAGE, borderStyle: 'dashed', boxShadow: 'none' },
   // The swirl fills the frame and carries the padding, so the whole button is gradient. The first stop shows behind it for the shadow.
   swirlFrame: { paddingVertical: 0, paddingHorizontal: 0, alignItems: 'stretch' },
-  swirl: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: 14, borderRadius: BUTTON_RADIUS },
+  swirl: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: 14 },
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] },
   label: {
   },
