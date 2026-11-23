@@ -72,5 +72,13 @@ export const radius = { sm: 1, md: 2, lg: 4 } as const;
 /** The smallest touch target, in pixels (REQUIREMENTS.md accessibility rules). */
 export const minTouchTarget = 44;
 
-export { toWebThemeCss, type WebThemeInput } from './css.js';
+export {
+  block,
+  generatedHeader,
+  rootLines,
+  themeLines,
+  toGeneratedFile,
+  toWebThemeCss,
+  type WebThemeInput,
+} from './css.js';
 export { v2 } from './v2/index.js';

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { colors, fontSerifStack, radius, spacing, toWebThemeCss } from '@griever/tokens';
+import { colors, fontSerifStack, radius, spacing, toGeneratedFile } from '@griever/tokens';
 
 const read = (name: string) => readFileSync(join(import.meta.dirname, name), 'utf8');
 
@@ -8,17 +8,24 @@ const read = (name: string) => readFileSync(join(import.meta.dirname, name), 'ut
 describe('tokens match the web theme', () => {
   const generated = read('theme.generated.css');
 
-  it('theme.generated.css equals toWebThemeCss of the v1 tokens', () => {
-    const header = generated.slice(0, generated.indexOf('@theme {'));
-    expect(header).toContain('GENERATED');
-    expect(generated.slice(header.length)).toBe(toWebThemeCss({ colors, fontSerifStack, spacing, radius }));
+  it('theme.generated.css equals toGeneratedFile of the v1 tokens, header included', () => {
+    expect(generated).toBe(toGeneratedFile({ colors, fontSerifStack, spacing, radius }));
   });
 
   it('styles.css imports the generated file and declares no token of its own', () => {
     const css = read('styles.css');
     expect(css).toContain("@import './theme.generated.css';");
     expect(css).not.toContain('@theme {');
-    expect(css).not.toMatch(/--(space|radius)-[\w-]+:/);
-    expect(css).not.toMatch(/--font-serif:|--color-(bg|white|surface|ink|accent[\w-]*|neutral-\d+|success-700):/);
+    const names = [
+      '--font-serif',
+      ...Object.keys(colors).map((name) => `--color-${name}`),
+      ...Object.keys(spacing).map((name) => `--space-${name}`),
+      ...Object.keys(radius).map((name) => `--radius-${name}`),
+    ];
+    for (const name of names) {
+      expect(css, `${name} is declared in styles.css`).not.toMatch(new RegExp(`${name}\\s*:`));
+    }
+    // A new family of generated tokens must not be hand-declared either.
+    expect(css).not.toMatch(/--(space|radius)-[\w-]+\s*:/);
   });
 });

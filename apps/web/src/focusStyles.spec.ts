@@ -58,7 +58,7 @@ function over(fg: string, alpha: number, bg: string): string {
 function rule(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = CSS.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`));
-  if (!match) throw new Error(`rule ${selector} not found in theme.generated.css`);
+  if (!match) throw new Error(`rule ${selector} not found in styles.css`);
   return match[1];
 }
 
@@ -130,7 +130,7 @@ describe('visible focus (#162)', () => {
 
   it('an input on a panel gets a border that clears 3:1 against the panel and its fill (#514)', () => {
     const match = CSS.match(/\.gg-panel \.gg-input\s*\{([^}]*)\}/);
-    if (!match) throw new Error('rule .gg-panel .gg-input not found in theme.generated.css');
+    if (!match) throw new Error('rule .gg-panel .gg-input not found in styles.css');
     const border = token(colourIn(match[1], 'border-color'));
     const fillName = colourIn(match[1], 'background');
     expect(fillName).toBe('bg');
