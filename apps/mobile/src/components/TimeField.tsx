@@ -4,7 +4,7 @@ import type { ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { formatServiceTime, serviceTimeFromText } from '@griever/shared';
 import { Button, SerifText as Text } from '../ui';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 
 export interface TimeFieldCopy {
   placeholder: string;
@@ -103,7 +103,7 @@ export function TimeField({ copy, value, onChange, accessibleName, missing }: Pr
       </Pressable>
       {open && Platform.OS === 'ios' ? (
         <View style={styles.picker}>
-          <DateTimePicker value={draft} mode="time" display="spinner" is24Hour={false} accentColor={colors['accent-700']} onChange={moveDraft} />
+          <DateTimePicker value={draft} mode="time" display="spinner" is24Hour={false} accentColor={v2.recipes.field.focusRing} onChange={moveDraft} />
           <View style={styles.actions}>
             {value ? <Button label={copy.clear} variant="tertiary" onPress={clear} /> : null}
             <Button label={copy.done} variant="secondary" onPress={done} />
@@ -121,13 +121,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
   },
-  fieldMissing: { borderStyle: 'dashed', borderColor: colors.ink },
-  value: { fontSize: 15, color: colors.ink },
-  placeholder: { fontSize: 15, color: colors['neutral-700'] },
+  fieldMissing: { borderStyle: 'dashed', borderColor: v2.roles.ink },
+  value: { fontSize: 15, color: v2.roles.ink },
+  placeholder: { fontSize: 15, color: v2.roles.muted },
   picker: { gap: spacing[1] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: spacing[1] },
 });

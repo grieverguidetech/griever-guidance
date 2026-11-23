@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
-import { computeChecklist } from '@griever/hooks';
+import { computeChecklist } from '@griever/shared';
 import { TIME_PHASE_KEYS } from '@griever/shared';
 import type {
   ChecklistFields,
@@ -9,8 +9,9 @@ import type {
   ChecklistItemState,
   ChecklistPhaseKey,
 } from '@griever/shared';
-import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { Sheet, focusNode, SerifText as Text } from '../ui';
+import { DoneMark } from '../ui/DoneMark';
 import type { ButtonNode } from '../ui';
 import { ChecklistGroupPanel } from './ChecklistGroupPanel';
 import { MUTED } from './colors';
@@ -129,10 +130,12 @@ export function PersonChecklistSheet({
             >
               <Text style={styles.label}>{group.label}</Text>
               {group.done ? (
-                <View style={styles.done} importantForAccessibility="no">
-                  <Text style={styles.check} allowFontScaling={false}>
-                    ✓
-                  </Text>
+                <View
+                  style={styles.done}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                >
+                  <DoneMark checked />
                   <Text style={styles.doneText}>{checklistCopy.done}</Text>
                 </View>
               ) : null}
@@ -151,16 +154,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing[2],
   },
-  pressed: { backgroundColor: colors['accent-100'] },
-  label: { flex: 1, fontSize: 16, color: colors.ink },
+  pressed: { backgroundColor: v2.roles.wash },
+  label: { flex: 1, fontSize: 16, color: v2.roles.ink },
   done: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  check: { fontSize: 16, color: colors['success-700'], fontWeight: '700' },
-  doneText: { fontSize: 14, color: colors['success-700'] },
+  doneText: { fontSize: 14, color: v2.roles.success },
 });

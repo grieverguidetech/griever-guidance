@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { CHECKLIST_PHASES } from '@griever/shared';
+import { CHECKLIST_PHASES } from './checklist.js';
 import type {
   ChecklistFields,
   ChecklistItemId,
   ChecklistItemState,
-} from '@griever/shared';
+} from './checklist.js';
 import { computeChecklist } from './checklistProgress.js';
 
 function allWith(value: ChecklistItemState): ChecklistFields {

@@ -5,7 +5,7 @@ import {
   type ChecklistItemState,
   type ChecklistItemId,
   type ChecklistPhaseKey,
-} from '@griever/shared';
+} from './checklist.js';
 
 export type ChecklistProgressItemState = ChecklistItemState | 'open';
 

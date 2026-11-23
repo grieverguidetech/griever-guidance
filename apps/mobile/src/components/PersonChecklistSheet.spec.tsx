@@ -65,8 +65,19 @@ describe('PersonChecklistSheet (#696)', () => {
   it('marks a phase Done when every item is ticked, in the label and on screen', async () => {
     await setup(tick(['right-away']));
     expect(doneGroup(phrases.phases['right-away'])).toBeTruthy();
-    expect(screen.getAllByText(phrases.done)).toHaveLength(1);
+    expect(screen.getAllByText(phrases.done, { includeHiddenElements: true })).toHaveLength(1);
     expect(doneGroup(phrases.phases['first-days'])).toBeNull();
+  });
+
+  it('uses the swirl mark for Done and reads Done once', async () => {
+    await setup(tick(['right-away']));
+    const hidden = { includeHiddenElements: true };
+    expect(screen.getAllByTestId('done-mark-swirl', hidden)).toHaveLength(1);
+    expect(screen.queryByTestId('done-mark-swirl')).toBeNull();
+    // Done is in the group label; the visible word and the mark are hidden from screen readers.
+    expect(doneGroup(phrases.phases['right-away'])).toBeTruthy();
+    expect(screen.queryAllByText(phrases.done)).toHaveLength(0);
+    expect(screen.getAllByText(phrases.done, hidden)).toHaveLength(1);
   });
 
   it('counts a saved not_applicable as handled for the phase (value kept for sync with web)', async () => {

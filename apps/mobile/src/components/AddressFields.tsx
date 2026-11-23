@@ -2,7 +2,7 @@ import { useId, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { ERROR } from './colors';
 import { Heading } from '../ui/Heading';
 import { Body } from '../ui/Text';
@@ -228,14 +228,14 @@ const styles = StyleSheet.create({
     minHeight: 44,
     padding: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 15,
   },
   // A wrong value also gets a message below; the border is only a second cue.
   inputError: { borderColor: ERROR },
   // Native focus cue (web draws its own ring through data-gg-field).
-  inputFocused: { borderColor: colors['accent-700'], borderWidth: 2 },
+  inputFocused: { borderColor: v2.recipes.field.focusRing, borderWidth: 2 },
 });

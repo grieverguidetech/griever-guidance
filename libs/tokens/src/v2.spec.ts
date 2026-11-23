@@ -42,6 +42,8 @@ const grounds = {
   page: c.page,
   sunGlow: c.glowSun,
   skyGlow: c.glowSky,
+  glassOverPage: over(c.glassFill, c.page),
+  glassOverSun: over(c.glassFill, c.glowSun),
   glassOverSky: over(c.glassFill, c.glowSky),
 };
 
@@ -86,14 +88,45 @@ describe('v2 tokens: layers', () => {
 
   it('has the roles and recipes the ticket names', () => {
     expect(Object.keys(v2.roles).sort()).toEqual(
-      ['body', 'doneMark', 'eyebrow', 'focus', 'heading', 'ink', 'loud', 'nudge', 'page', 'soft'],
+      [
+        'body', 'divider', 'doneMark', 'error', 'eyebrow', 'focus', 'heading', 'ink', 'link', 'loud',
+        'muted', 'mutedStrong', 'nudge', 'page', 'soft', 'success', 'wash',
+      ],
     );
-    expect(Object.keys(v2.recipes).sort()).toEqual(['button', 'card', 'doneMark', 'nudge']);
+    expect(Object.keys(v2.recipes).sort()).toEqual(['button', 'card', 'doneMark', 'field', 'nudge']);
     expect(Object.keys(v2.recipes.button).sort()).toEqual(['primary', 'secondary']);
   });
 
   it('leaves the v1 colours alone', () => {
     expect(colors.bg).toBe('#f3f2f2');
+  });
+});
+
+describe('v2 tokens: copied from the v1 look', () => {
+  it('copies the v1 value for each control and state role', () => {
+    const table: [string, string, string][] = [
+      ['accent-700', colors['accent-700'], v2.roles.link],
+      ['accent-100', colors['accent-100'], v2.roles.wash],
+      ['neutral-700', colors['neutral-700'], v2.roles.muted],
+      ['neutral-800', colors['neutral-800'], v2.roles.mutedStrong],
+      ['neutral-600', colors['neutral-600'], v2.recipes.field.edge],
+      ['surface', colors.surface, v2.recipes.field.fill],
+      ['accent-700 (ring)', colors['accent-700'], v2.recipes.field.focusRing],
+      ['success-700', colors['success-700'], v2.roles.success],
+    ];
+    for (const [name, v1, v2Value] of table) {
+      expect(v2Value, name).toBe(v1);
+    }
+  });
+
+  it('uses the web error and success values (D2), not the mobile ones', () => {
+    expect(v2.roles.error).toBe('#b3261e');
+    expect(v2.roles.success).toBe('#2a7048');
+  });
+
+  it('keeps the web divider and the field radius', () => {
+    expect(v2.roles.divider).toBe('rgba(32,30,29,0.16)');
+    expect(v2.recipes.field.radius).toBe(8);
   });
 });
 
@@ -140,6 +173,49 @@ describe('v2 tokens: contrast', () => {
       for (const stop of v2.roles.doneMark.swirl) {
         expect(contrast(stop, ground), `${stop} on ${name}`).toBeGreaterThanOrEqual(3);
       }
+    }
+  });
+
+  it('gives link, muted, mutedStrong, error and success at least 4.5:1 on every ground', () => {
+    const texts = {
+      link: v2.roles.link,
+      muted: v2.roles.muted,
+      mutedStrong: v2.roles.mutedStrong,
+      error: v2.roles.error,
+      success: v2.roles.success,
+    };
+    for (const [ground, bg] of Object.entries(grounds)) {
+      for (const [role, color] of Object.entries(texts)) {
+        expect(contrast(color, bg), `${role} on ${ground}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('gives the field edge and focus ring at least 3:1 on every ground', () => {
+    for (const [ground, bg] of Object.entries(grounds)) {
+      for (const color of [v2.recipes.field.edge, v2.recipes.field.focusRing]) {
+        expect(contrast(color, bg), `${color} on ${ground}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it('gives mutedStrong and link text at least 4.5:1 on the selected-row wash', () => {
+    for (const color of [v2.roles.mutedStrong, v2.roles.link]) {
+      expect(contrast(color, v2.roles.wash), color).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe('v2 tokens: contrast on the field fill', () => {
+  const { fill, edge } = v2.recipes.field;
+
+  it('gives the field edge at least 3:1 against the fill', () => {
+    expect(contrast(edge, fill)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('gives muted, link and error text at least 4.5:1 on the fill', () => {
+    for (const [role, color] of Object.entries({ muted: v2.roles.muted, link: v2.roles.link, error: v2.roles.error })) {
+      expect(contrast(color, fill), `${role} on fill`).toBeGreaterThanOrEqual(4.5);
     }
   });
 });

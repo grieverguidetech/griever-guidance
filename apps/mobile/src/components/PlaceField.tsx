@@ -5,7 +5,7 @@ import { fill } from '@griever/copy';
 import { newPlaceSessionToken, placeDetails, suggestPlaces } from '@griever/api-client';
 import { SERVICE_PLACE_TYPES } from '@griever/shared';
 import type { PlaceDetails, PlaceSuggestion } from '@griever/shared';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { SerifText as Text } from '../ui';
 
 export const PLACE_DEBOUNCE_MS = 300;
@@ -187,7 +187,7 @@ function PlaceFieldBase(
         style={[styles.input, missing && styles.inputMissing, focused && styles.inputFocused]}
         accessibilityLabel={accessibleName}
         placeholder={placeholder}
-        placeholderTextColor={colors['neutral-700']}
+        placeholderTextColor={v2.roles.muted}
         value={value}
         onChangeText={type}
         onFocus={() => setFocused(true)}
@@ -230,18 +230,18 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 15,
   },
-  inputMissing: { borderStyle: 'dashed', borderColor: colors.ink },
-  inputFocused: { borderStyle: 'solid', borderColor: colors['accent-700'], borderWidth: 2 },
-  list: { borderWidth: 1, borderColor: colors['neutral-600'], borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden' },
+  inputMissing: { borderStyle: 'dashed', borderColor: v2.roles.ink },
+  inputFocused: { borderStyle: 'solid', borderColor: v2.recipes.field.focusRing, borderWidth: 2 },
+  list: { borderWidth: 1, borderColor: v2.recipes.field.edge, borderRadius: v2.recipes.field.radius, backgroundColor: v2.recipes.field.fill, overflow: 'hidden' },
   row: { minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing[2], paddingVertical: spacing[1] },
-  rowPressed: { backgroundColor: colors['neutral-200'] },
-  rowText: { fontSize: 15, color: colors.ink },
-  rowName: { fontSize: 15, color: colors.ink, fontWeight: '700' },
-  status: { fontSize: 15, color: colors['neutral-700'] },
+  rowPressed: { backgroundColor: v2.recipes.field.fill },
+  rowText: { fontSize: 15, color: v2.roles.ink },
+  rowName: { fontSize: 15, color: v2.roles.ink, fontWeight: '700' },
+  status: { fontSize: 15, color: v2.roles.muted },
 });
