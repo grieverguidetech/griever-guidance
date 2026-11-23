@@ -1,7 +1,7 @@
 import { fill, screenCopy } from '@griever/copy';
-import { computeChecklist, computeSections } from '@griever/hooks';
+import { computeSections } from '@griever/hooks';
 import type { OverviewStatus } from '@griever/hooks';
-import { FLOW_DETAIL_TEXT_KEYS, LIFE_YEARS, parseCompleteDate, SECTION_ORDER } from '@griever/shared';
+import { computeChecklist, FLOW_DETAIL_TEXT_KEYS, LIFE_YEARS, parseCompleteDate, SECTION_ORDER } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemId, ChecklistPhaseKey, SectionFields, SectionKey, SessionDetails } from '@griever/shared';
 import { navTitle } from './SideNav';
 import { announcementPrefill, summaryLine, thanksPrefill } from './sections/messagePrefill';

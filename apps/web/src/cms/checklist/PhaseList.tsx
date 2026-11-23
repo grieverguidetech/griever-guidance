@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { screenCopy } from '@griever/copy';
-import { computeChecklist } from '@griever/hooks';
+import { computeChecklist } from '@griever/shared';
 import type {
   ChecklistFields,
   ChecklistItemId,

@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
-import { computeChecklist } from '@griever/hooks';
+import { computeChecklist } from '@griever/shared';
 import type {
   ChecklistFields,
   ChecklistItemId,
