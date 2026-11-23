@@ -24,35 +24,42 @@ export const CONIC_WEDGES = 24;
 /** The gradient rect is this wide compared with the box, so there is room to drift. */
 const DRIFT_WIDTH = 2.2;
 
+/** How long a swirl moves after it mounts. Then it rests (WCAG 2.2.2: no motion that never ends). */
+export const SETTLE_MS = 5000;
+
 /**
- * Runs a looping animation while Reduce Motion is off. When it is on, or turns on later, the loop
- * stops and nothing starts. The animated value stays where it was.
+ * Runs one pass of motion when the swirl mounts, then leaves it at rest where it ended. With
+ * Reduce Motion on nothing runs, and turning it on mid-pass stops the pass where it is. Once a
+ * pass has started it never runs again for this mount, so a change of settings stays calm.
  */
-function useLoop(makeLoop: () => Animated.CompositeAnimation) {
+function useSettle(makePass: () => Animated.CompositeAnimation) {
   const reduceMotion = useReduceMotion();
-  const makeRef = useRef(makeLoop);
-  makeRef.current = makeLoop;
+  const makeRef = useRef(makePass);
+  makeRef.current = makePass;
+  const started = useRef(false);
   useEffect(() => {
-    if (reduceMotion) {
+    if (reduceMotion || started.current) {
       return undefined;
     }
-    const loop = makeRef.current();
-    loop.start();
-    return () => loop.stop();
+    started.current = true;
+    const pass = makeRef.current();
+    pass.start();
+    return () => pass.stop();
   }, [reduceMotion]);
 }
 
 type LinearSwirlProps = {
+  /** 3- or 6-digit hex colours only (for example #fff or #ffffff). */
   stops: string[];
-  /** CSS-style angle in degrees: 0 points up, 90 points right. */
+  /** Degrees, 0 points up and 90 points right, in the box's own units. Approximate for angles that are not multiples of 90. */
   angle: number;
-  /** Time for one slide in one direction. */
+  /** Time for one full slide: sets the speed. */
   driftMs: number;
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 };
 
-/** Start and end points of the gradient line, as fractions of the box, for a CSS-style angle. */
+/** Start and end points of the gradient line, as fractions of the box. */
 function gradientLine(angle: number) {
   const rad = (angle * Math.PI) / 180;
   const dx = Math.sin(rad) / 2;
@@ -60,7 +67,10 @@ function gradientLine(angle: number) {
   return { x1: 0.5 - dx, y1: 0.5 - dy, x2: 0.5 + dx, y2: 0.5 + dy };
 }
 
-/** A colour gradient that slowly slides back and forth behind its children. */
+/**
+ * A colour gradient that slides behind (for about 5 seconds, then rests) its children. The children stay
+ * readable: only the decoration layer is hidden from screen readers.
+ */
 export function LinearSwirl({
   stops,
   angle,
@@ -71,23 +81,14 @@ export function LinearSwirl({
   const id = useId();
   const [width, setWidth] = useState(0);
   const slide = useRef(new Animated.Value(0)).current;
-  useLoop(() =>
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(slide, {
-          toValue: 1,
-          duration: driftMs,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(slide, {
-          toValue: 0,
-          duration: driftMs,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    ),
+  // driftMs is the time for one full slide, so a 5 s pass covers 5000 / driftMs of it (at most all).
+  useSettle(() =>
+    Animated.timing(slide, {
+      toValue: Math.min(1, SETTLE_MS / driftMs),
+      duration: SETTLE_MS,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }),
   );
   const onLayout = (event: LayoutChangeEvent) =>
     setWidth(event.nativeEvent.layout.width);
@@ -98,34 +99,41 @@ export function LinearSwirl({
   const line = gradientLine(angle);
   const gradientId = `swirl-${id}`;
   return (
-    <View {...HIDDEN} onLayout={onLayout} style={[styles.fill, style]}>
-      <Animated.View
-        style={[
-          styles.slider,
-          { width: `${DRIFT_WIDTH * 100}%`, transform: [{ translateX }] },
-        ]}
+    <View onLayout={onLayout} style={[styles.outer, style]}>
+      <View
+        {...HIDDEN}
+        pointerEvents="none"
+        testID="linear-swirl-decoration"
+        style={styles.decoration}
       >
-        <Svg width="100%" height="100%">
-          <Defs>
-            <LinearGradient id={gradientId} {...line}>
-              {stops.map((color, i) => (
-                <Stop
-                  key={i}
-                  offset={stops.length > 1 ? i / (stops.length - 1) : 0}
-                  stopColor={color}
-                />
-              ))}
-            </LinearGradient>
-          </Defs>
-          <Rect
-            x="0"
-            y="0"
-            width="100%"
-            height="100%"
-            fill={`url(#${gradientId})`}
-          />
-        </Svg>
-      </Animated.View>
+        <Animated.View
+          style={[
+            styles.slider,
+            { width: `${DRIFT_WIDTH * 100}%`, transform: [{ translateX }] },
+          ]}
+        >
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id={gradientId} {...line}>
+                {stops.map((color, i) => (
+                  <Stop
+                    key={i}
+                    offset={stops.length > 1 ? i / (stops.length - 1) : 0}
+                    stopColor={color}
+                  />
+                ))}
+              </LinearGradient>
+            </Defs>
+            <Rect
+              x="0"
+              y="0"
+              width="100%"
+              height="100%"
+              fill={`url(#${gradientId})`}
+            />
+          </Svg>
+        </Animated.View>
+      </View>
       {children}
     </View>
   );
@@ -174,66 +182,67 @@ function wedgePath(
   return `M${centre} ${centre}L${point(from)}A${radius} ${radius} 0 0 1 ${point(to)}Z`;
 }
 
-/** The wedges of a conic gradient: one path and one colour each. */
+/** The wedges of a conic gradient: one path and one colour each. Wedge 0 starts at 12 o'clock. */
 export function conicWedges(stops: string[], size: number) {
   const centre = size / 2;
   const step = (Math.PI * 2) / CONIC_WEDGES;
+  const top = -Math.PI / 2;
   // Each wedge runs a hair past its slice so no seam shows between neighbours.
   const overlap = step * 0.04;
   return Array.from({ length: CONIC_WEDGES }, (_, i) => ({
-    d: wedgePath(centre, centre, i * step, (i + 1) * step + overlap),
-    fill: colorAround(stops, i / CONIC_WEDGES),
+    d: wedgePath(
+      centre,
+      centre,
+      top + i * step,
+      top + (i + 1) * step + overlap,
+    ),
+    // The middle of the slice, so the colours are balanced round the wheel.
+    fill: colorAround(stops, (i + 0.5) / CONIC_WEDGES),
   }));
 }
 
 type ConicSwirlProps = {
+  /** 3- or 6-digit hex colours only (for example #fff or #ffffff). */
   stops: string[];
   size: number;
-  /** Time for one full turn. */
+  /** Time for one full turn: sets the speed. */
   spinMs: number;
+  testID?: string;
 };
 
 /**
- * A conic (colour wheel) gradient that turns slowly. SVG has no conic gradient, so the circle is
- * drawn as many thin wedges, each one flat colour.
+ * A conic (colour wheel) gradient that turns for about 5 seconds, then rests. SVG has no conic gradient, so the circle is
+ * drawn as many thin wedges, each one flat colour. With no stops it draws nothing.
  */
-export function ConicSwirl({ stops, size, spinMs }: ConicSwirlProps) {
-  const id = useId();
+export function ConicSwirl({ stops, size, spinMs, testID }: ConicSwirlProps) {
   const turn = useRef(new Animated.Value(0)).current;
-  useLoop(() =>
-    Animated.loop(
-      Animated.timing(turn, {
-        toValue: 1,
-        duration: spinMs,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    ),
+  // spinMs is the time for one full turn, so a 5 s pass turns 5000 / spinMs of a turn.
+  useSettle(() =>
+    Animated.timing(turn, {
+      toValue: SETTLE_MS / spinMs,
+      duration: SETTLE_MS,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }),
   );
-  const wedges = useMemo(() => conicWedges(stops, size), [stops, size]);
+  const wedges = useMemo(
+    () => (stops.length === 0 ? [] : conicWedges(stops, size)),
+    [stops, size],
+  );
   const rotate = turn.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-  const clipId = `swirl-clip-${id}`;
   return (
     <Animated.View
       {...HIDDEN}
+      pointerEvents="none"
+      testID={testID}
       style={{ width: size, height: size, transform: [{ rotate }] }}
     >
       <Svg width={size} height={size}>
-        <Defs>
-          <ClipPath id={clipId}>
-            <Circle cx={size / 2} cy={size / 2} r={size / 2} />
-          </ClipPath>
-        </Defs>
         {wedges.map((wedge, i) => (
-          <Path
-            key={i}
-            d={wedge.d}
-            fill={wedge.fill}
-            clipPath={`url(#${clipId})`}
-          />
+          <Path key={i} d={wedge.d} fill={wedge.fill} />
         ))}
       </Svg>
     </Animated.View>
@@ -241,6 +250,7 @@ export function ConicSwirl({ stops, size, spinMs }: ConicSwirlProps) {
 }
 
 const styles = StyleSheet.create({
-  fill: { ...StyleSheet.absoluteFill, overflow: 'hidden' },
+  outer: { overflow: 'hidden' },
+  decoration: { ...StyleSheet.absoluteFill, overflow: 'hidden' },
   slider: { position: 'absolute', top: 0, bottom: 0, left: 0 },
 });
