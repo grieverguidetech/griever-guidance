@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { StyleSheet } from 'react-native';
+import { v2 } from '@griever/tokens';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { ActionBar } from '../ActionBar';
 import { Sending } from './Sending';
@@ -51,6 +52,18 @@ describe('Sending (mobile)', () => {
     const strip = screen.UNSAFE_getAllByProps({ importantForAccessibility: 'no-hide-descendants' }).find((node) => typeof node.type === 'string');
     expect(strip?.props.accessibilityElementsHidden).toBe(true);
     expect(strip?.props.children).toHaveLength(3);
+  });
+
+  it('draws the current segment as a hollow ring of the done colour, so it differs from done by shape', () => {
+    render(<Sending {...base({ segments: ['done', 'current', 'waiting'] })} />);
+    const strip = screen.UNSAFE_getAllByProps({ importantForAccessibility: 'no-hide-descendants' }).find((node) => typeof node.type === 'string');
+    const [done, current, waiting] = (strip?.props.children as Array<{ props: { style: unknown } }>).map((child) => StyleSheet.flatten(child.props.style as never) as Record<string, unknown>);
+    expect(done.backgroundColor).toBe(v2.roles.link);
+    expect(current.borderColor).toBe(v2.roles.link);
+    expect(current.borderWidth).toBe(2);
+    expect(current.backgroundColor).toBe(v2.roles.page.color);
+    expect(current.backgroundColor).not.toBe(done.backgroundColor);
+    expect(waiting.borderWidth).toBeUndefined();
   });
 
   it('shows the name as the page heading at 28 points or more', () => {

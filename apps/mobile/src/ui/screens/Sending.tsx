@@ -262,7 +262,8 @@ const styles = StyleSheet.create({
   track: { flexDirection: 'row', gap: spacing[1] },
   segment: { flex: 1, height: 6, borderRadius: v2.recipes.field.radius, backgroundColor: v2.primitives.colors.fieldFill },
   segmentDone: { backgroundColor: v2.roles.link },
-  segmentCurrent: { backgroundColor: v2.primitives.colors.ocean },
+  // Current is a hollow ring of the done colour: told apart from done by shape, not by shade.
+  segmentCurrent: { backgroundColor: v2.roles.page.color, borderWidth: 2, borderColor: v2.roles.link },
   who: { gap: spacing[1] },
   name: { fontSize: NAME_FONT_SIZE, color: v2.roles.ink },
   input: {
