@@ -178,7 +178,7 @@ describe('ServiceSection', () => {
     expect(preview()).not.toHaveTextContent('Hall');
     await add('Add reception');
     await userEvent.type(screen.getByRole('textbox', { name: 'Reception Place' }), 'Hall');
-    expect(preview().querySelector('p.font-serif')?.textContent).toBe('A reception will be held at Hall.');
+    expect(preview().querySelector('p.whitespace-pre-line')?.textContent).toBe('A reception will be held at Hall.');
     expect(screen.queryByLabelText('Message')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
   });
@@ -213,7 +213,7 @@ describe('ServiceSection', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Use the details above' }));
     expect(patches.at(-1)).toEqual({ serviceMessage: undefined });
     expect(screen.queryByLabelText('Message')).toBeNull();
-    expect(preview().querySelector('p.font-serif')?.textContent).toBe("Margaret Hayes' service will be held June 3, 2026.");
+    expect(preview().querySelector('p.whitespace-pre-line')?.textContent).toBe("Margaret Hayes' service will be held June 3, 2026.");
     expect(screen.queryByRole('button', { name: 'Use the details above' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Change the words' })).toHaveFocus();
   });
@@ -233,7 +233,7 @@ describe('ServiceSection', () => {
     await change();
     await userEvent.type(message(), ' Thank you.');
     await userEvent.click(screen.getByRole('button', { name: 'Done' }));
-    expect(preview().querySelector('p.font-serif')?.textContent).toMatch(/ Thank you\.$/);
+    expect(preview().querySelector('p.whitespace-pre-line')?.textContent).toMatch(/ Thank you\.$/);
     expect(screen.getByRole('button', { name: 'Use the details above' })).toBeInTheDocument();
   });
 

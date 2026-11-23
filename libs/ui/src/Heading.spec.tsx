@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { Heading } from './Heading';
+import { Platform } from 'react-native';
+import { colors, v2 } from '@griever/tokens';
+import { Heading, headingColor } from './Heading';
 import type { HeadingLevel } from './Heading';
 
 describe('Heading', () => {
@@ -16,5 +18,23 @@ describe('Heading', () => {
   it('is a real h3 element for level 3', () => {
     render(<Heading level={3}>Subtitle</Heading>);
     expect(screen.getByRole('heading', { level: 3 }).tagName).toBe('H3');
+  });
+
+  it('uses the v2 heading colour var on web and ink on native', () => {
+    expect(headingColor()).toBe('var(--color-v2-heading)');
+    vi.spyOn(Platform, 'OS', 'get').mockReturnValue('ios');
+    expect(headingColor()).toBe(colors.ink);
+    vi.restoreAllMocks();
+  });
+
+  it('level 1 uses the v2 heading weight and level 2 the regular weight on web', () => {
+    render(
+      <>
+        <Heading level={1}>Big</Heading>
+        <Heading level={2}>Smaller</Heading>
+      </>,
+    );
+    expect(getComputedStyle(screen.getByRole('heading', { level: 1 })).fontWeight).toBe(String(v2.roles.heading.weight));
+    expect(getComputedStyle(screen.getByRole('heading', { level: 2 })).fontWeight).toBe(String(v2.primitives.font.weights.regular));
   });
 });

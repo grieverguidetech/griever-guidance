@@ -313,7 +313,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
             />
           </div>
         ) : messageText ? (
-          <p className="font-serif text-lg leading-relaxed whitespace-pre-line">{messageText}</p>
+          <p className="text-lg leading-relaxed whitespace-pre-line">{messageText}</p>
         ) : (
           <p className="gg-hint">{copy.previewEmpty}</p>
         )}

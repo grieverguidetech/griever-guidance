@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-/* Source Serif 4 is loaded via <link> in index.html (keeps @import rules from
+/* Sora (300, 400, 500) is loaded via <link> in index.html (keeps @import rules from
    tripping over Tailwind's injected layers). */
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -43,18 +43,23 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: var(--font-serif);
-  font-size: 15px;
+  font-family: var(--font-v2);
+  font-size: var(--v2-body-size);
+  font-weight: var(--v2-weight-regular);
+  /* Sora has no italic: italics show upright, like mobile. */
+  font-synthesis-style: none;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-v2);
+  font-weight: var(--v2-weight-regular);
+  color: var(--color-v2-heading);
   line-height: 1.14;
   letter-spacing: -0.015em;
 }
+h1 { font-weight: var(--v2-heading-weight); }
 
 ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
 :focus { outline: none; }
@@ -127,8 +132,8 @@ h1, h2, h3, h4, h5, h6 {
     gap: 6px;
     min-height: 44px;
     padding: var(--space-2) calc(var(--space-3) * 1.2);
-    font-family: var(--font-serif);
-    font-weight: 600;
+    font-family: var(--font-v2);
+    font-weight: var(--v2-weight-medium);
     font-size: 14px;
     line-height: 1.2;
     color: var(--color-text);
@@ -183,14 +188,14 @@ h1, h2, h3, h4, h5, h6 {
   .gg-card-selectable { cursor: pointer; }
   .gg-card-selected { outline: 2px solid var(--color-accent); outline-offset: -2px; }
   .gg-card-kicker {
-    font-size: 10px;
-    letter-spacing: 0.1em;
+    font-size: var(--v2-eyebrow-size);
+    letter-spacing: var(--v2-eyebrow-tracking);
     text-transform: uppercase;
-    color: var(--color-accent-700);
+    color: var(--color-v2-eyebrow);
   }
   .gg-card-title {
-    font-family: var(--font-serif);
-    font-weight: 600;
+    font-family: var(--font-v2);
+    font-weight: var(--v2-weight-regular);
     font-size: 17px;
     line-height: 1.2;
   }
@@ -352,10 +357,10 @@ h1, h2, h3, h4, h5, h6 {
 
   /* — misc — */
   .gg-eyebrow {
-    font-size: 10px;
-    letter-spacing: 0.1em;
+    font-size: var(--v2-eyebrow-size);
+    letter-spacing: var(--v2-eyebrow-tracking);
     text-transform: uppercase;
-    color: var(--text-eyebrow);
+    color: var(--color-v2-eyebrow);
   }
   .gg-reassure {
     font-style: italic;

@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Platform, StyleSheet, Text } from 'react-native';
 import { colors } from '@griever/tokens';
 import { useSerifStyle } from './typography';
 
@@ -13,6 +13,13 @@ export interface HeadingProps {
   headingRef?: ComponentProps<typeof Text>['ref'];
 }
 
+const webHeadingColor = 'var(--color-v2-heading)';
+
+/** Web reads the v2 heading var; native keeps ink. (jsdom drops a var() colour, so tests call this.) */
+export function headingColor(): string {
+  return Platform.OS === 'web' ? webHeadingColor : colors.ink;
+}
+
 const sizeByLevel: Record<HeadingLevel, number> = { 1: 22, 2: 17, 3: 15, 4: 14, 5: 13, 6: 12 };
 
 /**
@@ -24,9 +31,13 @@ function headingProps(level: HeadingLevel): Record<string, unknown> {
 }
 
 export function Heading({ level, children, headingRef }: HeadingProps) {
-  const font = useSerifStyle('semibold');
+  // Web (Sora): h1 is light, the rest regular. Native keeps its semibold face.
+  const webWeight = level === 1 ? 'heading' : 'regular';
+  const font = useSerifStyle(Platform.OS === 'web' ? webWeight : 'semibold');
+  // On web the heading colour comes from the v2 var, so a brand change reaches every heading.
+  const color = headingColor();
   return (
-    <Text ref={headingRef} style={[styles.base, font, { fontSize: sizeByLevel[level] }]} {...headingProps(level)}>
+    <Text ref={headingRef} style={[styles.base, font, { color }, { fontSize: sizeByLevel[level] }]} {...headingProps(level)}>
       {children}
     </Text>
   );
