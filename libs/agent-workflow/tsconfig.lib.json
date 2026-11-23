@@ -7,7 +7,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
-    "lib": ["es2022", "dom"]
+    "lib": ["es2022"]
   },
   "exclude": ["out-tsc", "dist", "src/**/*.spec.ts", "src/**/*.test.ts"],
   "include": ["src/**/*.ts"],

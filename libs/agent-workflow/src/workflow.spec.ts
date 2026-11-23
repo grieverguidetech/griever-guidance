@@ -1,12 +1,22 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { checklistDetail } from '@griever/copy';
 import { screenCopy } from '@griever/copy';
 import {
   CHECKLIST_PHASES,
+  DISPOSITIONS,
   TIME_PHASE_KEYS,
   computeChecklist,
 } from '@griever/shared';
 import type { ChecklistItemId, Situation } from '@griever/shared';
 import { nextStep, startWorkflow } from './workflow.js';
+
+vi.mock('@griever/copy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@griever/copy')>();
+  return {
+    ...actual,
+    checklistDetail: vi.fn((id: string) => (id === 'custody' ? null : actual.checklistDetail(id))),
+  };
+});
 
 const undecided: Situation = { disposition: 'undecided' };
 
@@ -61,14 +71,43 @@ describe('startWorkflow', () => {
 });
 
 describe('nextStep', () => {
-  it('equals computeChecklist().nextItem for every prefix of done ids', () => {
-    for (let n = 0; n <= timeIds.length; n += 1) {
-      const done = timeIds.slice(0, n);
-      const checklist = Object.fromEntries(done.map((id) => [id, 'done' as const]));
-      expect(nextStep(undecided, done).next?.id ?? null).toBe(
-        computeChecklist({ checklist }).nextItem,
-      );
+  it('equals computeChecklist() for every prefix of done ids and every disposition', () => {
+    for (const disposition of DISPOSITIONS) {
+      for (let n = 0; n <= timeIds.length; n += 1) {
+        const done = timeIds.slice(0, n);
+        const checklist: Partial<Record<ChecklistItemId, 'done'>> = Object.fromEntries(
+          done.map((id) => [id, 'done' as const]),
+        );
+        if (disposition !== 'undecided') {
+          checklist['burial-or-cremation'] = 'done';
+        }
+        const expected = computeChecklist({ checklist });
+        const result = nextStep({ disposition }, done);
+        expect(result.next?.id ?? null).toBe(expected.nextItem);
+        expect(result.phase).toBe(expected.currentPhase);
+      }
     }
+  });
+
+  it('matches computeChecklist when done ids are out of order', () => {
+    const done: ChecklistItemId[] = ['headstone', listIds[0]];
+    const expected = computeChecklist({
+      checklist: Object.fromEntries(done.map((id) => [id, 'done' as const])),
+    });
+    const result = nextStep(undecided, done);
+    expect(result.next?.id ?? null).toBe(expected.nextItem);
+    expect(result.phase).toBe(expected.currentPhase);
+  });
+
+  it('does not skip burial-or-cremation for an unknown disposition', () => {
+    expect(walk({ disposition: 'other' as never })).toContain('burial-or-cremation');
+  });
+
+  it('falls back to the coming-soon line when a detail is missing', () => {
+    const { next } = nextStep(undecided, ['pronouncement']);
+    expect(checklistDetail('custody')).toBeNull();
+    expect(next?.id).toBe('custody');
+    expect(next?.whatItIs).toBe(screenCopy('cmsChecklist').comingSoon);
   });
 
   it('never returns an obituary or planning-service item', () => {

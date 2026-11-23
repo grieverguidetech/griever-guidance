@@ -69,7 +69,7 @@ function stateFor(situation: Situation, done: readonly string[]): ChecklistField
       checklist[id as ChecklistItemId] = 'done';
     }
   }
-  if (situation.disposition !== 'undecided') {
+  if (situation.disposition === 'burial' || situation.disposition === 'cremation') {
     checklist['burial-or-cremation'] = 'done';
   }
   return { checklist };
