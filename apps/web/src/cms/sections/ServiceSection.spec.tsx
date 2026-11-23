@@ -68,7 +68,7 @@ describe('ServiceSection', () => {
       const b = screen.getByRole('button', { name });
       expect(b).not.toHaveAttribute('aria-expanded');
       expect(b).not.toHaveAttribute('aria-controls');
-      expect(b).toHaveClass('gg-chip', 'min-h-[44px]', 'text-accent-700');
+      expect(b).toHaveClass('gg-chip', 'min-h-[44px]', 'text-v2-link');
       expect(within(b).getByTestId('add-icon')).toHaveAttribute('aria-hidden', 'true');
     }
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();

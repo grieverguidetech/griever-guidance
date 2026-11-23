@@ -49,7 +49,7 @@ export function Home({ sessions, onOpen, onCreate, canCreate, checklistLink }: P
                   style={{
                     minHeight: 44,
                     // Opaque ink/bg mix: 3.16:1 against the page background.
-                    border: '1px solid color-mix(in srgb, var(--color-ink) 50%, var(--color-bg))',
+                    border: '1px solid color-mix(in srgb, var(--color-text) 50%, var(--color-v2-page))',
                   }}
                 >
                   <span className="flex flex-col min-w-0 break-words">

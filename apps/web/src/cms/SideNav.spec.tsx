@@ -138,9 +138,9 @@ describe('SideNav', () => {
   it('styles the current item beyond aria-current', () => {
     setup({ section: 'service' });
     const current = screen.getByRole('button', { name: /^Service/ });
-    expect(current).toHaveClass('bg-accent-100', 'shadow-[inset_3px_0_0_var(--color-accent-700)]');
+    expect(current).toHaveClass('bg-v2-wash', 'shadow-[inset_3px_0_0_var(--color-v2-link)]');
     expect(current).not.toHaveClass('font-semibold');
-    expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveClass('bg-accent-100');
+    expect(screen.getByRole('button', { name: 'Overview' })).not.toHaveClass('bg-v2-wash');
   });
 
   it('on The person screen marks Who you\'ve lost current, and says so in the phone menu button', () => {

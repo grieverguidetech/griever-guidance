@@ -35,7 +35,7 @@ export function AccordionSection({
       <Heading id={headingId} className="m-0">
         <button
           type="button"
-          className="flex min-h-11 w-full items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          className="flex min-h-11 w-full items-center gap-2 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-v2-link"
           aria-expanded={open}
           aria-controls={panelId}
           onClick={onToggle}
@@ -55,7 +55,7 @@ export function AccordionSection({
                 size={20}
                 weight="bold"
                 aria-hidden="true"
-                className="shrink-0 text-success-700"
+                className="shrink-0 text-v2-success"
               />
               <span className="sr-only">{doneLabel}</span>
             </>

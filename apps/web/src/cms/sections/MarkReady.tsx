@@ -110,7 +110,7 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
         </p>
       </div>
       {blocked ? (
-        <p id={blockedId} className="m-0 text-[13px] font-semibold leading-[1.5] text-[var(--color-error)]">
+        <p id={blockedId} className="m-0 text-[13px] font-semibold leading-[1.5] text-[var(--color-v2-error)]">
           {blockedMessage}
         </p>
       ) : null}

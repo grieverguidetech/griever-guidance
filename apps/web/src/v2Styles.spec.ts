@@ -96,8 +96,8 @@ describe('styles.css type roles', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('keeps the eyebrow colour at 4.5:1 or more on --color-surface', () => {
-    const surface = /--color-surface:\s*(#[0-9a-f]{6})/i.exec(theme)?.[1];
+  it('keeps the eyebrow colour at 4.5:1 or more on --color-v2-field-fill', () => {
+    const surface = /--color-v2-field-fill:\s*(#[0-9a-f]{6})/i.exec(theme)?.[1];
     expect(surface).toBeDefined();
     expect(contrast(v2.roles.eyebrow.color, surface as string)).toBeGreaterThanOrEqual(4.5);
   });
@@ -226,7 +226,7 @@ describe('styles.css glass cards and panels', () => {
   });
 
   it('keeps the 2px selected ring', () => {
-    expect(rule('.gg-card-selected')).toContain('outline: 2px solid var(--color-accent)');
+    expect(rule('.gg-card-selected')).toContain('outline: 2px solid var(--color-v2-focus)');
   });
 
   it('gives panel inputs the v2 field fill and edge (focus comes from the unlayered .gg-input ring)', () => {
@@ -236,10 +236,10 @@ describe('styles.css glass cards and panels', () => {
 
   it('shows keyboard focus on a selected card with a second ring outside the selection ring', () => {
     const focused = rule('.gg-card-selected:focus-visible');
-    expect(focused).toContain('var(--color-accent-700)');
+    expect(focused).toContain('var(--color-v2-link)');
     expect(focused).toContain('box-shadow');
     for (const ground of grounds) {
-      expect(contrast(themeVar('--color-accent-700'), themeVar(ground)), ground).toBeGreaterThanOrEqual(3);
+      expect(contrast(themeVar('--color-v2-link'), themeVar(ground)), ground).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -366,8 +366,8 @@ describe('styles.css swirl buttons', () => {
     expect(decls('.gg-btn-secondary')).toContain('border-color: var(--color-v2-secondary-border)');
 
     const pressed = decls("button[data-gg-btn='secondary'][aria-pressed='true']", unlayered);
-    expect(pressed).toContain('background-color: var(--color-accent-100)');
-    expect(decls(".gg-btn-secondary[aria-pressed='true']")).toContain('background-color: var(--color-accent-100)');
+    expect(pressed).toContain('background-color: var(--color-v2-wash)');
+    expect(decls(".gg-btn-secondary[aria-pressed='true']")).toContain('background-color: var(--color-v2-wash)');
 
     for (const variant of ['primary', 'secondary']) {
       const disabled = decls(`button[data-gg-btn='${variant}'][aria-disabled='true']`, unlayered);
@@ -484,25 +484,25 @@ describe('styles.css swirl buttons', () => {
     expect(contrast(hexVar('--color-v2-secondary-text'), page)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps a pressed toggle secondary as a flat accent-100 tint with no swirl or animation, label 4.5:1 or more', () => {
+  it('keeps a pressed toggle secondary as a flat wash tint with no swirl or animation, label 4.5:1 or more', () => {
     const decl = decls(".gg-btn-secondary[aria-pressed='true']");
     expect(decl).toContain('background-image: none');
-    expect(decl).toContain('background-color: var(--color-accent-100)');
+    expect(decl).toContain('background-color: var(--color-v2-wash)');
     expect(decl).toContain('animation: none');
-    expect(contrast(hexVar('--color-v2-secondary-text'), hexVar('--color-accent-100'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(hexVar('--color-v2-secondary-text'), hexVar('--color-v2-wash'))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('draws the swirl focus ring in accent-700 (4.5:1 or more on the page, glows and glass), unlayered, with no outline removal', () => {
+  it('draws the swirl focus ring in the link colour (4.5:1 or more on the page, glows and glass), unlayered, with no outline removal', () => {
     const selector = '.gg-btn-primary:focus-visible';
     const at = css.indexOf(selector);
     const layerEnd = css.lastIndexOf('\n}\n', at);
     // Unlayered: the @layer block that holds the components has closed before this rule.
     expect(block('@layer components')).not.toContain(selector);
     expect(layerEnd).toBeGreaterThan(0);
-    expect(decls(selector)).toContain('outline-color: var(--color-accent-700)');
-    expect(decls('.gg-btn-secondary:focus-visible')).toContain('outline-color: var(--color-accent-700)');
+    expect(decls(selector)).toContain('outline-color: var(--color-v2-link)');
+    expect(decls('.gg-btn-secondary:focus-visible')).toContain('outline-color: var(--color-v2-link)');
     for (const ground of [...grounds, ...glassOver]) {
-      expect(contrast(hexVar('--color-accent-700'), ground)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(hexVar('--color-v2-link'), ground)).toBeGreaterThanOrEqual(4.5);
     }
     const rules = ['.gg-btn-primary', '.gg-btn-secondary', ".gg-btn-primary[aria-disabled='true']", ".gg-btn-secondary[aria-disabled='true']"].map((s) => decls(s)).join('\n');
     expect(rules).not.toMatch(/pointer-events|outline/);
@@ -535,7 +535,7 @@ describe('styles.css swirl buttons', () => {
       }
       return readFileSync(file, 'utf8')
         .split('\n')
-        .filter((line) => /gg-btn-(?:primary|secondary)/.test(line) && /(?:^|[\s'"`:])(?:animate-|bg-)/.test(line.replace(/aria-pressed:bg-accent-100/g, '')))
+        .filter((line) => /gg-btn-(?:primary|secondary)/.test(line) && /(?:^|[\s'"`:])(?:animate-|bg-)/.test(line.replace(/aria-pressed:bg-v2-wash/g, '')))
         .map((line) => `${file}: ${line.trim()}`);
     });
     expect(offenders).toEqual([]);
@@ -588,7 +588,7 @@ describe('styles.css phone nudge (#1003)', () => {
     expect(card).toMatch(/border:\s*var\(--v2-border-thin\) solid var\(--color-v2-nudge-border\)/);
     expect(card).toContain('box-shadow: var(--v2-nudge-shadow)');
     expect(card).toContain('border-radius: var(--v2-radius)');
-    expect(card).not.toMatch(/--shadow-md|--color-accent-100/);
+    expect(card).not.toMatch(/--shadow-md|--color-v2-wash/);
   });
 
   it('draws the orb as a conic gradient that takes no pointer events, and the speckles inside the card, faint and small', () => {
@@ -779,7 +779,7 @@ describe('done mark swirl contrast (#1004)', () => {
     ...grounds.map((g): [string, string] => [g, themeVar(g)]),
     ...grounds.map((g): [string, string] => [`glass over ${g}`, glassOver(g)]),
     ['sheet and field fill', themeVar('--color-v2-field-fill')],
-    ['accent-100', themeVar('--color-accent-100')],
+    ['wash', themeVar('--color-v2-wash')],
   ];
 
   it('has the three recipe stops', () => {

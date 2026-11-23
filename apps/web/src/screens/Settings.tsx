@@ -67,7 +67,7 @@ export function SettingsBody({ onRemoveEverything, signsOut = false, removeMembe
 
       <section
         aria-labelledby="remove-heading"
-        className="flex flex-col gap-3 pt-4 mt-[var(--space-4)] border-t border-solid border-[color:var(--color-divider)] first:mt-0 first:pt-0 first:border-t-0"
+        className="flex flex-col gap-3 pt-4 mt-[var(--space-4)] border-t border-solid border-[color:var(--color-v2-divider)] first:mt-0 first:pt-0 first:border-t-0"
       >
         <Heading id="remove-heading" className="text-[16px] m-0">
           Remove everything from this device

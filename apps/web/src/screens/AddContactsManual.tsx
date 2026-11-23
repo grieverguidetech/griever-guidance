@@ -100,13 +100,13 @@ export function AddContactsManual({ contacts, onBack, onAdd, onDone, draft, onDr
           checked={hearsFirst}
           onChange={(e) => setHearsFirst(e.target.checked)}
         />
-        <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-accent)]">
+        <span className="flex items-center gap-3 rounded-md peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--color-v2-focus)]">
           {hearsFirst ? (
             <CheckCircle
               aria-hidden="true"
               size={20}
               weight="fill"
-              style={{ color: 'var(--color-accent)' }}
+              style={{ color: 'var(--color-v2-focus)' }}
             />
           ) : (
             <Circle

@@ -42,7 +42,7 @@ function CheckIcon({ name }: { name: string }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="shrink-0 text-[color:var(--color-success-700)]"
+      className="shrink-0 text-[color:var(--color-v2-success)]"
     >
       <path d="M3 8.5l3.2 3.2L13 4.8" />
     </svg>
@@ -167,7 +167,7 @@ export function SideNav({ personName, section, onSelect, statuses = {}, noCurren
               }
               const current = !noCurrent && key === navKeyFor(section);
               const href = hrefFor?.(key) ?? null;
-              const className = `gg-row flex-wrap ${current ? 'bg-accent-100 shadow-[inset_3px_0_0_var(--color-accent-700)]' : ''}`;
+              const className = `gg-row flex-wrap ${current ? 'bg-v2-wash shadow-[inset_3px_0_0_var(--color-v2-link)]' : ''}`;
               const label = (
                 <>
                   <span>{navTitle(key)}</span>
