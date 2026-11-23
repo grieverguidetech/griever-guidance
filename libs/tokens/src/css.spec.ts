@@ -251,6 +251,18 @@ describe('toWebThemeCss with v2', () => {
     expect(root['--v2-drift-ms']).toBe('9000ms');
   });
 
+  it('writes the nudge speckle colours, alpha and orb from the nudge recipe', () => {
+    const { speckles, orb } = v2.recipes.nudge;
+    expect(speckles.colors).toHaveLength(4);
+    speckles.colors.forEach((color, i) => {
+      expect(theme[`--color-v2-nudge-speckle-${i + 1}`]).toBe(color);
+    });
+    expect(root['--v2-nudge-speckle-alpha']).toBe(String(speckles.alpha));
+    expect(root['--v2-nudge-orb-size']).toBe(`${orb.size}px`);
+    expect(root['--v2-nudge-orb-turn']).toBe('135deg');
+    expect(root['--v2-nudge-orb']).toBe(`conic-gradient(${[...orb.conic, orb.conic[0]].join(', ')})`);
+  });
+
   it('maps ink to --color-text and writes the page colour and both glows', () => {
     expect(theme['--color-text']).toBe(v2.roles.ink);
     expect(theme['--color-v2-page']).toBe(v2.roles.page.color);
@@ -342,6 +354,10 @@ describe('toWebThemeCss with v2', () => {
     p.border.medium = 2.5;
     p.border.thin = 0.5;
     p.motion.spinMs = 7000;
+    p.speckleAlpha = 0.5;
+    p.size.orb = 30;
+    p.colors.lavender = '#111111';
+    p.colors.ocean = '#222222';
     p.font.weights.medium = 600;
     const roles = buildRoles(p);
     const changed = toWebThemeCss({
@@ -369,6 +385,13 @@ describe('toWebThemeCss with v2', () => {
     expect(r['--v2-border-thin']).toBe('0.5px');
     expect(r['--v2-spin-ms']).toBe('7000ms');
     expect(r['--v2-weight-medium']).toBe('600');
+    expect(t['--color-v2-nudge-speckle-1']).toBe('#111111');
+    expect(t['--color-v2-nudge-speckle-4']).toBe('#222222');
+    expect(r['--v2-nudge-speckle-alpha']).toBe('0.5');
+    expect(r['--v2-nudge-orb-size']).toBe('30px');
+    // settle 3000 of a 7000 turn
+    expect(r['--v2-nudge-orb-turn']).toBe(`${(360 * 3000) / 7000}deg`);
+    expect(r['--v2-nudge-orb']).toBe('conic-gradient(#222222, #279084, #111111, #f6c56b, #222222)');
   });
 });
 

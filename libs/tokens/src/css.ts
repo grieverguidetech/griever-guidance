@@ -88,6 +88,11 @@ function gradientCss(swirl: Gradient): string {
   return `linear-gradient(${swirl.angle}deg, ${swirl.stops.join(', ')})`;
 }
 
+/** `conic-gradient(a, b, c, a)`: the stops round the circle, the last blending back into the first (as mobile's ConicSwirl does). */
+function conicCss(stops: readonly string[]): string {
+  return `conic-gradient(${[...stops, stops[0]].join(', ')})`;
+}
+
 /** `0 1px 9px rgba(...)`, one entry per shadow, joined by commas. */
 function shadowCss(shadows: readonly Shadow[]): string {
   return shadows.map((s) => `${s.x}px ${s.y}px ${s.blur}px ${s.color}`).join(', ');
@@ -178,6 +183,7 @@ export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): str
     ['color-v2-card-border', card.border.color],
     ['color-v2-nudge-text', nudge.text.color],
     ['color-v2-nudge-border', nudge.border.color],
+    ...nudge.speckles.colors.map((color, i): [string, string] => [`color-v2-nudge-speckle-${i + 1}`, color]),
     ['color-v2-open-ring', roles.doneMark.openRing],
   ];
   return lines.map(([name, value]) => `  --${name}: ${value};`);
@@ -195,6 +201,11 @@ export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): stri
     ['secondary-shadow', shadowCss(secondary.shadow)],
     ['card-shadow', shadowCss(card.shadow)],
     ['nudge-shadow', shadowCss(nudge.shadow)],
+    ['nudge-speckle-alpha', String(nudge.speckles.alpha)],
+    ['nudge-orb', conicCss(nudge.orb.conic)],
+    ['nudge-orb-size', `${nudge.orb.size}px`],
+    // One pass of the orb: settle time of a full turn, never more than one turn (the cap mobile's ConicSwirl uses).
+    ['nudge-orb-turn', `${(360 * primary.settleMs) / Math.max(roles.doneMark.spinMs, primary.settleMs)}deg`],
     ['radius', `${card.radius}px`],
     ['border-thin', `${primitives.border.thin}px`],
     ['border-medium', `${primitives.border.medium}px`],

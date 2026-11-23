@@ -70,7 +70,7 @@ interface Props {
   nudgeRef?: Ref<HTMLDivElement>;
 }
 
-/** One blue card for every section: a heading, one line saying where the sending happens, and Got it at the right.
+/** One pastel swirl card for every section: a heading, one line saying where the sending happens, and Got it at the right.
  * A labelled region the parent focuses when it appears, so the heading and line are announced once. The
  * focus moves by script and shows no visible ring (#803, .gg-phone-nudge:focus in styles.css). */
 export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
@@ -85,13 +85,21 @@ export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
       aria-describedby={lineId}
       className="gg-phone-nudge flex w-full flex-wrap items-end gap-x-4 gap-y-3 p-4 gg-enter"
     >
-      <div className="flex min-w-0 basis-56 flex-1 flex-col gap-1">
-        <h2 id={headingId} className="text-base font-semibold">
-          {HEADINGS[section]}
-        </h2>
-        <p id={lineId}>{LINES[section]}</p>
+      <span aria-hidden="true" className="gg-phone-nudge-speckles">
+        {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+          <span key={n} />
+        ))}
+      </span>
+      <div className="gg-phone-nudge-row flex min-w-0 flex-1 basis-56 items-start gap-2">
+        <span aria-hidden="true" className="gg-phone-nudge-orb" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h2 id={headingId} className="text-base font-semibold">
+            {HEADINGS[section]}
+          </h2>
+          <p id={lineId}>{LINES[section]}</p>
+        </div>
       </div>
-      <button type="button" className="gg-btn gg-btn-primary ml-auto min-h-[44px]" onClick={onDismiss}>
+      <button type="button" className="gg-btn gg-btn-primary relative z-[1] ml-auto min-h-[44px]" onClick={onDismiss}>
         {copy.phoneNudgeDismiss}
       </button>
     </div>

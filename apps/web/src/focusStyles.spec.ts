@@ -103,10 +103,11 @@ describe('visible focus (#162)', () => {
     }
   });
 
-  it('the phone nudge takes focus with no visible ring and keeps its shadow (#803)', () => {
+  it('the phone nudge takes focus with no visible ring and keeps the nudge shadow (#803, #1003)', () => {
     const declarations = rule('.gg-phone-nudge:focus,\n.gg-phone-nudge:focus-visible');
     expect(declarations).toMatch(/outline:\s*2px solid transparent/);
-    expect(declarations).toMatch(/box-shadow:\s*var\(--shadow-md\)/);
+    expect(declarations).toMatch(/box-shadow:\s*var\(--v2-nudge-shadow\)/);
+    expect(declarations).not.toMatch(/--shadow-md/);
     expect(declarations).not.toMatch(/accent-700/);
   });
 
