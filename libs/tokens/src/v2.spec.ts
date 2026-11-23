@@ -57,13 +57,11 @@ function leaves(value: unknown): string[] {
 }
 
 describe('v2 tokens: layers', () => {
-  it('lets every role and recipe colour resolve to a primitive', () => {
+  it('lets every string in the roles and recipes be a value from the primitives', () => {
     const known = new Set(leaves(primitives));
     for (const layer of [v2.roles, v2.recipes]) {
       for (const value of leaves(layer)) {
-        if (/^(#|rgba?\()/.test(value)) {
-          expect(known.has(value), value).toBe(true);
-        }
+        expect(known.has(value), value).toBe(true);
       }
     }
   });
@@ -118,7 +116,7 @@ describe('v2 tokens: contrast', () => {
   });
 
   it('gives nudge text at least 4.5:1 on every stop, with and without a speckle', () => {
-    const speckles = [c.lavender, c.sunset, c.sea, c.ocean];
+    const speckles = [c.lavender, c.sunGold, c.sea, c.ocean];
     for (const stop of g.pastel.stops) {
       expect(contrast(c.nudgeText, stop), stop).toBeGreaterThanOrEqual(4.5);
       for (const speckle of speckles) {

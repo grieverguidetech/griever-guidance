@@ -24,7 +24,7 @@ export function buildRecipes(r: Roles, p: Primitives) {
       secondary: {
         swirl: r.soft,
         driftMs: p.motion.driftMs,
-        text: { color: p.colors.secondaryText, weight: p.font.weights.medium },
+        text: { color: p.colors.secondaryText, weight: p.font.weights.regular },
         border: { width: p.border.medium, color: p.colors.secondaryBorder },
         shadow: [p.shadows.glass],
         radius: p.radius,
@@ -32,14 +32,15 @@ export function buildRecipes(r: Roles, p: Primitives) {
     },
     nudge: {
       swirl: r.nudge,
+      driftMs: p.motion.driftMs,
       speckles: {
-        colors: [p.colors.lavender, p.colors.sunset, p.colors.sea, p.colors.ocean],
+        colors: [p.colors.lavender, p.colors.sunGold, p.colors.sea, p.colors.ocean],
         alpha: p.speckleAlpha,
       },
       text: { color: p.colors.nudgeText, size: r.body.size },
       border: { width: p.border.thin, color: p.colors.nudgeBorder },
       shadow: [p.shadows.nudgeNear, p.shadows.nudgeFar],
-      orb: { size: p.size.orb, conic: [p.colors.ocean, p.colors.sea, p.colors.lavender, p.colors.sunset] },
+      orb: { size: p.size.orb, conic: [p.colors.ocean, p.colors.sea, p.colors.lavender, p.colors.sunGold] },
       radius: p.radius,
     },
     doneMark: r.doneMark,

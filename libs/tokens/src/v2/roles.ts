@@ -12,7 +12,7 @@ export function buildRoles(p: Primitives) {
       uppercase: true,
     },
     body: { size: p.size.body, weight: p.font.weights.regular, family: p.font.family },
-    page: { color: p.colors.page, glows: [p.colors.glowSun, p.colors.glowSky] },
+    page: { color: p.colors.page, glows: { topRight: p.colors.glowSun, bottomLeft: p.colors.glowSky } },
     /** The strong swirl: the primary action. */
     loud: p.gradients.sunset,
     /** The quiet swirl: secondary actions. */

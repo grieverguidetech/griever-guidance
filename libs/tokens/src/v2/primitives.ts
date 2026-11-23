@@ -18,7 +18,7 @@ const colors = {
   ocean: '#1e7bb8',
   sea: '#279084',
   lavender: '#7b6fd0',
-  sunset: '#f6c56b',
+  sunGold: '#f6c56b',
 
   glassFill: 'rgba(255,255,255,0.65)',
   glassBorder: 'rgba(255,255,255,0.95)',
@@ -73,7 +73,15 @@ export const primitives = {
   motion: { driftMs: 9000, spinMs: 12000 },
 } as const;
 
-type Widen<T> = T extends string ? string : T extends number ? number : T extends readonly string[] ? readonly string[] : T extends object ? { -readonly [K in keyof T]: Widen<T[K]> } : T;
+type Widen<T> = T extends string
+  ? string
+  : T extends number
+    ? number
+    : T extends readonly string[]
+      ? readonly string[]
+      : T extends object
+        ? { -readonly [K in keyof T]: Widen<T[K]> }
+        : T;
 
 /** The shape of the primitives with plain string and number types, so a fixture can swap values. */
 export type Primitives = Widen<typeof primitives>;
