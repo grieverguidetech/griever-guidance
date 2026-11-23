@@ -192,3 +192,55 @@ describe('Button colours', () => {
     expect(style.opacity === '' || style.opacity === '1').toBe(true);
   });
 });
+
+describe('Button swirl hook on web', () => {
+  const variants = ['primary', 'secondary', 'tinted', 'ghost', 'tertiary', 'header'] as const;
+
+  it.each(['primary', 'secondary'] as const)('puts data-gg-btn="%s" on the DOM node (react-native-web turns dataSet into data-*)', (variant) => {
+    render(<Button label="Go" onPress={vi.fn()} variant={variant} />);
+    expect(screen.getByRole('button', { name: 'Go' })).toHaveAttribute('data-gg-btn', variant);
+  });
+
+  it('is the default variant, so a plain button carries the primary hook', () => {
+    render(<Button label="Go" onPress={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Go' })).toHaveAttribute('data-gg-btn', 'primary');
+  });
+
+  it.each(variants.filter((v) => v !== 'primary' && v !== 'secondary'))('has no hook on the %s variant', (variant) => {
+    render(<Button label="Go" onPress={vi.fn()} variant={variant} />);
+    expect(screen.getByRole('button', { name: 'Go' })).not.toHaveAttribute('data-gg-btn');
+  });
+
+  it('drops the v1 fill on a swirl button, and keeps the tinted fill on the others', () => {
+    const { unmount } = render(<Button label="Go" onPress={vi.fn()} variant="primary" ariaDisabled />);
+    const swirl = getComputedStyle(screen.getByRole('button', { name: 'Go' }));
+    // jsdom reports rgb(), so assert the empty or transparent fill rather than comparing to hex tokens.
+    expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(swirl.backgroundColor);
+    unmount();
+    render(<Button label="Go" onPress={vi.fn()} variant="tinted" />);
+    expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).not.toContain(getComputedStyle(screen.getByRole('button', { name: 'Go' })).backgroundColor);
+  });
+
+  it('lets the label inherit the swirl text colour instead of the v1 page-colour label', () => {
+    render(<Button label="Go" onPress={vi.fn()} variant="primary" />);
+    const label = getComputedStyle(screen.getByText('Go'));
+    expect(label.color).toBe(getComputedStyle(screen.getByRole('button', { name: 'Go' })).color);
+    expect(label.color).not.toBe('rgb(243, 242, 242)');
+    expect(label.color).not.toBe('rgb(0, 103, 134)');
+    expect(label.fontFamily).toBe('inherit');
+    expect(label.fontWeight).toBe('inherit');
+    expect(['inherit', '']).toContain(label.fontSize);
+  });
+
+  it('keeps aria-disabled, focus and onPress on a swirl button that is unavailable', async () => {
+    const onPress = vi.fn();
+    render(<Button label="Go" onPress={onPress} variant="secondary" ariaDisabled />);
+    const button = screen.getByRole('button', { name: 'Go' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAttribute('data-gg-btn', 'secondary');
+    await userEvent.tab();
+    expect(button).toHaveFocus();
+    await userEvent.click(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});

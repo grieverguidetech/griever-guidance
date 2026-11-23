@@ -60,9 +60,10 @@ describe('Account', () => {
     const button = screen.getByRole('button', { name: 'Sign out' });
     await userEvent.click(button);
     expect(props.onSignOut).toHaveBeenCalledTimes(1);
-    // The header look has no fill; the primary Save has a solid one.
+    // The header look has no fill and no swirl hook; the primary Save is the swirl button on web.
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(getComputedStyle(button).backgroundColor);
-    expect(getComputedStyle(screen.getByRole('button', { name: 'Save' })).backgroundColor).not.toBe(getComputedStyle(button).backgroundColor);
+    expect(button).not.toHaveAttribute('data-gg-btn');
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('data-gg-btn', 'primary');
   });
 
   it('leaves Sign out out when there is no handler', () => {

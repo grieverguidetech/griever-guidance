@@ -168,11 +168,12 @@ describe('Hub', () => {
     }
   });
 
-  it('Edit person is the primary look: accent-700 fill, page-colour text', () => {
+  it('Edit person is the primary look: on web it carries the swirl hook, with no v1 accent-700 fill or page-colour label', () => {
     setup();
-    const style = getComputedStyle(screen.getByRole('button', { name: 'Edit person' }));
-    expect(style.backgroundColor).toBe('rgb(0, 103, 134)');
-    expect(getComputedStyle(screen.getByText('Edit person')).color).toBe('rgb(243, 242, 242)');
+    const button = screen.getByRole('button', { name: 'Edit person' });
+    expect(button).toHaveAttribute('data-gg-btn', 'primary');
+    expect(getComputedStyle(button).backgroundColor).not.toBe('rgb(0, 103, 134)');
+    expect(getComputedStyle(screen.getByText('Edit person')).color).not.toBe('rgb(243, 242, 242)');
   });
 
   it('keeps a locked step focusable, aria-disabled and explained, and it asks for the paywall', async () => {

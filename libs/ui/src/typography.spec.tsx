@@ -14,7 +14,7 @@ function renderAll(ready: boolean) {
     <SerifReadyContext.Provider value={ready}>
       <Eyebrow>Eyebrow text</Eyebrow>
       <Body>Body text</Body>
-      <Button label="Go" onPress={vi.fn()} />
+      <Button label="Go" onPress={vi.fn()} variant="tinted" />
     </SerifReadyContext.Provider>,
   );
 }
