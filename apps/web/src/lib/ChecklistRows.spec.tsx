@@ -34,15 +34,28 @@ describe('Checklist rows (#176)', () => {
     expect(await accountStore.getChecklistTicks()).toEqual([]);
   });
 
+  it('keeps a 44px target and a hidden mark: a ring when open, a swirl when ticked (#1004)', async () => {
+    const user = userEvent.setup();
+    renderList();
+    await loaded();
+    const insurance = row('Life insurance policies');
+    expect(insurance).toHaveClass('min-h-[44px]');
+    expect(insurance.querySelector('[data-testid="done-mark"]')).toHaveAttribute('aria-hidden', 'true');
+    expect(insurance.querySelector('[data-testid="done-mark-ring"]')).toBeInTheDocument();
+    await user.click(insurance);
+    expect(insurance.querySelector('[data-testid="done-mark-ring"]')).toBeNull();
+  });
+
   it('ticks a row on tap, strikes the text through, and unticks on a second tap', async () => {
     const user = userEvent.setup();
     renderList();
     await loaded();
     await user.click(row('Life insurance policies'));
     expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
-    // Strikethrough is not the only cue: the pressed state and the filled icon change too.
+    // Strikethrough is not the only cue: the pressed state and the done mark change too.
     expect(screen.getByText('Life insurance policies')).toHaveClass('line-through');
-    expect(row('Life insurance policies').querySelector('svg')).toBeInTheDocument();
+    expect(row('Life insurance policies').querySelector('[data-testid="done-mark-swirl"]')).toBeInTheDocument();
+    expect(row('Life insurance policies').querySelector('svg')).toBeNull();
     expect(row('Military discharge papers')).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(row('Life insurance policies'));

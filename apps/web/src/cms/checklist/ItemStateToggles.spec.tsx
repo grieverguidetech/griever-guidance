@@ -79,7 +79,8 @@ describe('ItemStateToggles', () => {
       const done = screen.getByRole('button', { name: 'Done' });
       expect(done).toHaveAttribute('aria-pressed', 'true');
       expect(done.textContent).toBe('');
-      expect(done.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(within(done).getByTestId('done-mark')).toHaveAttribute('aria-hidden', 'true');
+      expect(done.querySelector('svg')).toBeNull();
       expect(screen.queryByRole('button', { name: "Doesn't apply" })).toBeNull();
     });
 

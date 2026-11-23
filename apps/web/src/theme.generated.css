@@ -99,6 +99,10 @@
   --v2-nudge-orb: conic-gradient(#1e7bb8, #279084, #7b6fd0, #f6c56b, #1e7bb8);
   --v2-nudge-orb-size: 22px;
   --v2-nudge-orb-turn: 135deg;
+  --v2-done-mark-size: 16px;
+  --v2-done-mark-ring-width: 1.5px;
+  --v2-done-mark-swirl: conic-gradient(#1e7bb8, #279084, #7b6fd0, #1e7bb8);
+  --v2-done-mark-turn: 135deg;
   --v2-radius: 8px;
   --v2-border-thin: 1px;
   --v2-border-medium: 1.5px;

@@ -669,3 +669,127 @@ describe('styles.css phone nudge (#1003)', () => {
     }
   });
 });
+
+describe('styles.css done mark (#1004)', () => {
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const mediaStart = bare.indexOf('@media (prefers-reduced-motion: no-preference) {\n    .gg-done-mark-turn');
+  it('finds the no-preference block, so the slices below test the right text', () => {
+    expect(mediaStart).toBeGreaterThan(0);
+  });
+  /** The text of the braces that open at `open`, without the braces themselves. */
+  const block = (open: number) => {
+    let depth = 0;
+    for (let i = open; i < bare.length; i += 1) {
+      if (bare[i] === '{') {
+        depth += 1;
+      } else if (bare[i] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return { inner: bare.slice(open + 1, i), end: i };
+        }
+      }
+    }
+    throw new Error('Unbalanced braces');
+  };
+  const media = block(bare.indexOf('{', mediaStart));
+  const noPref = media.inner;
+  const outside = bare.slice(0, mediaStart) + bare.slice(media.end + 1);
+  const decls = (selector: string, source: string) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\>]/g, '\\$&');
+    const found = [...source.matchAll(new RegExp(`(?:^|\\n)\\s*${escaped}\\s*\\{([^{}]*)\\}`, 'g'))];
+    if (found.length === 0) {
+      throw new Error(`No rule for ${selector}`);
+    }
+    return found.map((m) => m[1]).join('\n');
+  };
+  const markRules = ['.gg-done-mark', '.gg-done-mark-swirl,\n  .gg-done-mark-ring', '.gg-done-mark-swirl', '.gg-done-mark-ring'];
+  const ms = (name: string) => parseInt(themeVar(name), 10);
+
+  it('takes the size, ring width, ring colour and swirl from the generated vars', () => {
+    expect(decls('.gg-done-mark', outside)).toContain('width: var(--v2-done-mark-size)');
+    expect(decls('.gg-done-mark', outside)).toContain('height: var(--v2-done-mark-size)');
+    expect(decls('.gg-done-mark-ring', outside)).toContain('border: var(--v2-done-mark-ring-width) solid var(--color-v2-open-ring)');
+    expect(decls('.gg-done-mark-swirl', outside)).toContain('background: var(--v2-done-mark-swirl)');
+    const { size, openWidth, swirl, openRing } = v2.recipes.doneMark;
+    expect(size).toBe(16);
+    expect(themeVar('--v2-done-mark-size')).toBe(`${size}px`);
+    expect(themeVar('--v2-done-mark-ring-width')).toBe(`${openWidth}px`);
+    expect(themeVar('--v2-done-mark-swirl')).toBe(`conic-gradient(${[...swirl, swirl[0]].join(', ')})`);
+    expect(themeVar('--color-v2-open-ring')).toBe(openRing);
+  });
+
+  it('turns one pass of the settle var (4.5 s at most) and rests (forwards), only inside a no-preference block', () => {
+    expect(outside).not.toMatch(/\.gg-done-mark[^{}]*\{[^{}]*\banimation/);
+    expect(outside).not.toMatch(/@keyframes gg-done-mark-turn/);
+    const anim = /animation:\s*([^;]+);/.exec(decls('.gg-done-mark-turn', noPref))?.[1] ?? '';
+    expect(anim).toContain('gg-done-mark-turn var(--v2-settle-ms)');
+    expect(anim).toMatch(/\bforwards\b/);
+    expect(anim).not.toMatch(/infinite|\bboth\b|alternate/);
+    expect(ms('--v2-settle-ms')).toBeLessThanOrEqual(4500);
+    expect(noPref).toMatch(/@keyframes gg-done-mark-turn/);
+    expect(noPref).toContain('rotate(var(--v2-done-mark-turn))');
+  });
+
+  it('paints the swirl in CanvasText under forced colours, where gradients are dropped', () => {
+    const forced = bare.slice(bare.indexOf('@media (forced-colors: active) {\n    .gg-done-mark-swirl'));
+    expect(forced).toMatch(/^@media \(forced-colors: active\) \{\n    .gg-done-mark-swirl \{ background: CanvasText; \}/);
+  });
+
+  it('turns by settle / spin of a full turn, capped at one turn', () => {
+    const expected = (360 * ms('--v2-settle-ms')) / Math.max(ms('--v2-spin-ms'), ms('--v2-settle-ms'));
+    expect(themeVar('--v2-done-mark-turn')).toBe(`${expected}deg`);
+  });
+
+  it('uses no literal colours or sizes in the done mark rules, and defines every var they use', () => {
+    const rules = markRules.map((s) => decls(s, outside)).join('\n');
+    const all = `${rules}\n${noPref}`;
+    expect(all).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    expect(all).not.toMatch(/\b\d+(\.\d+)?px\b/);
+    const used = [...all.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(0);
+    for (const name of new Set(used)) {
+      expect(`${theme}\n${css}`, name).toMatch(new RegExp(`${name}:`));
+    }
+  });
+
+  const ring = () => themeVar('--color-v2-open-ring');
+  const ink = () => themeVar('--color-text');
+  // The row fill under the pointer: a chip or row is washed with 7% (hover) or 14% (active) of the text colour.
+  const wash = (alpha: number, ground: string) => blend({ rgb: toRgb(ink()), alpha }, ground);
+
+  it.each(grounds)('keeps the open ring at 3:1 or more on %s and on glass over it', (ground) => {
+    const onGround = contrast(ring(), themeVar(ground));
+    const onGlass = contrast(ring(), glassOver(ground));
+    // eslint-disable-next-line no-console -- recorded for the PR
+    console.info(`open ring on ${ground}: ${onGround.toFixed(2)}; on glass: ${onGlass.toFixed(2)}`);
+    expect(onGround).toBeGreaterThanOrEqual(3);
+    expect(onGlass).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each(grounds)('keeps the open ring at 3:1 or more on the hover and pressed row fill over glass on %s', (ground) => {
+    for (const alpha of [0.07, 0.14]) {
+      expect(contrast(ring(), wash(alpha, glassOver(ground)))).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
+
+describe('done mark swirl contrast (#1004)', () => {
+  const stops = () => [...themeVar('--v2-done-mark-swirl').matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+  const behind = (): Array<[string, string]> => [
+    ...grounds.map((g): [string, string] => [g, themeVar(g)]),
+    ...grounds.map((g): [string, string] => [`glass over ${g}`, glassOver(g)]),
+    ['sheet and field fill', themeVar('--color-v2-field-fill')],
+    ['accent-100', themeVar('--color-accent-100')],
+  ];
+
+  it('has the three recipe stops', () => {
+    // The gradient blends the last stop back into the first, so it lists the first stop twice.
+    expect(stops()).toEqual([...v2.recipes.doneMark.swirl, v2.recipes.doneMark.swirl[0]]);
+  });
+
+  it.each(behind())('keeps every swirl stop at 3:1 or more (non-text) on %s', (_name, ground) => {
+    for (const stop of stops()) {
+      expect(contrast(stop, ground), `${stop} on ${ground}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
