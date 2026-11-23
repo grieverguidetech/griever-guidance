@@ -31,6 +31,17 @@ export function buildRecipes(r: Roles, p: Primitives) {
         shadow: [p.shadows.glass],
         radius: p.radius,
       },
+      /** The secondary tier (navigation): transparent, a thin link-colour edge, link-colour text. No swirl, shadow or drift. */
+      outline: {
+        text: { color: r.link, weight: p.font.weights.medium, family: p.font.bodyFamily },
+        border: { width: p.border.thin, color: r.link },
+        radius: p.radius,
+      },
+      /** The tertiary tier (suggestion): link-colour text with an underline, no fill or edge. */
+      tertiary: {
+        text: { color: r.link, weight: p.font.weights.medium, family: p.font.bodyFamily },
+        underline: true,
+      },
     },
     nudge: {
       swirl: r.nudge,

@@ -147,8 +147,7 @@ export function ObituaryScreen({ session, onBack, onDone }: Props) {
           <button
             type="button"
             onClick={onDone}
-            className="gg-btn gg-btn-ghost"
-            style={{ color: 'var(--text-muted)' }}
+            className="gg-btn gg-btn-secondary"
           >
             Done
           </button>

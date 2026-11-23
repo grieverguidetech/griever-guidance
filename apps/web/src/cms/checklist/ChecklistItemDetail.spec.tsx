@@ -89,7 +89,7 @@ describe('ChecklistItemDetail', () => {
   it('styles Back as a ghost button with a hidden icon, keeping its name', () => {
     render(<ChecklistItemDetail itemId="custody" state={null} onSetState={noop} onBack={noop} />);
     const back = screen.getByRole('button', { name: copy.back });
-    expect(back.className).toContain('gg-btn-ghost');
+    expect(back.className).toContain('gg-btn-secondary');
     expect(back.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 

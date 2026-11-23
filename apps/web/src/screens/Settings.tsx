@@ -102,14 +102,6 @@ export function SettingsBody({ onRemoveEverything, signsOut = false, removeMembe
             <button
               type="button"
               className="gg-btn gg-btn-primary gg-btn-block"
-              onClick={() => void remove()}
-              aria-disabled={pending}
-            >
-              Remove everything
-            </button>
-            <button
-              type="button"
-              className="gg-btn gg-btn-secondary gg-btn-block"
               onClick={() => {
                 setConfirming(false);
                 setStatus('');
@@ -117,6 +109,14 @@ export function SettingsBody({ onRemoveEverything, signsOut = false, removeMembe
               disabled={pending}
             >
               Keep everything
+            </button>
+            <button
+              type="button"
+              className="gg-btn gg-btn-secondary gg-btn-block"
+              onClick={() => void remove()}
+              aria-disabled={pending}
+            >
+              Remove everything
             </button>
           </div>
         )}

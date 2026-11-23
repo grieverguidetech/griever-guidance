@@ -71,7 +71,7 @@ export function ConfirmScreen({ flow }: Props) {
             aria-expanded={sampleOpen}
             aria-controls="message-sample"
             onClick={() => setSampleOpen((v) => !v)}
-            className="gg-btn gg-btn-ghost"
+            className="gg-btn gg-btn-tertiary"
             style={{ minHeight: 44, minWidth: 44 }}
           >
             {copy.sample}

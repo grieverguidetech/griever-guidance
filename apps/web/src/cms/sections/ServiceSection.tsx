@@ -347,7 +347,7 @@ export function ServiceSection({ values, onChange, onReadyChange, nextSection, o
             </button>
           )}
           {edited && (
-            <button type="button" className="gg-btn gg-btn-secondary" onClick={useDetails}>
+            <button type="button" className="gg-btn gg-btn-tertiary" onClick={useDetails}>
               {copy.useDetails}
             </button>
           )}

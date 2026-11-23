@@ -224,7 +224,13 @@ describe('start this message again (#98)', () => {
     await user.click(link() as HTMLElement);
     const confirm = screen.getByText(/Clear what you've written for this message\? People and contacts stay as they are\./);
     expect(confirm.closest('[role="group"]')).toHaveFocus();
-    await user.click(screen.getByRole('button', { name: 'Clear it' }));
+    // The safe choice is primary and first; the destructive one is secondary.
+    const keepIt = screen.getByRole('button', { name: 'Keep it' });
+    const clearIt = screen.getByRole('button', { name: 'Clear it' });
+    expect(keepIt).toHaveClass('gg-btn-primary');
+    expect(clearIt).toHaveClass('gg-btn-secondary');
+    expect(keepIt.compareDocumentPosition(clearIt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(clearIt);
 
     expect(screen.getByLabelText(/Anything you'd like to add/)).toHaveValue('');
     expect(link()).not.toBeInTheDocument();

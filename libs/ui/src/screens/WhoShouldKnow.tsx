@@ -169,11 +169,10 @@ export function WhoShouldKnow({
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={onBack} />
+        <Button label={copy.back} variant="secondary" onPress={onBack} />
         {onWhatYoullNeed ? (
           <Button
             label={copy.checklist}
-            variant="header"
             opensDialog
             onPress={onWhatYoullNeed}
             buttonRef={checklistRef}
@@ -392,7 +391,7 @@ function AddByHand({
           hint={empty ? copy.fillBoth : undefined}
           onPress={submit}
         />
-        <Button label={copy.cancel} variant="tertiary" onPress={close} />
+        <Button label={copy.cancel} variant="secondary" onPress={close} />
       </View>
       {empty ? (
         <Body id={reasonId} hidden small>

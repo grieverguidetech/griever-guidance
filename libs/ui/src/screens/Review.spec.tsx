@@ -110,6 +110,9 @@ describe('Review', () => {
     render(<Harness onToneChange={onToneChange} />);
     const softer = screen.getByRole('button', { name: 'Softer tone' });
     expect(softer).toHaveAttribute('aria-pressed', 'false');
+    // A toggle is secondary: it has the pressed wash and an unavailable look that keeps opacity 1.
+    expect(softer).toHaveAttribute('data-gg-btn', 'secondary');
+    expect(screen.getByRole('button', { name: 'Edit wording' })).toHaveAttribute('data-gg-btn', 'secondary');
     await user.click(softer);
     expect(onToneChange).toHaveBeenCalledWith('softer');
     expect(screen.getByRole('button', { name: 'Softer tone' })).toHaveAttribute('aria-pressed', 'true');

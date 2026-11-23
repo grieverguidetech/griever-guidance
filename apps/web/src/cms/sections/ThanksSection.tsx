@@ -49,7 +49,7 @@ export function ThanksSection({ values, onChange, onReadyChange, nextSection, on
           {edited && (
             <button
               type="button"
-              className="gg-btn gg-btn-secondary"
+              className="gg-btn gg-btn-tertiary"
               onClick={() => {
                 onChange({ thanksMessage: undefined });
                 // The button goes away on reset, so keep focus on the message.

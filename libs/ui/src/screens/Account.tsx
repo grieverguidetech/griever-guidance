@@ -90,9 +90,9 @@ export function Account({
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} variant="header" onPress={onBack} />
+        <Button label={copy.back} variant="secondary" onPress={onBack} />
         {onWhatYoullNeed ? (
-          <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button label={copy.checklist} opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
         ) : null}
       </View>
       <View style={styles.head}>
@@ -132,7 +132,7 @@ export function Account({
       </View>
       <Status id={statusId} message={status?.message} tone={status?.tone} />
       <Button label={primaryLabel} ariaDisabled={primaryBusy === true} announceDisabled onPress={submit} />
-      {onSignOut ? <Button label={copy.signOut} variant="header" onPress={onSignOut} /> : null}
+      {onSignOut ? <Button label={copy.signOut} variant="secondary" onPress={onSignOut} /> : null}
       {children}
     </View>
   );

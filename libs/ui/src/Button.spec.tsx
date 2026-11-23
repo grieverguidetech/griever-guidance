@@ -145,11 +145,10 @@ describe('tertiary Button', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('has no fill and no border, and a 44px target', () => {
+  it('has no fill, and a 44px target; its border is removed in styles.css', () => {
     render(<Button label="Back" variant="tertiary" onPress={vi.fn()} />);
     const style = getComputedStyle(screen.getByRole('button', { name: 'Back' }));
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-    expect(style.borderTopColor).toBe('rgba(0, 0, 0, 0.00)');
     expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
     expect(parseInt(style.minWidth, 10)).toBeGreaterThanOrEqual(44);
   });
@@ -161,29 +160,28 @@ describe('tertiary Button', () => {
   });
 });
 
-describe('header Button (Back, What you\'ll need)', () => {
-  it('has a page-coloured (transparent) fill, a thin accent outline, a 44px target and no underline', () => {
-    render(<Button label="What you'll need" variant="header" onPress={vi.fn()} />);
-    const style = getComputedStyle(screen.getByRole('button', { name: "What you'll need" }));
+describe('secondary Button (navigation: Back, Close)', () => {
+  it('has a transparent fill, a 44px target and no underline; its edge comes from styles.css', () => {
+    render(<Button label="Back" variant="secondary" onPress={vi.fn()} />);
+    const style = getComputedStyle(screen.getByRole('button', { name: 'Back' }));
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-    expect(style.borderTopColor).toBe('rgba(0, 103, 134, 1.00)');
-    expect(style.borderTopWidth).toBe('1px');
     expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
-    expect(getComputedStyle(screen.getByText("What you'll need")).textDecoration).not.toContain('underline');
+    expect(getComputedStyle(screen.getByText('Back')).textDecoration).not.toContain('underline');
   });
 });
 
 describe('Button colours', () => {
   it.each([
     ['unavailable primary: page colour on muted', page, v2.roles.muted],
-    ['unavailable secondary or ghost: muted on the page', v2.roles.muted, page],
-    ['unavailable secondary or ghost: muted on a field fill', v2.roles.muted, v2.recipes.field.fill],
+    ['unavailable secondary: muted on the page', v2.roles.muted, page],
+    ['unavailable secondary: muted on a field fill', v2.roles.muted, v2.recipes.field.fill],
     ['available primary: page colour on link', page, v2.roles.link],
-    ['available secondary or ghost: link on the page', v2.roles.link, page],
-    ['header: the focus outline on the page (non-text, 3:1)', v2.roles.focus, page, 3],
+    ['available secondary: link on the page', v2.roles.link, page],
+    ['secondary: the link edge on the page (non-text, 3:1)', v2.roles.link, page, 3],
     ['tertiary: link on the page', v2.roles.link, page],
     ['tertiary pressed: link on wash', v2.roles.link, v2.roles.wash],
-    ['tertiary unavailable: muted on the page', v2.roles.muted, page],
+    ['tertiary unavailable (web: muted text, opacity 1, no fade): muted on the page', v2.roles.muted, page],
+    ['tertiary unavailable: muted on a field fill', v2.roles.muted, v2.recipes.field.fill],
   ])('%s is at least its minimum ratio', (_name, foreground, background, minimum = 4.5) => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(minimum);
   });
@@ -196,9 +194,7 @@ describe('Button colours', () => {
 });
 
 describe('Button swirl hook on web', () => {
-  const variants = ['primary', 'secondary', 'tinted', 'ghost', 'tertiary', 'header'] as const;
-
-  it.each(['primary', 'secondary'] as const)('puts data-gg-btn="%s" on the DOM node (react-native-web turns dataSet into data-*)', (variant) => {
+  it.each(['primary', 'secondary', 'tertiary'] as const)('puts data-gg-btn="%s" on the DOM node (react-native-web turns dataSet into data-*)', (variant) => {
     render(<Button label="Go" onPress={vi.fn()} variant={variant} />);
     expect(screen.getByRole('button', { name: 'Go' })).toHaveAttribute('data-gg-btn', variant);
   });
@@ -208,19 +204,11 @@ describe('Button swirl hook on web', () => {
     expect(screen.getByRole('button', { name: 'Go' })).toHaveAttribute('data-gg-btn', 'primary');
   });
 
-  it.each(variants.filter((v) => v !== 'primary' && v !== 'secondary'))('has no hook on the %s variant', (variant) => {
-    render(<Button label="Go" onPress={vi.fn()} variant={variant} />);
-    expect(screen.getByRole('button', { name: 'Go' })).not.toHaveAttribute('data-gg-btn');
-  });
-
-  it('drops the v1 fill on a swirl button, and keeps the tinted fill on the others', () => {
-    const { unmount } = render(<Button label="Go" onPress={vi.fn()} variant="primary" ariaDisabled />);
+  it('drops the v1 fill on a web button', () => {
+    render(<Button label="Go" onPress={vi.fn()} variant="primary" ariaDisabled />);
     const swirl = getComputedStyle(screen.getByRole('button', { name: 'Go' }));
     // jsdom reports rgb(), so assert the empty or transparent fill rather than comparing to hex tokens.
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(swirl.backgroundColor);
-    unmount();
-    render(<Button label="Go" onPress={vi.fn()} variant="tinted" />);
-    expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).not.toContain(getComputedStyle(screen.getByRole('button', { name: 'Go' })).backgroundColor);
   });
 
   it('lets the label inherit the swirl text colour instead of the v1 page-colour label', () => {

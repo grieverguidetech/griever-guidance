@@ -49,7 +49,7 @@ export function AnnouncementSection({ values, onChange, onReadyChange, nextSecti
           {edited && (
             <button
               type="button"
-              className="gg-btn gg-btn-secondary"
+              className="gg-btn gg-btn-tertiary"
               onClick={() => {
                 onChange({ announcementMessage: undefined });
                 // The button goes away on reset, so keep focus on the message.

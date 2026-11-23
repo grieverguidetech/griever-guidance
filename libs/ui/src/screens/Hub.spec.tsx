@@ -157,23 +157,27 @@ describe('Hub', () => {
     expect(screen.getAllByTestId('lock-icon')).toHaveLength(1);
   });
 
-  it('Home and What you will need share the outline look: 44px, outline, no fill, no underline', () => {
+  it('Home and What you will need are 44px with no v1 fill and no underline', () => {
     setup();
     for (const name of ['Home', "What you'll need"]) {
       const style = getComputedStyle(screen.getByRole('button', { name }));
       expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-      expect(style.borderTopColor).toBe('rgba(0, 103, 134, 1.00)');
       expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
       expect(getComputedStyle(screen.getByText(name)).textDecoration).not.toContain('underline');
     }
   });
 
-  it('Edit person is the primary look: on web it carries the swirl hook, with no v1 accent-700 fill or page-colour label', () => {
+  it('Edit person is secondary (navigation); its outline comes from styles.css through the hook', () => {
     setup();
     const button = screen.getByRole('button', { name: 'Edit person' });
-    expect(button).toHaveAttribute('data-gg-btn', 'primary');
+    expect(button).toHaveAttribute('data-gg-btn', 'secondary');
     expect(getComputedStyle(button).backgroundColor).not.toBe('rgb(0, 103, 134)');
-    expect(getComputedStyle(screen.getByText('Edit person')).color).not.toBe('rgb(248, 247, 244)');
+  });
+
+  it('Home is secondary and What you will need is primary', () => {
+    setup();
+    expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute('data-gg-btn', 'secondary');
+    expect(screen.getByRole('button', { name: "What you'll need" })).toHaveAttribute('data-gg-btn', 'primary');
   });
 
   it('keeps a locked step focusable, aria-disabled and explained, and it asks for the paywall', async () => {

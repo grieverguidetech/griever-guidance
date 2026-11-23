@@ -11,14 +11,13 @@ import { useSerifStyle } from './typography';
 export type ButtonNode = ComponentRef<typeof Pressable>;
 
 /**
- * Looks follow the mobile app's buttons (decision by Peter, 2026-10-25): rounded 10px corners,
- * a solid roles.link primary, a roles.link outline for secondary, and a tinted outlined "link" button
- * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: a
- * roles.link label with an underline, no fill and no border, and a roles.wash fill while pressed.
- * `header` is Back and What you'll need (#362): the page shows through, a thin roles.focus outline,
- * no underline, same as web's top bar. No icons. Palette and serif still follow web.
+ * Three tiers, chosen by what the button does (product owner, 2026-11-23):
+ * `primary` is an action (the sunset swirl), `secondary` is navigation (an outline: transparent, a 1px
+ * roles.link edge, roles.link text) and `tertiary` is a suggestion (roles.link text with an underline,
+ * no fill or edge). On web, apps/web/src/styles.css draws all three, found through data-gg-btn.
+ * No icons. Palette and serif still follow web.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
+export type ButtonVariant = 'primary' | 'secondary' | 'tertiary';
 
 const BUTTON_RADIUS = 10;
 
@@ -100,8 +99,8 @@ export function Button({
   }
 
   const font = useSerifStyle('semibold');
-  // Web primary and secondary take the swirl look from apps/web/src/styles.css, found through data-gg-btn.
-  const swirl = Platform.OS === 'web' && (variant === 'primary' || variant === 'secondary');
+  // On web every tier takes its look from apps/web/src/styles.css, found through data-gg-btn.
+  const swirl = Platform.OS === 'web';
   const unavailableFill = ariaDisabled && variant === 'primary' && !swirl;
   return (
     <Pressable
@@ -115,7 +114,7 @@ export function Button({
         !swirl && styles.v1Edge,
         swirl ? styles.swirl : styles[variant],
         unavailableFill && styles.unavailableFill,
-        pressed && !swirl && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : styles.pressed),
+        pressed && !swirl && (variant === 'tertiary' ? styles.pressedWash : styles.pressed),
       ]}
       {...(swirl ? { dataSet: { ggBtn: variant } } : {})}
       {...extra}
@@ -162,14 +161,10 @@ const styles = StyleSheet.create({
   swirl: { paddingVertical: 14 },
   // Fills behind text use the v2 link colour (see Button.spec for the contrast with the page colour).
   primary: { backgroundColor: v2.roles.link, paddingVertical: 14 },
-  // Outlined with the link colour, as mobile's secondary button.
+  // Outlined with the link colour, as mobile's header button.
   secondary: { borderColor: v2.roles.link, paddingVertical: 14 },
-  tinted: { borderColor: v2.roles.link, backgroundColor: v2.roles.wash },
-  ghost: {},
   // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
   tertiary: {},
-  // The v2 focus colour holds 3:1 on every ground (v2.spec).
-  header: { borderColor: v2.roles.focus },
   pressed: { opacity: 0.7 },
   // link on wash is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
   pressedWash: { backgroundColor: v2.roles.wash },

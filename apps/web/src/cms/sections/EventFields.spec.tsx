@@ -147,10 +147,9 @@ describe('EventFields', () => {
     const onUse = vi.fn();
     setup({ dateSuggestion: { label: 'Same day', onUse }, placeSuggestion: { label: 'Same place', onUse } });
     const day = screen.getByRole('button', { name: 'Reception Same day' });
-    // A text link under its field: underlined, no padding of its own, 44px target from the stylesheet.
-    expect(day).toHaveClass('gg-link-button');
+    // A suggestion under its field: the tertiary tier (underlined link text), 44px target from the stylesheet.
+    expect(day).toHaveClass('gg-btn', 'gg-btn-tertiary');
     expect(day).not.toHaveClass('gg-chip');
-    expect(day.className).toBe('gg-link-button');
     expect(day.parentElement).toHaveClass('gg-field');
     expect(day.parentElement?.contains(screen.getByLabelText('Date', { selector: 'input' }))).toBe(true);
     await userEvent.click(day);

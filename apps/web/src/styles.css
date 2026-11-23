@@ -178,14 +178,14 @@ h1 { font-weight: var(--v2-heading-weight); }
   .gg-btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
   [data-gg-btn]:disabled,
   [data-gg-btn][aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
-  /* Primary and secondary are the v2 swirl buttons (same look as mobile Button.tsx): a gradient fill drawn from the generated vars.
+  /* Three tiers, chosen by what the button does. Primary (an action) is the sunset swirl: a gradient fill drawn from the generated vars.
      The fill is twice the button size so the one-pass drift below has room to slide. Hover and pressed keep the edge at full strength
      and only wash the fill: a translucent page-colour layer over the swirl (8% hover, 15% pressed). v2Styles.spec checks the label
-     against every stop and midpoint under that wash, and the edge against the page, both glows and glass. */
+     against every stop and midpoint under that wash, and the edge against the page, both glows and glass.
+     Secondary (navigation) is an outline: transparent, a 1px link-colour edge, link-colour text; no swirl, shadow or drift.
+     Tertiary (a suggestion) is underlined link text, see .gg-btn-tertiary. */
   .gg-btn-primary,
-  [data-gg-btn='primary'],
-  .gg-btn-secondary,
-  [data-gg-btn='secondary'] {
+  [data-gg-btn='primary'] {
     background-size: 200% 200%;
     background-position: 0% 50%;
     border-radius: var(--v2-radius);
@@ -201,12 +201,13 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
   .gg-btn-secondary,
   [data-gg-btn='secondary'] {
-    background-image: var(--v2-secondary-bg);
-    color: var(--color-v2-secondary-text);
-    font-weight: var(--v2-weight-regular);
-    border-width: var(--v2-border-medium);
-    border-color: var(--color-v2-secondary-border);
-    box-shadow: var(--v2-secondary-shadow);
+    background: transparent;
+    color: var(--color-v2-outline-text);
+    font-weight: var(--v2-weight-medium);
+    border-width: var(--v2-border-thin);
+    border-color: var(--color-v2-outline-border);
+    border-radius: var(--v2-radius);
+    min-width: 44px;
   }
   /* Hover only where a pointer can hover, so it does not stick after a tap on a phone. */
   @media (hover: hover) {
@@ -216,7 +217,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     }
     .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):hover,
     [data-gg-btn='secondary']:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):hover {
-      background-image: linear-gradient(color-mix(in srgb, var(--color-v2-page) 8%, transparent), color-mix(in srgb, var(--color-v2-page) 8%, transparent)), var(--v2-secondary-bg);
+      background-image: linear-gradient(color-mix(in srgb, var(--color-v2-focus) 10%, transparent), color-mix(in srgb, var(--color-v2-focus) 10%, transparent));
     }
   }
   .gg-btn-primary:not(:disabled):not([aria-disabled='true']):active,
@@ -225,14 +226,14 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
   .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):active,
   [data-gg-btn='secondary']:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):active {
-    background-image: linear-gradient(color-mix(in srgb, var(--color-v2-page) 15%, transparent), color-mix(in srgb, var(--color-v2-page) 15%, transparent)), var(--v2-secondary-bg);
+    /* Heading colour while pressed: the link colour falls under 4.5:1 on the 18% tint over the sun glow. */
+    color: var(--color-v2-heading);
+    background-image: linear-gradient(color-mix(in srgb, var(--color-v2-focus) 18%, transparent), color-mix(in srgb, var(--color-v2-focus) 18%, transparent));
   }
-  /* A secondary used as a toggle (ItemStateToggles): the pressed state is a flat accent tint, not the swirl. */
+  /* A secondary used as a toggle (ItemStateToggles): the pressed state is a flat accent wash. */
   .gg-btn-secondary[aria-pressed='true'],
   [data-gg-btn='secondary'][aria-pressed='true'] {
-    background-image: none;
     background-color: var(--color-v2-wash);
-    animation: none;
   }
   /* Unavailable is quiet, not a fade (opacity would drop the label under 4.5:1): a flat page fill, a dashed edge, no swirl, no shadow,
      and the button's own text colour. It must read as "not yet", never heavier than the enabled swirl. aria-disabled buttons stay in
@@ -241,14 +242,7 @@ h1 { font-weight: var(--v2-heading-weight); }
   .gg-btn-primary:disabled,
   [data-gg-btn='primary']:disabled,
   .gg-btn-primary[aria-disabled='true'],
-  [data-gg-btn='primary'][aria-disabled='true'] {
-    opacity: 1;
-    background-image: none;
-    background-color: var(--color-v2-page);
-    border-style: dashed;
-    box-shadow: none;
-    animation: none;
-  }
+  [data-gg-btn='primary'][aria-disabled='true'],
   .gg-btn-secondary:disabled,
   [data-gg-btn='secondary']:disabled,
   .gg-btn-secondary[aria-disabled='true'],
@@ -265,19 +259,14 @@ h1 { font-weight: var(--v2-heading-weight); }
      so the combined rules run both. */
   @media (prefers-reduced-motion: no-preference) {
     .gg-btn-primary,
-    [data-gg-btn='primary'],
-    .gg-btn-secondary,
-    [data-gg-btn='secondary'] {
+    [data-gg-btn='primary'] {
       animation: gg-swirl-drift var(--v2-settle-ms) ease-in-out forwards;
     }
-    .gg-btn-primary.gg-enter,
-    .gg-btn-secondary.gg-enter {
+    .gg-btn-primary.gg-enter {
       animation: gg-enter var(--dur-2) var(--ease-calm) both, gg-swirl-drift var(--v2-settle-ms) ease-in-out forwards;
     }
     .gg-btn-primary.gg-enter:disabled,
-    .gg-btn-primary.gg-enter[aria-disabled='true'],
-    .gg-btn-secondary.gg-enter:disabled,
-    .gg-btn-secondary.gg-enter[aria-disabled='true'] {
+    .gg-btn-primary.gg-enter[aria-disabled='true'] {
       animation: gg-enter var(--dur-2) var(--ease-calm) both;
     }
     @keyframes gg-swirl-drift {
@@ -285,28 +274,51 @@ h1 { font-weight: var(--v2-heading-weight); }
       to { background-position: 100% 50%; }
     }
   }
-  /* A link-style button: underlined. Contrast of the text on its own tints (computed): the link colour clears 4.5:1 on the 10% hover tint over the page;
-     the 18% active tint uses the heading colour, because the link colour falls under 4.5:1 on the field fill. Rows and toggles opt out with .gg-btn-ghost-plain. */
-  .gg-btn-ghost {
+  /* Tertiary (a suggestion): underlined link text, no fill or edge, a 44px target. Contrast of the text on its own tints (computed): the link
+     colour clears 4.5:1 on the 10% hover tint over the page; the 18% active tint uses the heading colour, because the link colour falls
+     under 4.5:1 on the field fill. A row or toggle that is not one of the tiers uses .gg-btn-plain: the same without the underline. */
+  .gg-btn-tertiary,
+  [data-gg-btn='tertiary'] {
     color: var(--color-v2-link);
     padding-inline: var(--space-1);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
-  .gg-btn-ghost:not(:disabled):hover {
+  .gg-btn-plain {
+    color: var(--color-v2-link);
+    padding-inline: var(--space-1);
+  }
+  .gg-btn-tertiary:not(:disabled):not([aria-disabled='true']):hover,
+  [data-gg-btn='tertiary']:not(:disabled):not([aria-disabled='true']):hover {
     text-decoration-thickness: 2px;
+  }
+  /* The tertiary wash is a background-image: react-native-web resets background-color unlayered, which would beat it. */
+  .gg-btn-tertiary:not(:disabled):not([aria-disabled='true']):hover,
+  [data-gg-btn='tertiary']:not(:disabled):not([aria-disabled='true']):hover {
+    background-image: linear-gradient(color-mix(in srgb, var(--color-v2-focus) 10%, transparent), color-mix(in srgb, var(--color-v2-focus) 10%, transparent));
+  }
+  .gg-btn-plain:not(:disabled):hover {
     background: color-mix(in srgb, var(--color-v2-focus) 10%, transparent);
   }
-  .gg-btn-ghost:not(:disabled):active {
+  .gg-btn-tertiary:not(:disabled):not([aria-disabled='true']):active,
+  [data-gg-btn='tertiary']:not(:disabled):not([aria-disabled='true']):active {
+    color: var(--color-v2-heading);
+    background-image: linear-gradient(color-mix(in srgb, var(--color-v2-focus) 18%, transparent), color-mix(in srgb, var(--color-v2-focus) 18%, transparent));
+  }
+  .gg-btn-plain:not(:disabled):active {
     color: var(--color-v2-heading);
     background: color-mix(in srgb, var(--color-v2-focus) 18%, transparent);
   }
-  /* A ghost button used as a row or a toggle, not a link: no underline. */
-  .gg-btn-ghost.gg-btn-ghost-plain,
-  .gg-btn-ghost.gg-btn-ghost-plain:not(:disabled):hover { text-decoration: none; }
+  /* Unavailable tertiary: the muted text colour, no fade (opacity would drop it under 4.5:1), no underline colour change. */
+  .gg-btn-tertiary:disabled,
+  [data-gg-btn='tertiary']:disabled,
+  .gg-btn-tertiary[aria-disabled='true'],
+  [data-gg-btn='tertiary'][aria-disabled='true'] {
+    opacity: 1;
+    color: var(--color-v2-muted);
+    background-image: none;
+  }
   .gg-btn-block { width: 100%; }
-  /* Top-bar buttons (Back, What you'll need): bordered, never smaller than 44 by 44. */
-  .gg-btn-bar { min-width: 44px; color: var(--color-v2-link); border-color: var(--color-v2-link); }
 
   /* — cards — */
   .gg-card {
@@ -670,26 +682,6 @@ h1 { font-weight: var(--v2-heading-weight); }
     border: 1px solid var(--color-v2-muted);
   }
   .gg-chip-outlined[aria-pressed='true'] { border-color: var(--color-v2-link); }
-  /* A text-only link button under a field: underlined, no visible padding. */
-  /* The 44px target is the button box itself, with the text at its top, so it
-     sits flush under the field and never covers the input above it. */
-  .gg-link-button {
-    display: inline-flex;
-    align-items: flex-start;
-    min-height: 44px;
-    align-self: flex-start;
-    margin: 0;
-    padding: 0;
-    font: inherit;
-    font-size: 14px;
-    color: var(--color-v2-link);
-    background: transparent;
-    border: 0;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
-  .gg-link-button:hover { text-decoration-thickness: 2px; }
   /* The empty or checked box inside a toggle chip. */
   .gg-check-box {
     display: inline-flex;
@@ -728,7 +720,7 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
 }
 
-/* Swirl buttons: the focus ring is pinned to --color-v2-link (at least 5.26:1 on the page, both glows and glass), so it holds on
+/* Primary and secondary buttons: the focus ring is pinned to --color-v2-link (at least 5.26:1 on the page, both glows and glass), so it holds on
    the swirl whatever the focus role becomes. Today it equals --color-v2-focus. Unlayered so it beats nothing it should not,
    and cannot lose to the component layer. */
 .gg-btn-primary:focus-visible,
@@ -741,8 +733,9 @@ h1 { font-weight: var(--v2-heading-weight); }
    so they win; the values are the same vars the layered rules use (v2Styles.spec checks they match). Padding and min size come from the
    Button's own styles. The states use [aria-disabled='true'] only because the libs/ui Button never sets native disabled. */
 button[data-gg-btn='primary'] { border: var(--v2-border-thin) solid var(--color-v2-primary-border); }
-button[data-gg-btn='secondary'] { border: var(--v2-border-medium) solid var(--color-v2-secondary-border); }
+button[data-gg-btn='secondary'] { border: var(--v2-border-thin) solid var(--color-v2-outline-border); background-color: transparent; }
 button[data-gg-btn='secondary'][aria-pressed='true'] { background-color: var(--color-v2-wash); }
+button[data-gg-btn='tertiary'] { border: 0; background-color: transparent; }
 button[data-gg-btn='primary'][aria-disabled='true'],
 button[data-gg-btn='secondary'][aria-disabled='true'] { border-style: dashed; background-color: var(--color-v2-page); }
 

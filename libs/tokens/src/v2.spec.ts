@@ -94,7 +94,13 @@ describe('v2 tokens: layers', () => {
       ],
     );
     expect(Object.keys(v2.recipes).sort()).toEqual(['button', 'card', 'doneMark', 'field', 'nudge']);
-    expect(Object.keys(v2.recipes.button).sort()).toEqual(['primary', 'secondary']);
+    expect(Object.keys(v2.recipes.button).sort()).toEqual(['outline', 'primary', 'secondary', 'tertiary']);
+    // The secondary tier (navigation) is a transparent outline in the link colour; the tertiary (suggestion) is underlined link text.
+    const { outline, tertiary } = v2.recipes.button;
+    expect(outline.text.color).toBe(v2.roles.link);
+    expect(outline.border).toEqual({ width: v2.primitives.border.thin, color: v2.roles.link });
+    expect(tertiary.text.color).toBe(v2.roles.link);
+    expect(tertiary.underline).toBe(true);
   });
 
 });

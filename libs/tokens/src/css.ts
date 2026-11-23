@@ -140,7 +140,7 @@ export function webEyebrowFontStack(p: Pick<Primitives, 'font'>, eyebrowFamily: 
 
 /** `--font-v2-heading`, `--font-v2-body`, `--font-v2-eyebrow` and the v2 colours (Tailwind reads these). Every name starts `v2`, except ink, which is `--color-text`. */
 export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): string[] {
-  const { primary, secondary } = recipes.button;
+  const { primary, secondary, outline } = recipes.button;
   const { card, nudge, field } = recipes;
   const lines: Array<[string, string]> = [
     ['font-v2-heading', webHeadingFontStack(primitives)],
@@ -167,6 +167,8 @@ export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): str
     ['color-v2-primary-border', primary.border.color],
     ['color-v2-secondary-text', secondary.text.color],
     ['color-v2-secondary-border', secondary.border.color],
+    ['color-v2-outline-text', outline.text.color],
+    ['color-v2-outline-border', outline.border.color],
     ['color-v2-card-fill', card.fill],
     ['color-v2-card-border', card.border.color],
     ['color-v2-nudge-text', nudge.text.color],

@@ -211,6 +211,10 @@ describe('PeopleHelping: stop helping (#223)', () => {
     const keep = screen.getByRole('button', { name: 'Keep helping' });
     expect(stop).toHaveClass('gg-btn');
     expect(keep).toHaveClass('gg-btn');
+    // The safe choice is primary and first; the destructive one is secondary.
+    expect(keep).toHaveClass('gg-btn-primary');
+    expect(stop).toHaveClass('gg-btn-secondary');
+    expect(keep.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.body.textContent).not.toContain('!');
     expect(onLeave).not.toHaveBeenCalled();
   });

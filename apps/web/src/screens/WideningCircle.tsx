@@ -68,7 +68,7 @@ export function WideningCircle({ flow, contacts, notifiedContactIds }: Props) {
             <button
               type="button"
               onClick={() => selectContacts(section.items.map((c) => c.contactId))}
-              className="gg-btn gg-btn-ghost !min-h-0 !py-0 !px-0 text-[12px]"
+              className="gg-btn gg-btn-tertiary !px-0 text-[12px]"
             >
               Select all
             </button>

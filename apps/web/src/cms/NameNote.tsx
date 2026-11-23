@@ -7,7 +7,7 @@ export function NameNote({ onOpenAccount }: { onOpenAccount: () => void }) {
   return (
     <button
       type="button"
-      className="gg-btn gg-btn-ghost gg-hint !px-0 !justify-start !text-left !font-normal !text-[length:inherit] w-full"
+      className="gg-btn gg-btn-plain gg-hint !px-0 !justify-start !text-left !font-normal !text-[length:inherit] w-full"
       onClick={onOpenAccount}
     >
       <span>

@@ -365,7 +365,6 @@ describe('styles.css swirl buttons', () => {
   const glassOver = grounds.map((g) => blend({ rgb: [255, 255, 255], alpha: 0.65 }, g));
   const swirls = [
     { name: 'primary', bg: '--v2-primary-bg', text: '--color-v2-primary-text', edge: '--color-v2-primary-border', base: '.gg-btn-primary' },
-    { name: 'secondary', bg: '--v2-secondary-bg', text: '--color-v2-secondary-text', edge: '--color-v2-secondary-border', base: '.gg-btn-secondary' },
   ];
   const noPref = block('@media (prefers-reduced-motion: no-preference)');
   const enabled = ":not(:disabled):not([aria-disabled='true'])";
@@ -375,7 +374,7 @@ describe('styles.css swirl buttons', () => {
     const lists = [...bare.matchAll(/([^{}]+)\{/g)].map((m) => m[1].split(',').map((part) => part.trim()));
     let checked = 0;
     for (const list of lists) {
-      for (const variant of ['primary', 'secondary']) {
+      for (const variant of ['primary', 'secondary', 'tertiary']) {
         const classParts = list.filter((part) => part.startsWith(`.gg-btn-${variant}`) && !part.includes('.gg-enter'));
         for (const part of classParts) {
           const twin = part.replace(`.gg-btn-${variant}`, `[data-gg-btn='${variant}']`);
@@ -396,9 +395,10 @@ describe('styles.css swirl buttons', () => {
     expect(decls('.gg-btn-primary')).toContain('border-color: var(--color-v2-primary-border)');
 
     const secondary = decls("button[data-gg-btn='secondary']", unlayered);
-    expect(secondary).toMatch(/border:[^;]*var\(--v2-border-medium\)[^;]*solid[^;]*var\(--color-v2-secondary-border\)/);
-    expect(decls('.gg-btn-secondary')).toContain('border-width: var(--v2-border-medium)');
-    expect(decls('.gg-btn-secondary')).toContain('border-color: var(--color-v2-secondary-border)');
+    expect(secondary).toMatch(/border:[^;]*var\(--v2-border-thin\)[^;]*solid[^;]*var\(--color-v2-outline-border\)/);
+    expect(secondary).toContain('background-color: transparent');
+    expect(decls('.gg-btn-secondary')).toContain('border-width: var(--v2-border-thin)');
+    expect(decls('.gg-btn-secondary')).toContain('border-color: var(--color-v2-outline-border)');
 
     const pressed = decls("button[data-gg-btn='secondary'][aria-pressed='true']", unlayered);
     expect(pressed).toContain('background-color: var(--color-v2-wash)');
@@ -431,24 +431,23 @@ describe('styles.css swirl buttons', () => {
     expect(decl).toContain('var(--v2-settle-ms)');
     expect(decl).toMatch(/\bforwards\b/);
     expect(decl).not.toMatch(/infinite|alternate/);
-    expect(decls('.gg-btn-secondary', noPref)).toContain(decl);
+    // The outline (secondary) never drifts.
+    expect(noPref).not.toContain('gg-btn-secondary');
     expect(parseInt(themeVar('--v2-settle-ms'), 10)).toBeLessThanOrEqual(5000);
     expect(decls('.gg-btn-primary:disabled')).toContain('animation: none');
     expect(decls(".gg-btn-secondary[aria-disabled='true']")).toContain('animation: none');
   });
 
-  it('runs the enter fade and the drift together on a swirl button that also has gg-enter', () => {
-    for (const base of ['.gg-btn-primary', '.gg-btn-secondary']) {
-      const decl = decls(`${base}.gg-enter`, noPref);
-      expect(decl).toMatch(/animation:\s*gg-enter [^,;]+,\s*gg-swirl-drift var\(--v2-settle-ms\) ease-in-out forwards/);
-    }
+  it('runs the enter fade and the drift together on a primary button that also has gg-enter', () => {
+    const decl = decls('.gg-btn-primary.gg-enter', noPref);
+    expect(decl).toMatch(/animation:\s*gg-enter [^,;]+,\s*gg-swirl-drift var\(--v2-settle-ms\) ease-in-out forwards/);
   });
 
   it('animates background-position over a fill larger than the button', () => {
     expect(decls('.gg-btn-primary')).toMatch(/background-size:\s*2\d\d%/);
   });
 
-  it('gives primary and secondary their swirl, text, weight, edge, shadow and radius from the generated vars', () => {
+  it('gives primary its swirl and secondary its outline (transparent, link edge and text, no swirl or shadow) from the generated vars', () => {
     const primary = decls('.gg-btn-primary');
     expect(primary).toContain('background-image: var(--v2-primary-bg)');
     expect(primary).toContain('color: var(--color-v2-primary-text)');
@@ -457,24 +456,26 @@ describe('styles.css swirl buttons', () => {
     expect(primary).toContain('border-color: var(--color-v2-primary-border)');
     expect(primary).toContain('box-shadow: var(--v2-primary-shadow)');
     const secondary = decls('.gg-btn-secondary');
-    expect(secondary).toContain('background-image: var(--v2-secondary-bg)');
-    expect(secondary).toContain('color: var(--color-v2-secondary-text)');
-    expect(secondary).toContain('font-weight: var(--v2-weight-regular)');
-    expect(secondary).toContain('border-width: var(--v2-border-medium)');
-    expect(secondary).toContain('border-color: var(--color-v2-secondary-border)');
-    expect(secondary).toContain('box-shadow: var(--v2-secondary-shadow)');
+    expect(secondary).toContain('background: transparent');
+    expect(secondary).toContain('color: var(--color-v2-outline-text)');
+    expect(secondary).toContain('font-weight: var(--v2-weight-medium)');
+    expect(secondary).toContain('border-width: var(--v2-border-thin)');
+    expect(secondary).toContain('border-color: var(--color-v2-outline-border)');
+    expect(secondary).toContain('border-radius: var(--v2-radius)');
+    expect(secondary).not.toMatch(/background-image|box-shadow|background-size|animation/);
     expect(decls('.gg-btn-primary')).toContain('border-radius: var(--v2-radius)');
     expect(themeVar('--v2-radius')).toBe('8px');
   });
 
   it('washes only the fill on hover and pressed (8% and 15% page colour), keeps opacity 1, and hovers only where a pointer can', () => {
     const hover = block('@media (hover: hover)');
-    for (const { base } of swirls) {
-      const hoverSelector = base === '.gg-btn-secondary' ? `${base}${enabled}:not([aria-pressed='true']):hover` : `${base}${enabled}:hover`;
-      expect(decls(hoverSelector, hover)).toMatch(/color-mix\(in srgb, var\(--color-v2-page\) 8%, transparent\)/);
-      const pressed = base === '.gg-btn-secondary' ? `${base}${enabled}:not([aria-pressed='true']):active` : `${base}${enabled}:active`;
-      expect(decls(pressed)).toMatch(/color-mix\(in srgb, var\(--color-v2-page\) 15%, transparent\)/);
-    }
+    expect(decls(`.gg-btn-primary${enabled}:hover`, hover)).toMatch(/color-mix\(in srgb, var\(--color-v2-page\) 8%, transparent\)/);
+    expect(decls(`.gg-btn-primary${enabled}:active`)).toMatch(/color-mix\(in srgb, var\(--color-v2-page\) 15%, transparent\)/);
+    // The outline washes with the focus colour (10% hover, 18% pressed), see the outline contrast test below.
+    const secondaryNotPressed = `.gg-btn-secondary${enabled}:not([aria-pressed='true'])`;
+    expect(decls(`${secondaryNotPressed}:hover`, hover)).toMatch(/background-image: linear-gradient\(color-mix\(in srgb, var\(--color-v2-focus\) 10%, transparent\)/);
+    expect(decls(`${secondaryNotPressed}:active`)).toMatch(/background-image: linear-gradient\(color-mix\(in srgb, var\(--color-v2-focus\) 18%, transparent\)/);
+    expect(decls(`${secondaryNotPressed}:active`)).toContain('color: var(--color-v2-heading)');
     expect(css.replace(hover, '')).not.toMatch(/\.gg-btn-(?:primary|secondary)[^{}]*:hover/);
     expect(css).not.toMatch(/\.gg-btn-(?:primary|secondary)[^{}]*\{[^}]*opacity:\s*0\.\d+/);
   });
@@ -516,15 +517,78 @@ describe('styles.css swirl buttons', () => {
     expect(decl).toContain('background-color: var(--color-v2-page)');
     expect(decl).toContain('border-style: dashed');
     expect(decl).not.toMatch(/(?:^|[\s;])color:/);
-    expect(contrast(hexVar('--color-v2-secondary-text'), page)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(hexVar('--color-v2-outline-text'), page)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps a pressed toggle secondary as a flat wash tint with no swirl or animation, label 4.5:1 or more', () => {
+  it('keeps a pressed toggle secondary as a flat wash tint, label 4.5:1 or more', () => {
     const decl = decls(".gg-btn-secondary[aria-pressed='true']");
-    expect(decl).toContain('background-image: none');
     expect(decl).toContain('background-color: var(--color-v2-wash)');
-    expect(decl).toContain('animation: none');
-    expect(contrast(hexVar('--color-v2-secondary-text'), hexVar('--color-v2-wash'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(hexVar('--color-v2-outline-text'), hexVar('--color-v2-wash'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // The 10% (hover) and 18% (pressed) washes sit over the page, both glows and glass over each. The pressed tertiary label turns heading colour.
+  const washed = (ground: string, percent: number) => mix(hexVar('--color-v2-focus'), ground, percent / 100);
+
+  it('keeps the secondary outline edge at 3:1 and its label at 4.5:1 on the page, both glows and glass, at rest, hover and pressed', () => {
+    for (const ground of [...grounds, ...glassOver]) {
+      expect(contrast(hexVar('--color-v2-outline-border'), ground), `edge on ${ground}`).toBeGreaterThanOrEqual(3);
+      for (const wash of [0, 10]) {
+        expect(contrast(hexVar('--color-v2-outline-text'), washed(ground, wash)), `label on ${ground} wash ${wash}`).toBeGreaterThanOrEqual(4.5);
+      }
+      // Pressed: the label turns heading colour, because the link colour falls under 4.5:1 on the 18% tint over the sun glow.
+      expect(contrast(hexVar('--color-v2-heading'), washed(ground, 18)), `heading on ${ground} wash 18`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('keeps the tertiary label at 4.5:1 on the page, both glows and glass, at rest and hover (link colour) and pressed (heading colour)', () => {
+    expect(decls('.gg-btn-tertiary')).toContain('color: var(--color-v2-link)');
+    expect(decls('.gg-btn-tertiary')).toContain('text-decoration: underline');
+    expect(decls(`.gg-btn-tertiary${enabled}:active`)).toContain('color: var(--color-v2-heading)');
+    for (const ground of [...grounds, ...glassOver]) {
+      for (const wash of [0, 10]) {
+        expect(contrast(hexVar('--color-v2-link'), washed(ground, wash)), `link on ${ground} wash ${wash}`).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(hexVar('--color-v2-heading'), washed(ground, 18)), `heading on ${ground} wash 18`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('makes an unavailable tertiary the muted text colour with opacity 1, and keeps that label at 4.5:1 on the page, both glows and glass', () => {
+    for (const selector of ['.gg-btn-tertiary:disabled', ".gg-btn-tertiary[aria-disabled='true']", "[data-gg-btn='tertiary']:disabled", "[data-gg-btn='tertiary'][aria-disabled='true']"]) {
+      const decl = decls(selector);
+      expect(decl, selector).toContain('opacity: 1');
+      expect(decl, selector).toContain('color: var(--color-v2-muted)');
+      expect(decl, selector).toContain('background-image: none');
+    }
+    for (const ground of [...grounds, ...glassOver]) {
+      expect(contrast(hexVar('--color-v2-muted'), ground), `muted on ${ground}`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(hexVar('--color-v2-muted'), hexVar('--color-v2-wash'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // react-native-web's unlayered reset and the unlayered `background-color: transparent` rule beat any layered background-color, so the
+  // libs/ui secondary and tertiary wash must be a background-image (which neither resets). This fails if it goes back to background-color.
+  it('draws the data-gg-btn secondary and tertiary hover and pressed wash as a background-image, never a background-color', () => {
+    const unlayered = css.replace(block('@layer components'), '');
+    expect(unlayered).toMatch(/button\[data-gg-btn='secondary'\]\s*\{[^}]*background-color:\s*transparent/);
+    expect(unlayered).toMatch(/button\[data-gg-btn='tertiary'\]\s*\{[^}]*background-color:\s*transparent/);
+    const hover = block('@media (hover: hover)');
+    const washes = [
+      [`[data-gg-btn='secondary']${enabled}:not([aria-pressed='true']):hover`, hover],
+      [`[data-gg-btn='secondary']${enabled}:not([aria-pressed='true']):active`, css],
+      [`[data-gg-btn='tertiary']${enabled}:hover`, css],
+      [`[data-gg-btn='tertiary']${enabled}:active`, css],
+    ] as const;
+    for (const [selector, source] of washes) {
+      const decl = decls(selector, source);
+      expect(decl, selector).toMatch(/background-image:\s*linear-gradient\(color-mix/);
+      expect(decl, selector).not.toMatch(/background(?:-color)?:/);
+    }
+  });
+
+  it('draws no blue soft-ocean swirl in styles.css', () => {
+    expect(css).not.toContain('--v2-secondary-bg');
+    expect(css).not.toContain('--v2-secondary-shadow');
+    expect(css).not.toMatch(/soft-?ocean/i);
   });
 
   it('draws the swirl focus ring in the link colour (4.5:1 or more on the page, glows and glass), unlayered, with no outline removal', () => {
@@ -540,7 +604,7 @@ describe('styles.css swirl buttons', () => {
       expect(contrast(hexVar('--color-v2-link'), ground)).toBeGreaterThanOrEqual(4.5);
     }
     const rules = ['.gg-btn-primary', '.gg-btn-secondary', ".gg-btn-primary[aria-disabled='true']", ".gg-btn-secondary[aria-disabled='true']"].map((s) => decls(s)).join('\n');
-    expect(rules).not.toMatch(/pointer-events|outline/);
+    expect(rules).not.toMatch(/pointer-events|(?:^|[\s;])outline(?:-\w+)?:/);
   });
 
   it('uses no literal colours in the swirl button rules, and defines every var they use', () => {
