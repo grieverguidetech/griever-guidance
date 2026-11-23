@@ -79,6 +79,16 @@ describe('Ready to send (Share the service)', () => {
     expect(screen.getByDisplayValue(/Oak Chapel/)).toBeTruthy();
   });
 
+  it('lets the message box grow to fit the whole message (#963)', () => {
+    render(<Harness />);
+    const box = screen.getByLabelText('Your message');
+    expect(box.props.multiline).toBe(true);
+    // A line cap would stop the box at that height on iOS, so the rest would scroll inside it.
+    expect(box.props.numberOfLines).toBeUndefined();
+    expect(StyleSheet.flatten(box.props.style)).toMatchObject({ minHeight: 132 });
+    expect(StyleSheet.flatten(box.props.style).maxHeight).toBeUndefined();
+  });
+
   it('sends the edited text in the sms: link', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     render(<Harness />);

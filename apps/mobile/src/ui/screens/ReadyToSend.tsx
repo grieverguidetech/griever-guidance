@@ -319,7 +319,6 @@ function MessageField({ label, lead, caption, value, onChangeText }: MessageFiel
         accessibilityHint={caption}
         aria-describedby={captionId}
         multiline
-        numberOfLines={6}
         value={value}
         onChangeText={onChangeText}
       />
