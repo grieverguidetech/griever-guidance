@@ -49,6 +49,25 @@ describe('PhoneNudge', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
+  it('hides the swirl decorations from screen readers and clicks, and reads heading, line, button in order', () => {
+    render(<PhoneNudge section="service" onDismiss={() => undefined} />);
+    const card = screen.getByRole('region');
+    const hidden = card.querySelectorAll('[aria-hidden="true"]');
+    expect(card.querySelector('.gg-phone-nudge-orb')).toHaveAttribute('aria-hidden', 'true');
+    expect(card.querySelector('.gg-phone-nudge-speckles')).toHaveAttribute('aria-hidden', 'true');
+    expect(hidden.length).toBe(2);
+    expect(card.querySelectorAll('.gg-phone-nudge-speckles > span')).toHaveLength(7);
+    expect(screen.queryAllByRole('img')).toEqual([]);
+    const heading = screen.getByRole('heading', { level: 2 });
+    const line = card.querySelector('p') as HTMLElement;
+    const button = screen.getByRole('button', { name: 'Got it' });
+    expect(heading.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(line.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const decoration of Array.from(hidden)) {
+      expect(decoration.contains(heading) || decoration.contains(button)).toBe(false);
+    }
+  });
+
   it('holds no hard-coded copy', () => {
     const source = readFileSync(join(import.meta.dirname, 'PhoneNudge.tsx'), 'utf8');
     expect(findHardCodedCopy(source, 'cmsShell')).toEqual([]);

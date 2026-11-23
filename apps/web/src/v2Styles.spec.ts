@@ -541,3 +541,94 @@ describe('styles.css swirl buttons', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('styles.css phone nudge (#1003)', () => {
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const noPrefStart = bare.indexOf('@media (prefers-reduced-motion: no-preference) {\n    .gg-phone-nudge {');
+  const noPrefOpen = bare.indexOf('{', noPrefStart);
+  let depth = 0;
+  let noPrefEnd = noPrefOpen;
+  for (let i = noPrefOpen; i < bare.length; i += 1) {
+    if (bare[i] === '{') {
+      depth += 1;
+    } else if (bare[i] === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        noPrefEnd = i;
+        break;
+      }
+    }
+  }
+  const noPref = bare.slice(noPrefOpen + 1, noPrefEnd);
+  /** Everything except the no-preference block. */
+  const outside = bare.slice(0, noPrefStart) + bare.slice(noPrefEnd + 1);
+  /** Declarations of the one rule with this exact selector, in the given source. */
+  const decls = (selector: string, source: string) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\>]/g, '\\$&');
+    const found = [...source.matchAll(new RegExp(`(?:^|\\n)\\s*${escaped}\\s*\\{([^{}]*)\\}`, 'g'))];
+    if (found.length === 0) {
+      throw new Error(`No rule for ${selector}`);
+    }
+    return found.map((m) => m[1]).join('\n');
+  };
+  const nudgeRules = [
+    '.gg-phone-nudge',
+    '.gg-phone-nudge-orb',
+    '.gg-phone-nudge-speckles',
+    '.gg-phone-nudge-speckles > span',
+    ...[1, 2, 3, 4, 5, 6, 7].map((n) => `.gg-phone-nudge-speckles > span:nth-child(${n})`),
+  ];
+
+  it('takes the swirl, text, edge, shadow and radius from the generated nudge vars', () => {
+    const card = decls('.gg-phone-nudge', outside);
+    expect(card).toContain('background-image: var(--v2-nudge-bg)');
+    expect(card).toMatch(/background-size:\s*200% 200%/);
+    expect(card).toContain('color: var(--color-v2-nudge-text)');
+    expect(card).toMatch(/border:\s*var\(--v2-border-thin\) solid var\(--color-v2-nudge-border\)/);
+    expect(card).toContain('box-shadow: var(--v2-nudge-shadow)');
+    expect(card).toContain('border-radius: var(--v2-radius)');
+    expect(card).not.toMatch(/--shadow-md|--color-accent-100/);
+  });
+
+  it('draws the orb as a conic gradient that takes no pointer events, and the speckles inside the card, faint and small', () => {
+    expect(decls('.gg-phone-nudge-orb', outside)).toMatch(/background-image:\s*conic-gradient\(/);
+    expect(decls('.gg-phone-nudge-orb', outside)).toContain('pointer-events: none');
+    expect(decls('.gg-phone-nudge-speckles', outside)).toContain('pointer-events: none');
+    expect(decls('.gg-phone-nudge-speckles > span', outside)).toMatch(/opacity:\s*0\.28/);
+  });
+
+  it('declares every nudge animation only inside a no-preference block, as one pass of the settle var that rests (forwards)', () => {
+    expect(outside).not.toMatch(/\.gg-phone-nudge[^{}]*\{[^{}]*\banimation/);
+    expect(outside).not.toMatch(/@keyframes gg-orb-turn/);
+    const card = /animation:\s*([^;]+);/.exec(decls('.gg-phone-nudge', noPref))?.[1] ?? '';
+    expect(card).toContain('gg-swirl-drift var(--v2-settle-ms)');
+    const orb = /animation:\s*([^;]+);/.exec(decls('.gg-phone-nudge-orb', noPref))?.[1] ?? '';
+    expect(orb).toContain('var(--v2-settle-ms)');
+    for (const decl of [card, orb, /animation:\s*([^;]+);/.exec(decls('.gg-phone-nudge.gg-enter', noPref))?.[1] ?? '']) {
+      expect(decl).toMatch(/\bforwards\b/);
+      expect(decl).not.toMatch(/infinite|alternate/);
+    }
+    expect(parseInt(themeVar('--v2-settle-ms'), 10)).toBeLessThanOrEqual(5000);
+    expect(noPref).toMatch(/@keyframes gg-orb-turn/);
+  });
+
+  it('keeps the nudge text at 4.5:1 or more against every pastel stop and the midpoint of each pair', () => {
+    const text = themeVar('--color-v2-nudge-text');
+    const stops = [...themeVar('--v2-nudge-bg').matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+    expect(stops.length).toBeGreaterThanOrEqual(3);
+    const mids = stops.slice(1).map((stop, i) => blend({ rgb: toRgb(stop), alpha: 0.5 }, stops[i]));
+    for (const ground of [...stops, ...mids]) {
+      expect({ ground, ok: contrast(text, ground) >= 4.5 }).toEqual({ ground, ok: true });
+    }
+  });
+
+  it('uses no literal colours in the nudge rules, and defines every var they use', () => {
+    const rules = nudgeRules.map((s) => decls(s, outside)).join('\n');
+    expect(`${rules}\n${noPref}`).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    const used = [...`${rules}\n${noPref}`.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(0);
+    for (const name of new Set(used)) {
+      expect(`${theme}\n${css}`, name).toMatch(new RegExp(`${name}:`));
+    }
+  });
+});

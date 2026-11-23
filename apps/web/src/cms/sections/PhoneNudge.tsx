@@ -70,7 +70,7 @@ interface Props {
   nudgeRef?: Ref<HTMLDivElement>;
 }
 
-/** One blue card for every section: a heading, one line saying where the sending happens, and Got it at the right.
+/** One pastel swirl card for every section: a heading, one line saying where the sending happens, and Got it at the right.
  * A labelled region the parent focuses when it appears, so the heading and line are announced once. The
  * focus moves by script and shows no visible ring (#803, .gg-phone-nudge:focus in styles.css). */
 export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
@@ -85,6 +85,12 @@ export function PhoneNudge({ section, onDismiss, nudgeRef }: Props) {
       aria-describedby={lineId}
       className="gg-phone-nudge flex w-full flex-wrap items-end gap-x-4 gap-y-3 p-4 gg-enter"
     >
+      <span aria-hidden="true" className="gg-phone-nudge-speckles">
+        {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+          <span key={n} />
+        ))}
+      </span>
+      <span aria-hidden="true" className="gg-phone-nudge-orb" />
       <div className="flex min-w-0 basis-56 flex-1 flex-col gap-1">
         <h2 id={headingId} className="text-base font-semibold">
           {HEADINGS[section]}
