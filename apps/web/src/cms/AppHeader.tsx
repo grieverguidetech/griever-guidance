@@ -38,7 +38,7 @@ export function AppHeader({ checklist }: { checklist?: HeaderChecklistToggle } =
           data-testid="wordmark-name"
           className="text-[17px] leading-6 text-[color:var(--color-v2-heading)]"
           style={{
-            fontFamily: 'var(--font-v2)',
+            fontFamily: 'var(--font-v2-body)',
             fontWeight: 'var(--v2-weight-regular)',
           }}
         >

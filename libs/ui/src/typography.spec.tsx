@@ -3,7 +3,7 @@ import { v2 } from '@griever/tokens';
 import * as tokens from '@griever/tokens';
 import { Body, Eyebrow } from './Text';
 import { Button } from './Button';
-import { serifFamily, serifWeight, webFontFamily } from './typography';
+import { serifFamily, serifWeight, webEyebrowFontFamily, webFontFamily } from './typography';
 
 function family(text: string): string {
   return getComputedStyle(screen.getByText(text)).fontFamily;
@@ -41,9 +41,16 @@ describe('one font for all text', () => {
         <Button label="Go" onPress={vi.fn()} variant="tinted" />
       </>,
     );
-    for (const text of ['Eyebrow text', 'Body text', 'Go']) {
+    for (const text of ['Body text', 'Go']) {
       expect(family(text)).toContain('var(--font-v2-body)');
     }
+  });
+
+  it('the Eyebrow reads the eyebrow role: the --font-v2-eyebrow var, and the role names the body family', () => {
+    expect(v2.roles.eyebrow.family).toBe(v2.primitives.font.bodyFamily);
+    expect(webEyebrowFontFamily).toBe('var(--font-v2-eyebrow)');
+    render(<Eyebrow>Eyebrow line</Eyebrow>);
+    expect(family('Eyebrow line')).toContain('var(--font-v2-eyebrow)');
   });
 
   it('no Source Serif family name is exported by tokens (#1010)', () => {

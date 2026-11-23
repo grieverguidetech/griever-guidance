@@ -19,6 +19,7 @@ export {
   toMarketingCss,
   toMarketingFile,
   toWebThemeCss,
+  webEyebrowFontStack,
   webFontStack,
   webHeadingFontStack,
   type MarketingInput,

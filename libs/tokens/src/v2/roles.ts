@@ -11,7 +11,8 @@ export function buildRoles(p: Primitives) {
       soft: p.font.headingSoft,
     },
     eyebrow: {
-      family: p.font.headingFamily,
+      /** The small uppercase line reads better in the body family. Every eyebrow surface reads this role. */
+      family: p.font.bodyFamily,
       color: p.colors.eyebrow,
       size: p.size.eyebrow,
       tracking: p.size.eyebrowTracking,

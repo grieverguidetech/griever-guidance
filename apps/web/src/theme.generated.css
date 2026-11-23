@@ -4,7 +4,7 @@
 @theme {
   --font-v2-heading: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
   --font-v2-body: 'Nunito Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-v2: 'Nunito Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-v2-eyebrow: 'Nunito Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --color-text: #1b2433;
   --color-v2-page: #f8f7f4;
   --color-v2-glow-sun: #fcefd6;

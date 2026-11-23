@@ -81,7 +81,6 @@ export function marketingLines({ roles, recipes }: MarketingInput): string[] {
     ['glow-sun', roles.page.glows.topRight],
     ['glow-sky', roles.page.glows.bottomLeft],
     ['ink', roles.ink],
-    ['font', `'${roles.body.family}'`],
     ['font-heading', `'${roles.heading.family}'`],
     ['font-body', `'${roles.body.family}'`],
     ['heading-soft', String(roles.heading.soft)],
@@ -134,14 +133,19 @@ export function webHeadingFontStack(p: Pick<Primitives, 'font'>): string {
   return `'${p.font.headingFamily}', ui-serif, Georgia, 'Times New Roman', serif`;
 }
 
-/** `--font-v2-heading`, `--font-v2-body`, `--font-v2` (an alias of the body stack, so older uses keep working) and the v2 colours (Tailwind reads these). Every name starts `v2`, except ink, which is `--color-text`. */
+/** The web font stack for the eyebrow: the stack of whichever family `roles.eyebrow.family` names (body, today). */
+export function webEyebrowFontStack(p: Pick<Primitives, 'font'>, eyebrowFamily: string): string {
+  return eyebrowFamily === p.font.headingFamily ? webHeadingFontStack(p) : webFontStack(p);
+}
+
+/** `--font-v2-heading`, `--font-v2-body`, `--font-v2-eyebrow` and the v2 colours (Tailwind reads these). Every name starts `v2`, except ink, which is `--color-text`. */
 export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): string[] {
   const { primary, secondary } = recipes.button;
   const { card, nudge, field } = recipes;
   const lines: Array<[string, string]> = [
     ['font-v2-heading', webHeadingFontStack(primitives)],
     ['font-v2-body', webFontStack(primitives)],
-    ['font-v2', webFontStack(primitives)],
+    ['font-v2-eyebrow', webEyebrowFontStack(primitives, roles.eyebrow.family)],
     ['color-text', roles.ink],
     ['color-v2-page', roles.page.color],
     ['color-v2-glow-sun', roles.page.glows.topRight],

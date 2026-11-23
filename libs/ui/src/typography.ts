@@ -6,6 +6,14 @@ export const webFontFamily = 'var(--font-v2-body)';
 /** The web heading family: Fraunces, from the generated --font-v2-heading var. */
 export const webHeadingFontFamily = 'var(--font-v2-heading)';
 
+/** The web eyebrow family: the generated --font-v2-eyebrow var, built from `v2.roles.eyebrow.family`. */
+export const webEyebrowFontFamily = 'var(--font-v2-eyebrow)';
+
+/** `fontFamily` and `fontWeight` for the eyebrow: the eyebrow role's family at the regular weight. */
+export function useEyebrowStyle(): { fontFamily: string; fontWeight: '400' } {
+  return { fontFamily: webEyebrowFontFamily, fontWeight: String(v2.primitives.font.weights.regular) as '400' };
+}
+
 /**
  * `heading` is the h1 weight (v2.roles.heading) and `headingRegular` the lower heading levels; both use the
  * heading family. `regular` and `semibold` use the body family (`semibold` is the emphasis weight, 600).

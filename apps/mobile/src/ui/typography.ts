@@ -23,8 +23,14 @@ const weightByName = {
   semibold: v2.primitives.font.weights.medium,
 } as const;
 
+/** The font kind the eyebrow uses: the kind whose family `v2.roles.eyebrow.family` names (body, today). */
+export const eyebrowKind: FontKind = v2.roles.eyebrow.family === v2.roles.heading.family ? 'heading' : 'body';
+
 // Fraunces ships 300 and 400 here, Nunito Sans 400 and 600. A weight a family does not ship takes
-// its closest face: heading "semibold" is Fraunces 400, body "light" is Nunito Sans 400.
+// its closest face, on purpose and without a warning:
+//   heading "semibold" -> Fraunces 400 (headings are never bolder than 400)
+//   body "light"       -> Nunito Sans 400 (body text has no light face)
+// (pinned in typography.spec.ts)
 const nativeFamily = {
   heading: { light: fontFamilies.heading.light, regular: fontFamilies.heading.regular, semibold: fontFamilies.heading.regular },
   body: { light: fontFamilies.body.regular, regular: fontFamilies.body.regular, semibold: fontFamilies.body.semibold },

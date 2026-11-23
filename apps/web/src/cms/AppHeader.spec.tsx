@@ -26,7 +26,7 @@ describe('AppHeader', () => {
   it('takes the font and colours from v2 variables', () => {
     renderApp(<AppHeader />);
     const name = screen.getByTestId('wordmark-name');
-    expect(name.style.fontFamily).toBe('var(--font-v2)');
+    expect(name.style.fontFamily).toBe('var(--font-v2-body)');
     expect(name.style.fontWeight).toBe('var(--v2-weight-regular)');
     expect(name.className).toContain('text-[color:var(--color-v2-heading)]');
     const [sun, line] = Array.from(screen.getByRole('banner').querySelectorAll('svg path'));

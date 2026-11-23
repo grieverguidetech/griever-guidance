@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { v2 } from '@griever/tokens';
-import { useSerifStyle } from './typography';
+import { useEyebrowStyle, useSerifStyle } from './typography';
 
 export interface EyebrowProps {
   children: ReactNode;
@@ -11,7 +11,7 @@ export interface EyebrowProps {
 
 /** The small accent line above a heading, for example "For Margaret". */
 export function Eyebrow({ children, tone = 'accent' }: EyebrowProps) {
-  const font = useSerifStyle('regular');
+  const font = useEyebrowStyle();
   return <Text style={[styles.eyebrow, tone === 'accent2' && styles.accent2, font]}>{children}</Text>;
 }
 

@@ -58,7 +58,7 @@ export function PeopleList({ sessions, onOpen, onCreate, canCreate, holding = fa
                   className="gg-panel group flex items-center justify-between gap-3 w-full min-h-11 text-left cursor-pointer hover:shadow-[var(--shadow-sm)] motion-safe:transition-[box-shadow,transform] motion-safe:duration-150 motion-safe:active:translate-y-px"
                 >
                   <span className="flex flex-col min-w-0 break-words">
-                    <span className={named ? 'font-medium' : 'gg-meta'}>{name}</span>
+                    <span className={named ? 'font-semibold' : 'gg-meta'}>{name}</span>
                     {passed && <span className="gg-meta">{passed}</span>}
                   </span>
                   <CaretRight

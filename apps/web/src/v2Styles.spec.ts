@@ -79,11 +79,24 @@ describe('styles.css type roles', () => {
   });
 
   it('sets headings, card titles and eyebrows in Fraunces with the SOFT axis, and buttons in the body family', () => {
-    for (const selector of ['h1, h2, h3, h4, h5, h6', '.gg-card-title', '.gg-card-kicker', '.gg-eyebrow']) {
+    for (const selector of ['h1, h2, h3, h4, h5, h6', '.gg-card-title']) {
       expect(rule(selector), selector).toContain('font-family: var(--font-v2-heading)');
       expect(rule(selector), selector).toContain("font-variation-settings: 'SOFT' var(--v2-heading-soft)");
     }
     expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*\{[^}]*font-family: var\(--font-v2-body\)/);
+  });
+
+  it('sets both eyebrow classes from the eyebrow role var, which is the body family', () => {
+    for (const selector of ['.gg-card-kicker', '.gg-eyebrow']) {
+      expect(rule(selector), selector).toContain('font-family: var(--font-v2-eyebrow)');
+    }
+    expect(v2.roles.eyebrow.family).toBe(v2.primitives.font.bodyFamily);
+    expect(theme).toContain(`--font-v2-eyebrow: '${v2.roles.eyebrow.family}'`);
+  });
+
+  it('has no --font-v2 alias left in the theme or the styles', () => {
+    expect(theme).not.toMatch(/--font-v2:/);
+    expect(css).not.toMatch(/var\(--font-v2\)/);
   });
 
   it('has no Sora left in the styles', () => {

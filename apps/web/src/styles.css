@@ -322,8 +322,7 @@ h1 { font-weight: var(--v2-heading-weight); }
   .gg-card-selectable { cursor: pointer; }
   .gg-card-selected { outline: 2px solid var(--color-v2-focus); outline-offset: -2px; }
   .gg-card-kicker {
-    font-family: var(--font-v2-heading);
-    font-variation-settings: 'SOFT' var(--v2-heading-soft);
+    font-family: var(--font-v2-eyebrow);
     font-size: var(--v2-eyebrow-size);
     letter-spacing: var(--v2-eyebrow-tracking);
     text-transform: uppercase;
@@ -497,8 +496,7 @@ h1 { font-weight: var(--v2-heading-weight); }
 
   /* — misc — */
   .gg-eyebrow {
-    font-family: var(--font-v2-heading);
-    font-variation-settings: 'SOFT' var(--v2-heading-soft);
+    font-family: var(--font-v2-eyebrow);
     font-size: var(--v2-eyebrow-size);
     letter-spacing: var(--v2-eyebrow-tracking);
     text-transform: uppercase;

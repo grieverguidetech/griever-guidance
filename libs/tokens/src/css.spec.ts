@@ -6,6 +6,7 @@ import {
   toMarketingCss,
   toMarketingFile,
   toWebThemeCss,
+  webEyebrowFontStack,
   webFontStack,
   webHeadingFontStack,
 } from './css.js';
@@ -100,7 +101,7 @@ describe('toMarketingCss', () => {
     expect(vars['--gg-glow-sky']).toBe(c.glowSky);
     expect(vars['--gg-ink']).toBe(c.ink);
     expect(vars['--gg-heading']).toBe(c.heading);
-    expect(vars['--gg-font']).toBe("'Nunito Sans'");
+    expect(vars['--gg-font']).toBeUndefined();
     expect(vars['--gg-font-body']).toBe("'Nunito Sans'");
     expect(vars['--gg-font-heading']).toBe("'Fraunces'");
     expect(vars['--gg-heading-soft']).toBe('100');
@@ -176,7 +177,9 @@ describe('toWebThemeCss with v2', () => {
   it('puts colours and the font in @theme, and gradients, shadows, radius and ms in :root', () => {
     expect(theme['--color-v2-error']).toBe('#b3261e');
     expect(theme['--color-v2-success']).toBe('#2a7048');
-    expect(theme['--font-v2']).toBe(webFontStack(v2.primitives));
+    expect(theme['--font-v2']).toBeUndefined();
+    expect(theme['--font-v2-eyebrow']).toBe(webEyebrowFontStack(v2.primitives, v2.roles.eyebrow.family));
+    expect(theme['--font-v2-eyebrow']).toBe(webFontStack(v2.primitives));
     expect(theme['--font-v2-body']).toBe(webFontStack(v2.primitives));
     expect(theme['--font-v2-heading']).toBe(webHeadingFontStack(v2.primitives));
     expect(root['--v2-primary-bg']).toMatch(/^linear-gradient\(120deg, /);
@@ -220,7 +223,7 @@ describe('toWebThemeCss with v2', () => {
       if (name === '--color-text') {
         continue;
       }
-      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2(-heading|-body)?$|space-\d+$)/);
+      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2-(heading|body|eyebrow)$|space-\d+$)/);
     }
   });
 
@@ -311,7 +314,7 @@ describe('toWebThemeCss with v2', () => {
     expect(t['--color-v2-error']).toBe('#0a0b0c');
     expect(t['--color-v2-focus']).toBe('#010203'); // the focus role follows the link primitive (#1005)
     expect(t['--color-v2-secondary-border']).toBe('#112233');
-    expect(t['--font-v2']).toMatch(/^'Fixture', /);
+    expect(t['--font-v2-eyebrow']).toMatch(/^'Fixture', /);
     expect(t['--font-v2-body']).toMatch(/^'Fixture', /);
     expect(t['--font-v2-heading']).toMatch(/^'FixtureHead', /);
     expect(r['--v2-primary-bg']).toBe(
