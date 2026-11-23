@@ -25,7 +25,7 @@ import { App } from './app';
 
 const FLOW = '3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10';
 const SECOND = 'b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e';
-const MISSING_LINE = "That page isn't here. Your people are below.";
+const MISSING_LINE = "That page isn't here. The people you've lost are below.";
 const OTHER = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
 
 function personRecord(id: string, flowId: string, personName: string, openedAt = '2026-10-10T00:00:00.000Z') {
@@ -156,10 +156,10 @@ describe('editor URLs (#849)', () => {
     expect(window.history.length).toBe(before);
   });
 
-  it('a person who is not on this device: Your people with a calm line, the id gone from the page and the address', async () => {
+  it('a person who is not on this device: Who you\'ve lost with a calm line, the id gone from the page and the address', async () => {
     renderApp(<App />, { path: `/people/${OTHER}/service` });
-    expect(await h1('Your people')).toBeInTheDocument();
-    expect(screen.getByText("That page isn't here. Your people are below.")).toBeInTheDocument();
+    expect(await h1("Who you've lost")).toBeInTheDocument();
+    expect(screen.getByText("That page isn't here. The people you've lost are below.")).toBeInTheDocument();
     expect(window.location.pathname).toBe('/people');
     expect(document.body.textContent).not.toContain(OTHER);
     expect(screen.getByRole('button', { name: 'Margaret Hayes' })).toBeInTheDocument();
@@ -173,17 +173,17 @@ describe('editor URLs (#849)', () => {
 
   it('a person not on this device: the line is said once from a polite region that was already there (#849 a11y)', async () => {
     renderApp(<App />, { path: `/people/${OTHER}` });
-    await h1('Your people');
+    await h1("Who you've lost");
     const visible = screen.getByText(MISSING_LINE, { selector: 'p' });
     expect(visible).not.toHaveAttribute('role');
     const regions = () => screen.getAllByRole('status').filter((region) => region.getAttribute('aria-live') === 'polite');
     await waitFor(() => expect(regions().some((region) => region.textContent === MISSING_LINE)).toBe(true));
   });
 
-  it('a person removed on this device: Your people, with no "not here" line (#849 S3)', async () => {
+  it('a person removed on this device: Who you\'ve lost, with no "not here" line (#849 S3)', async () => {
     window.localStorage.setItem('gg.removedFlows.v1', JSON.stringify([{ id: OTHER, ownerId: null }]));
     renderApp(<App />, { path: `/people/${OTHER}/service` });
-    expect(await h1('Your people')).toBeInTheDocument();
+    expect(await h1("Who you've lost")).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(screen.queryByText(MISSING_LINE)).toBeNull();
     expect(window.location.pathname).toBe('/people');
@@ -219,14 +219,14 @@ describe('leaving an unnamed new person (#849 B1)', () => {
     await h1('The person');
   }
 
-  it('Start, then Your people: the list, with no "not here" line', async () => {
+  it('Start, then Who you\'ve lost: the list, with no "not here" line', async () => {
     const user = userEvent.setup();
     await startUnnamed(user);
-    await user.click(nav().getByRole('link', { name: 'Your people' }));
-    expect(await h1('Your people')).toBeInTheDocument();
+    await user.click(nav().getByRole('link', { name: "Who you've lost" }));
+    expect(await h1("Who you've lost")).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(screen.queryByText(MISSING_LINE)).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: "Who you've lost" })).toBeInTheDocument();
   });
 
   it('Start, then Your account: lands on Account', async () => {
@@ -380,18 +380,18 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
     }
   });
 
-  it('nobody saved: an item opened from Your people closes back to Your people at its own address', async () => {
+  it('nobody saved: an item opened from Who you\'ve lost closes back to Who you\'ve lost at its own address', async () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/start' });
     await h1('Overview');
-    await user.click(nav().getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(nav().getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     const before = window.location.pathname;
     await user.click(panel().getByRole('button', { name: ITEM }));
     await h1(ITEM);
     expect(window.location.pathname).toBe('/start/guide/pronouncement');
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    await h1('Your people');
+    await h1("Who you've lost");
     expect(window.location.pathname).toBe(before);
   });
 
@@ -468,7 +468,7 @@ describe('checklist items and the empty pages have URLs (#856)', () => {
   });
 });
 
-describe('Your people and Your account have URLs (#850)', () => {
+describe('Who you\'ve lost and Your account have URLs (#850)', () => {
   const ITEM = 'Get a legal pronouncement of death';
 
   function back() {
@@ -479,7 +479,7 @@ describe('Your people and Your account have URLs (#850)', () => {
 
   it('/people and /account open their screens by deep link, and a reload stays there', async () => {
     const people = renderApp(<App />, { path: '/people' });
-    expect(await h1('Your people')).toBeInTheDocument();
+    expect(await h1("Who you've lost")).toBeInTheDocument();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(window.location.pathname).toBe('/people');
     people.unmount();
@@ -505,14 +505,14 @@ describe('Your people and Your account have URLs (#850)', () => {
     await waitFor(() => expect(service).toHaveFocus());
   });
 
-  it('Back from /account returns to Your people when it was opened from there, and Forward goes on', async () => {
+  it('Back from /account returns to Who you\'ve lost when it was opened from there, and Forward goes on', async () => {
     const user = userEvent.setup();
     renderApp(<App />, { path: '/people' });
-    await h1('Your people');
+    await h1("Who you've lost");
     await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
     back();
-    await h1('Your people');
+    await h1("Who you've lost");
     expect(window.location.pathname).toBe('/people');
     act(() => {
       window.history.forward();
@@ -547,16 +547,16 @@ describe('Your people and Your account have URLs (#850)', () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 
-  it('an item opened from the preview panel on Your people closes back to Your people (nobody saved)', async () => {
+  it('an item opened from the preview panel on Who you\'ve lost closes back to Who you\'ve lost (nobody saved)', async () => {
     window.localStorage.clear();
     const user = userEvent.setup();
     renderApp(<App />, { path: '/people' });
-    await h1('Your people');
+    await h1("Who you've lost");
     await user.click(within(screen.getByRole('complementary', { name: "What you'll need" })).getByRole('button', { name: ITEM }));
     await h1(ITEM);
     expect(window.location.pathname).toBe('/start/guide/pronouncement');
     await user.click(screen.getByRole('button', { name: 'Back' }));
-    await h1('Your people');
+    await h1("Who you've lost");
     expect(window.location.pathname).toBe('/people');
   });
 

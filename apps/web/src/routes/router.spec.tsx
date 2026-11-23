@@ -77,13 +77,13 @@ describe('scroll restoration (#852)', () => {
     const router = createMemoryRouter(routes, { initialEntries: ['/people'] });
     render(<RouterProvider router={router} />);
 
-    // Halfway down Your people, open a person: the new page starts at the top.
+    // Halfway down Who you've lost, open a person: the new page starts at the top.
     scrolledTo(640);
     scrollTo.mockClear();
     await act(() => router.navigate('/people/3f2b8c1e-9d4a-4c7e-b1f0-2a6d5e8c9b10'));
     expect(scrollTo).toHaveBeenLastCalledWith(0, 0);
 
-    // Back: Your people comes back at 640, not at the top.
+    // Back: Who you've lost comes back at 640, not at the top.
     scrolledTo(0);
     scrollTo.mockClear();
     await act(() => router.navigate(-1));

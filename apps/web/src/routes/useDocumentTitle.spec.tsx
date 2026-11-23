@@ -43,7 +43,7 @@ describe('titleForPath', () => {
     ['/sign-in', 'Sign in · Grievers Guidance'],
     ['/sign-in/factor-one', 'Sign in · Grievers Guidance'],
     ['/sign-up', 'Create an account · Grievers Guidance'],
-    ['/people', 'Your people · Grievers Guidance'],
+    ['/people', 'Who you\'ve lost · Grievers Guidance'],
     [`/people/${FLOW}`, 'Overview · Grievers Guidance'],
     [`/people/${FLOW}/person`, 'The person · Grievers Guidance'],
     [`/people/${FLOW}/announcement`, 'Announcement · Grievers Guidance'],
@@ -113,7 +113,7 @@ const EDITOR_ON: [string, string, string][] = [
   ['/sign-in', PERSON, OVERVIEW],
   ['/sign-up', PERSON, OVERVIEW],
   ['/join', PERSON, OVERVIEW],
-  ['/people', '/people', 'Your people · Grievers Guidance'],
+  ['/people', '/people', 'Who you\'ve lost · Grievers Guidance'],
   [PERSON, PERSON, OVERVIEW],
   [`${PERSON}/person`, `${PERSON}/person`, 'The person · Grievers Guidance'],
   [`${PERSON}/announcement`, `${PERSON}/announcement`, 'Announcement · Grievers Guidance'],
@@ -169,7 +169,7 @@ describe('no title ever holds a person\'s name (#852)', () => {
     mocks.loadClerk.mockResolvedValue({ available: false });
     window.localStorage.setItem('gg.signedIn.v1', 'u1');
     renderApp(<App />, { path: '/people' });
-    await settlesOn('/people', 'Your people · Grievers Guidance');
+    await settlesOn('/people', 'Who you\'ve lost · Grievers Guidance');
     // The person is on the page, so a title built from the page would show the name.
     expect(await screen.findByText(/Margaret Hayes/)).toBeInTheDocument();
     expect(document.title).not.toMatch(/Margaret|Hayes/);
@@ -184,12 +184,13 @@ describe('no title ever holds a person\'s name (#852)', () => {
     expect(document.title).not.toMatch(/Margaret|Hayes/);
   });
 
-  it('Your people names them on screen, while the title stays generic', async () => {
+  it('Who you\'ve lost names them on screen, while the title stays generic', async () => {
     mocks.cms = true;
     renderApp(<App />, { path: '/people' });
-    await screen.findByRole('heading', { level: 1, name: 'Your people' });
+    await screen.findByRole('heading', { level: 1, name: "Who you've lost" });
     // The name is on the page, so a title built from the page's person would show it.
     expect(document.body.textContent).toContain('Margaret Hayes');
-    expect(document.title).toBe('Your people · Grievers Guidance');
+    expect(document.title).toBe('Who you\'ve lost · Grievers Guidance');
+    expect(document.title).not.toMatch(/Margaret|Hayes/);
   });
 });

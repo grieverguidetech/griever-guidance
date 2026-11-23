@@ -1,6 +1,6 @@
 /**
  * #603 (Peter's walkthrough round 3): sign-up lands on the Overview with names from Clerk, the account
- * page is titled "Account", Overview and Your people are different pages with nobody saved, "Start with
+ * page is titled "Account", Overview and Who you've lost are different pages with nobody saved, "Start with
  * someone I've lost" always opens The person, and the side nav is the same in every state.
  */
 import { screen, waitFor, within } from '@testing-library/react';
@@ -178,8 +178,8 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
     const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
     await user.click(nav().getByRole('link', { name: 'Your account' }));
     await h1('Account');
-    await user.click(nav().getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(nav().getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     await user.click(nav().getByRole('button', { name: 'Overview' }));
     await h1('Overview');
     await settle();
@@ -229,7 +229,7 @@ describe('the Clerk name prefill is safe (#603 review)', () => {
 });
 
 describe('Account page (#603 2)', () => {
-  it('is titled Account with no name question and no Your people link', async () => {
+  it('is titled Account with no name question and no Who you\'ve lost link', async () => {
     signedIn(undefined, { firstName: 'Anna', senderName: 'Anna' });
     const user = userEvent.setup();
     renderApp(<App />);
@@ -239,20 +239,20 @@ describe('Account page (#603 2)', () => {
     expect(await h1('Account')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'What should we call you?' })).not.toBeInTheDocument();
     const main = screen.getByRole('main');
-    expect(within(main).queryByRole('link', { name: 'Your people' })).not.toBeInTheDocument();
+    expect(within(main).queryByRole('link', { name: "Who you've lost" })).not.toBeInTheDocument();
   });
 });
 
-describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
-  it('Overview shows its own empty page and Your people shows another, in both directions', async () => {
+describe('Overview and Who you\'ve lost with nobody saved (#603 3, 4, 5)', () => {
+  it('Overview shows its own empty page and Who you\'ve lost shows another, in both directions', async () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
     expect(screen.getByText(/Nothing is here yet/)).toBeInTheDocument();
     expect(screen.queryByText('No one here yet.')).not.toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Sections' });
-    await user.click(within(nav).getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(within(nav).getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     expect(screen.getByText('No one here yet.')).toBeInTheDocument();
     expect(screen.queryByText(/Nothing is here yet/)).not.toBeInTheDocument();
     await user.click(within(nav).getByRole('button', { name: 'Overview' }));
@@ -265,8 +265,8 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
     await h1('Overview');
     const nav = screen.getByRole('navigation', { name: 'Sections' });
     expect(within(nav).getAllByRole('img', { name: 'Not started' })).toHaveLength(4);
-    await userEvent.click(within(nav).getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await userEvent.click(within(nav).getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     expect(within(screen.getByRole('navigation', { name: 'Sections' })).getAllByRole('img', { name: 'Not started' })).toHaveLength(4);
   });
 
@@ -288,12 +288,12 @@ describe('Overview and Your people with nobody saved (#603 3, 4, 5)', () => {
     expect(await h1('The person')).toBeInTheDocument();
   });
 
-  it('"Start with someone I\'ve lost" opens The person from Your people', async () => {
+  it('"Start with someone I\'ve lost" opens The person from Who you\'ve lost', async () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(within(screen.getByRole('navigation', { name: 'Sections' })).getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     await user.click(screen.getByRole('button', { name: CREATE }));
     expect(await h1('The person')).toBeInTheDocument();
   });

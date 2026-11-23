@@ -49,7 +49,7 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const PEOPLE = 'Your people';
+const PEOPLE = "Who you've lost";
 const HOME = "Who you're writing about";
 const CREATE = "Start with someone I've lost";
 
@@ -95,9 +95,9 @@ async function openMargaret() {
   return screen.findByRole('heading', { level: 1, name: 'Overview' });
 }
 
-/** The "Your people" item in the side nav (there is no Change button any more). */
+/** The "Who you've lost" item in the side nav (there is no Change button any more). */
 function peopleNav() {
-  return within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' });
+  return within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" });
 }
 
 beforeEach(() => {
@@ -189,7 +189,7 @@ describe('editor on (#395)', () => {
     await waitFor(() => expect(focused4).toHaveFocus());
   });
 
-  it('"Your people" in the nav drops an unnamed person', async () => {
+  it('"Who you\'ve lost" in the nav drops an unnamed person', async () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
@@ -201,7 +201,7 @@ describe('editor on (#395)', () => {
     expect(stored()).toHaveLength(0);
   });
 
-  it('"Your people" in the nav keeps an unnamed person who has service data', async () => {
+  it('"Who you\'ve lost" in the nav keeps an unnamed person who has service data', async () => {
     const user = userEvent.setup();
     renderApp(<App />);
     await user.click(await screen.findByRole('button', { name: "Start with someone I've lost" }));
@@ -292,7 +292,7 @@ describe('editor on (#395)', () => {
     expect(screen.getByLabelText('Date they passed (optional)', { selector: 'input' })).toHaveValue('June 1, 2026');
   });
 
-  it('"Your people" in the nav keeps a named person', async () => {
+  it('"Who you\'ve lost" in the nav keeps a named person', async () => {
     const user = userEvent.setup();
     await openMargaret();
     await user.click(peopleNav());
@@ -489,7 +489,7 @@ describe('editor on, signed in (#395)', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Account' })).toBeInTheDocument();
   });
 
-  it('a brand-new user lands on the empty Overview in the shell with the checklist preview, and Your people has the same layout', async () => {
+  it('a brand-new user lands on the empty Overview in the shell with the checklist preview, and Who you\'ve lost has the same layout', async () => {
     mocks.auth = true;
     mocks.getProfile.mockResolvedValue({ ok: false, reason: 'no_profile' });
     mocks.loadClerk.mockResolvedValue(fakeClerk().load);
@@ -501,7 +501,7 @@ describe('editor on, signed in (#395)', () => {
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByText('Your ticks are kept once you start with someone.')).toBeInTheDocument();
     await user.click(peopleNav());
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: "Who you've lost" })).toBeInTheDocument();
     expectOneEditorLayout();
     expect(within(screen.getByRole('complementary')).getByText('Your ticks are kept once you start with someone.')).toBeInTheDocument();
   });
@@ -526,7 +526,7 @@ describe('editor on, signed in (#395)', () => {
     renderApp(<App />);
     await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(peopleNav());
-    await screen.findByRole('heading', { level: 1, name: 'Your people' });
+    await screen.findByRole('heading', { level: 1, name: "Who you've lost" });
     await user.click(screen.getByRole('link', { name: 'Your account' }));
     await screen.findByRole('heading', { level: 1, name: 'Account' });
     const panel = within(screen.getByRole('complementary'));
@@ -586,12 +586,12 @@ describe('editor on, signed in (#395)', () => {
     await waitFor(() => expect(screen.queryByRole('button', { name: CREATE })).not.toBeInTheDocument());
   });
 
-  it('an owner with nobody saved lands on Your people', async () => {
+  it('an owner with nobody saved lands on Who you\'ve lost', async () => {
     mocks.sharing = true;
     mocks.getMembers.mockResolvedValue({ ok: true, view: { role: 'owner', members: [], invites: [] } });
     signedInAs('owner');
     renderApp(<App />);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: "Who you've lost" })).toBeInTheDocument();
   });
 });
 

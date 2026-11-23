@@ -38,7 +38,7 @@ vi.mock('@griever/api-client', async (importOriginal) => {
 
 import { App } from './app';
 
-const NAV = ['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', 'Your people', 'Your account'];
+const NAV = ['Overview', 'Announcement', 'Service', 'Obituary', 'Thank-yous', "Who you've lost", 'Your account'];
 const CREATE = "Start with someone I've lost";
 const MEMBER_LINE = 'This page fills in when someone shares a person with you.';
 const MEMBER_PREVIEW_LINE = 'Your ticks are kept once someone shares a person with you.';
@@ -112,11 +112,11 @@ describe.each(['owner', 'member'] as const)('an empty %s account (#597)', (kind)
   }
 
   async function openPeople(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
   }
 
-  it('shows the full nav and the checklist preview on Your people', async () => {
+  it('shows the full nav and the checklist preview on Who you\'ve lost', async () => {
     await openPeople(await open());
     expectFullNav();
     expectOneEditorLayout();
@@ -229,13 +229,13 @@ describe('an empty owner account starts from a section (#597)', () => {
     expect(within(screen.getByRole('main')).queryByRole('button', { name: CREATE })).toBeNull();
   });
 
-  it('browser Back after Start leaves the empty page for Your people, with no arrival note', async () => {
+  it('browser Back after Start leaves the empty page for Who you\'ve lost, with no arrival note', async () => {
     signedInAs('owner');
     const user = userEvent.setup();
     renderApp(<App />);
     await h1('Overview');
-    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     await user.click(within(screen.getByRole('navigation', { name: /^Sections/ })).getByRole('button', { name: /^Obituary/ }));
     await h1('Obituary');
     await user.click(within(screen.getByRole('main')).getByRole('button', { name: CREATE }));
@@ -243,8 +243,8 @@ describe('an empty owner account starts from a section (#597)', () => {
     // Some content makes the new person listable, so the empty page would otherwise be redirected away from.
     await user.type(await screen.findByLabelText('Their name'), 'Margaret');
     window.history.back();
-    await h1('Your people');
-    expect(screen.getByRole('heading', { level: 1, name: 'Your people' })).toBeInTheDocument();
+    await h1("Who you've lost");
+    expect(screen.getByRole('heading', { level: 1, name: "Who you've lost" })).toBeInTheDocument();
     expect(screen.queryByText('A person is here now. Their page is open.')).toBeNull();
   });
 
@@ -254,8 +254,8 @@ describe('an empty owner account starts from a section (#597)', () => {
     renderApp(<App />);
     await h1('Overview');
     const nav = () => within(screen.getByRole('navigation', { name: /^Sections/ }));
-    await user.click(nav().getByRole('link', { name: 'Your people' }));
-    await h1('Your people');
+    await user.click(nav().getByRole('link', { name: "Who you've lost" }));
+    await h1("Who you've lost");
     await user.click(nav().getByRole('button', { name: /^Service/ }));
     await h1('Service');
     // An item, then another page: the entries behind Start are Service, the item, Obituary.
@@ -270,7 +270,7 @@ describe('an empty owner account starts from a section (#597)', () => {
     const personPath = window.location.pathname;
     expect(personPath).toMatch(/^\/people\//);
     window.history.back();
-    await h1('Your people');
+    await h1("Who you've lost");
     expect(window.location.pathname).not.toBe(personPath);
   });
 });
