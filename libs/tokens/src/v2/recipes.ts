@@ -16,6 +16,8 @@ export function buildRecipes(r: Roles, p: Primitives) {
       primary: {
         swirl: r.loud,
         driftMs: p.motion.driftMs,
+        /** One eased pass, then rest. At most 5 s (WCAG 2.2.2). */
+        settleMs: p.motion.settleMs,
         text: { color: p.colors.primaryText, weight: p.font.weights.medium },
         border: { width: p.border.thin, color: p.colors.primaryBorder },
         shadow: [p.shadows.sunset],

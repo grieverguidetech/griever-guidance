@@ -1,0 +1,129 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: var(--gg-font), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--gg-ink);
+  background-color: var(--gg-page);
+  background-image:
+    radial-gradient(circle at 100% 0%, var(--gg-glow-sun), transparent 55%),
+    radial-gradient(circle at 0% 100%, var(--gg-glow-sky), transparent 55%);
+  background-attachment: fixed;
+}
+a {
+  color: var(--gg-link);
+}
+h1,
+h2 {
+  color: var(--gg-heading);
+  font-weight: var(--gg-heading-weight);
+}
+.section {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+.hero {
+  padding-top: 80px;
+}
+.hero h1 {
+  font-size: 2.5rem;
+  line-height: 1.2;
+  margin-bottom: 16px;
+}
+.hero p {
+  font-size: 1.125rem;
+  color: var(--gg-muted);
+  margin-bottom: 40px;
+  max-width: 480px;
+}
+.button {
+  display: inline-block;
+  padding: 14px 28px;
+  font-size: 15px;
+  text-decoration: none;
+  color: var(--gg-primary-text);
+  font-weight: var(--gg-primary-weight);
+  background: var(--gg-primary-bg);
+  background-size: 200% 200%;
+  border: var(--gg-primary-border);
+  border-radius: var(--gg-primary-radius);
+  box-shadow: var(--gg-primary-shadow);
+}
+.button:focus-visible {
+  outline: 2px solid var(--gg-heading);
+  outline-offset: 3px;
+}
+.steps h2 {
+  font-size: 1.25rem;
+  margin-bottom: 40px;
+}
+.steps ol {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.step {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 20px;
+  background: var(--gg-card-bg);
+  border: var(--gg-card-border);
+  border-radius: var(--gg-card-radius);
+  box-shadow: var(--gg-card-shadow);
+}
+.step-number {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gg-secondary-bg);
+  color: var(--gg-secondary-text);
+  border: var(--gg-secondary-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: var(--gg-secondary-weight);
+}
+.step strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.step p {
+  font-size: 14px;
+  color: var(--gg-muted);
+  margin-top: 4px;
+}
+.footer {
+  border-top: 1px solid var(--gg-divider);
+  padding: 32px 24px;
+  text-align: center;
+}
+.footer p {
+  font-size: 13px;
+  color: var(--gg-muted);
+}
+/* One slow pass of the button colour, once, and only when the visitor allows motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .button {
+    animation: gg-drift var(--gg-settle-ms) ease-in-out 1;
+  }
+}
+@keyframes gg-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}

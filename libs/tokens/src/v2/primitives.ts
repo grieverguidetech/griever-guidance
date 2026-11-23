@@ -83,7 +83,7 @@ export const primitives = {
   /** Alpha of the nudge card speckles. */
   speckleAlpha: 0.28,
   /** Milliseconds. All of it stops under the OS Reduce Motion setting. */
-  motion: { driftMs: 9000, spinMs: 12000 },
+  motion: { driftMs: 9000, spinMs: 12000, settleMs: 4500 },
 } as const;
 
 type Widen<T> = T extends string
