@@ -408,7 +408,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     background: var(--color-v2-field-fill);
     border-color: var(--color-v2-field-edge);
   }
-  .gg-panel .gg-input:hover { border-color: var(--color-v2-field-edge); }
+  .gg-panel .gg-input:hover { border-color: var(--color-neutral-700); }
   .gg-panel .gg-input:focus-visible {
     border-color: var(--color-v2-field-focus);
     outline-color: var(--color-v2-field-focus);
