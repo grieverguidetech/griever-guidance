@@ -41,13 +41,14 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
+      {/* Back left, Done right; they wrap onto two lines at 320px rather than overflow. */}
+      <div data-testid="item-actions" className="flex flex-wrap items-center justify-between gap-2">
         <button type="button" className="gg-btn gg-btn-ghost" onClick={onBack}>
           <CaretLeft aria-hidden="true" />
           {copy.back}
         </button>
+        {readOnly ? null : <ItemStateToggles groupLabel={copy.items[itemId]} state={state} onChange={onSetState} />}
       </div>
-      {readOnly ? null : <ItemStateToggles groupLabel={copy.items[itemId]} state={state} onChange={onSetState} />}
       <div className="gg-panel flex flex-col">
         {detail ? (
           parts.map((part, index) => (

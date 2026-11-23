@@ -166,18 +166,25 @@ test('Ready leads on: The person ready, Next opens Announcement with its h1; no 
   await expect(heading).toBeFocused();
 });
 
-test('Show checklist in the header: Hide moves focus to it, it opens the panel and focuses Hide; axe clean', async ({ page }) => {
+test("What you'll need in the header closes and reopens the panel, aria-expanded flips, focus stays on it; axe clean", async ({ page }) => {
   await startPerson(page);
   await openSection(page, 'Overview', 'Overview');
-  await page.getByRole('button', { name: 'Hide checklist' }).click();
-  const show = page.getByRole('banner').getByRole('button', { name: 'Show checklist' });
-  await expect(show).toBeVisible();
-  await expect(show).toBeFocused();
-  expect(await violations(page)).toEqual([]);
-  await show.click();
+  const toggle = page.getByRole('banner').getByRole('button', { name: "What you'll need" });
   const panel = page.getByRole('complementary', { name: "What you'll need" });
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(panel).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Hide checklist' })).toBeFocused();
+  expect(await violations(page)).toEqual([]);
+  await toggle.click();
+  await expect(panel).toHaveCount(0);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toggle).toBeFocused();
+  expect(await violations(page)).toEqual([]);
+  await toggle.click();
+  await expect(panel).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toBeFocused();
+  await expect(page.getByRole('button', { name: /(show|hide) checklist/i })).toHaveCount(0);
 });
 
 test('Announcement phone nudge: shows when Ready with focus on it, Got it keeps focus on the toggle and stays hidden after reload; axe clean (WEB-13)', async ({ page }) => {

@@ -49,6 +49,14 @@ const CARD =
   'gg-panel w-full min-h-[44px] flex flex-col gap-1 text-left font-[inherit] text-[color:inherit] border-0 cursor-pointer ' +
   'hover:[background:color-mix(in_srgb,var(--color-text)_7%,var(--color-v2-field-fill))] ' +
   'active:[background:color-mix(in_srgb,var(--color-text)_14%,var(--color-v2-field-fill))]';
+/**
+ * The Now nudge: the selected side-nav item's background (bg-v2-wash, as SideNav.tsx), with the hover and pressed tints
+ * mixed over that wash so it never turns grey. Text stays the page text colour (checked in Overview.spec).
+ */
+const NOW_CARD =
+  'gg-panel w-full min-h-[44px] flex flex-col gap-1 text-left font-[inherit] text-[color:inherit] border-0 cursor-pointer bg-v2-wash ' +
+  'hover:[background:color-mix(in_srgb,var(--color-text)_7%,var(--color-v2-wash))] ' +
+  'active:[background:color-mix(in_srgb,var(--color-text)_14%,var(--color-v2-wash))]';
 /** The next card: a 3px link-colour bar down the left edge, drawn inside so nothing shifts. */
 const NEXT_BAR = ' shadow-[inset_3px_0_0_var(--color-v2-link)]';
 
@@ -152,11 +160,11 @@ export function Overview({ session, checklist: checklistState, onOpen, onOpenIte
   const nextSection = overview.next;
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* First in the content, so it reads straight after the shell's h1. */}
+    <div className="flex flex-col gap-4">
+      {/* First in the content, so it reads straight after the shell's h1. gap-4 is the shell's own rhythm (CmsShell main and content), so the h1, the nudge and the intro are evenly spaced. */}
       {phase ? (
         item && onOpenItem ? (
-          <button type="button" data-checklist-item={item} className={CARD} onClick={() => onOpenItem(item)}>
+          <button type="button" data-checklist-item={item} className={NOW_CARD} onClick={() => onOpenItem(item)}>
             <span className="text-[14px] font-semibold" style={{ color: 'var(--text-muted)' }}>
               {fill(checklist.nowPhase, { phase: PHASE_COPY[phase] })}
             </span>

@@ -202,6 +202,50 @@ describe('Overview', () => {
     expect(now.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('spaces the Now card from the title with the shell rhythm (gap-4, as CmsShell), with no extra margin', () => {
+    const { container } = setup();
+    const column = container.firstElementChild as HTMLElement;
+    expect(column).toHaveClass('flex', 'flex-col', 'gap-4');
+    expect(column.className).not.toContain('gap-6');
+    expect(column.firstElementChild).toBe(screen.getByRole('button', { name: /^Now:/ }));
+    const shellSource = readFileSync(join(import.meta.dirname, 'CmsShell.tsx'), 'utf8');
+    expect(shellSource).toContain('<main className="flex flex-col gap-4');
+  });
+
+  it('gives the Now card the selected nav item background, and text that clears 4.5:1 on it', () => {
+    setup();
+    const card = screen.getByRole('button', { name: /^Now:/ });
+    expect(card).toHaveClass('bg-v2-wash');
+    const nav = readFileSync(join(import.meta.dirname, 'SideNav.tsx'), 'utf8');
+    expect(nav).toContain("current ? 'bg-v2-wash ");
+
+    const theme = readFileSync(join(import.meta.dirname, '..', 'theme.generated.css'), 'utf8');
+    const hex = (name: string) => new RegExp(`${name}: (#[0-9a-f]{6});`).exec(theme)?.[1] ?? '';
+    const channels = (value: string) => [1, 3, 5].map((i) => parseInt(value.slice(i, i + 2), 16));
+    const mix = (top: string, over: string, share: number) =>
+      '#' + channels(top).map((c, i) => Math.round(c * share + channels(over)[i] * (1 - share)).toString(16).padStart(2, '0')).join('');
+    const luminance = (value: string) => {
+      const [r, g, b] = channels(value).map((c) => {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrast = (a: string, b: string) => {
+      const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (light + 0.05) / (dark + 0.05);
+    };
+    const wash = hex('--color-v2-wash');
+    const text = hex('--color-text');
+    expect(wash).not.toBe('');
+    // The card text, the muted "Now:" label (72% text colour, see --text-muted), and both on the hover (7%) and pressed (14%) tints.
+    expect(contrast(text, wash)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(mix(text, wash, 0.72), wash)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(text, mix(text, wash, 0.07))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(mix(text, mix(text, wash, 0.07), 0.72), mix(text, wash, 0.07))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(mix(text, mix(text, wash, 0.14), 0.72), mix(text, wash, 0.14))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('without onOpenItem the phase shows and the next-item button does not', () => {
     render(<Overview session={{}} checklist={{}} onOpen={vi.fn()} />);
     expect(screen.getByText('Now: Right away (first 24 to 48 hours)').tagName).toBe('P');

@@ -93,6 +93,17 @@ describe('ChecklistItemDetail', () => {
     expect(back.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('puts Back and Done on one row: space-between, wrapping, Back first', () => {
+    render(<ChecklistItemDetail itemId="custody" state={null} onSetState={noop} onBack={noop} />);
+    const row = screen.getByTestId('item-actions');
+    expect(row).toHaveClass('flex', 'flex-wrap', 'items-center', 'justify-between');
+    const back = screen.getByRole('button', { name: copy.back });
+    const done = screen.getByRole('button', { name: copy.done });
+    expect(row).toContainElement(back);
+    expect(row).toContainElement(done);
+    expect(back.compareDocumentPosition(done) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('orders Back, then the toggles, then the guidance panel, then Open Service', () => {
     render(
       <ChecklistItemDetail itemId="set-service" state={null} onSetState={noop} onBack={noop} onOpenSection={noop} />,
