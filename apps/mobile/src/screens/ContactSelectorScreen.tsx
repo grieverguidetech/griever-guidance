@@ -5,7 +5,7 @@ import type { UseContactsResult } from '@griever/hooks';
 import type { TemplateCategory } from '@griever/shared';
 import { Cancelled, detectDeviceRegion, runImport, toE164, type NormalizedContact } from '@griever/contacts';
 import { fill, screenCopy } from '@griever/copy';
-import { colors, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 import { Body, Button, Heading, LiveLine, PersonRow, SelectedCount, Sheet, WhoShouldKnow } from '../ui';
 import type { ButtonNode } from '../ui';
 import { expoContactsSource } from '../lib/expoContactsSource';
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   review: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
-  sticky: { gap: spacing[1], padding: spacing[3], borderTopWidth: 1, borderTopColor: colors['neutral-300'] },
+  sticky: { gap: spacing[1], padding: spacing[3], borderTopWidth: 1, borderTopColor: v2.roles.divider },
   footerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: spacing[2], paddingTop: spacing[1] },
   countBox: { flexShrink: 1 },
 });

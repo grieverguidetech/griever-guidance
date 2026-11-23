@@ -5,7 +5,7 @@ import type { Session } from '@griever/hooks';
 import { freshDraft } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { CHECKLIST_PHASES, templates } from '@griever/shared';
-import { colors, v2 } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
 import { PRESSED_OPACITY } from '../ui/screens/Hub';
@@ -410,8 +410,8 @@ describe('HubScreen', () => {
   it('draws the check in success-700, and it keeps 3:1 on the panel colour', () => {
     setup({ ...anna, recipientsNotified: { announcement: ['c1'] }, momentCompletedAt: { announce: '2026-10-02T12:00:00.000Z' } } as unknown as Session);
     const check = screen.getAllByTestId('status-check', { includeHiddenElements: true })[0];
-    expect(check.findByType(Path).props.stroke).toBe(colors['success-700']);
-    expect(contrast(colors['success-700'], colors.surface)).toBeGreaterThanOrEqual(3);
+    expect(check.findByType(Path).props.stroke).toBe(v2.roles.success);
+    expect(contrast(v2.roles.success, v2.recipes.field.fill)).toBeGreaterThanOrEqual(3);
   });
 
   it('names what is missing on an obituary that waits for its link', () => {
@@ -667,11 +667,11 @@ describe('HubScreen', () => {
         { card: hex(mix(glass, under, PRESSED_OPACITY)), text: (color: string) => hex(mix(channels(color), under, PRESSED_OPACITY)) },
       ];
       for (const { card, text } of cases) {
-        expect(contrast(text(colors['neutral-700']), card)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(text(colors['accent-700']), card)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(text(colors['neutral-800']), card)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(text(v2.roles.muted), card)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(text(v2.roles.link), card)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(text(v2.roles.mutedStrong), card)).toBeGreaterThanOrEqual(4.5);
         // The check is a graphic: 3:1 (WCAG 1.4.11).
-        expect(contrast(text(colors['success-700']), card)).toBeGreaterThanOrEqual(3);
+        expect(contrast(text(v2.roles.success), card)).toBeGreaterThanOrEqual(3);
       }
     }
   });
@@ -699,7 +699,7 @@ describe('HubScreen', () => {
     expect(within(lit).getByTestId('next-bar')).toBeTruthy();
     const bar = StyleSheet.flatten(screen.getByTestId('next-bar').props.style);
     expect(bar.width).toBe(3);
-    expect(bar.backgroundColor).toBe(colors['accent-700']);
+    expect(bar.backgroundColor).toBe(v2.roles.link);
     expect(bar.left).toBe(0);
     expect(within(screen.getByRole('button', { name: /^Share the service/ })).queryByText('Continue')).toBeNull();
   });

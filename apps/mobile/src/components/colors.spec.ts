@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { ACCENT, ACCENT_TINT, ERROR, FIELD_BORDER, MUTED, MUTED_STRONG, SUCCESS } from './colors';
 
 function luminance(hex: string): number {
@@ -39,27 +39,27 @@ describe('mobile colours', () => {
 
   // #654: Card, PersonRow and the Hub step boxes use neutral-600 for their edge (3:1 or more on the page and on the card fill).
   it.each([
-    ['page', colors.bg],
-    ['card fill', colors.surface],
+    ['page', v2.primitives.colors.page],
+    ['card fill', v2.recipes.field.fill],
   ])('keeps the neutral-600 box border at least 3:1 on the %s', (_name, background) => {
-    expect(contrast(colors['neutral-600'], background)).toBeGreaterThanOrEqual(3);
+    expect(contrast(v2.recipes.field.edge, background)).toBeGreaterThanOrEqual(3);
   });
 
   // #654: a selected PersonRow has an accent-700 edge and an accent-100 fill; an unselected row has a neutral-600 edge and a surface fill.
   it('keeps the selected person row edge at least 3:1 on the page and on its own fill', () => {
-    expect(contrast(colors['accent-700'], colors.bg)).toBeGreaterThanOrEqual(3);
-    expect(contrast(colors['accent-700'], colors['accent-100'])).toBeGreaterThanOrEqual(3);
+    expect(contrast(v2.roles.link, v2.primitives.colors.page)).toBeGreaterThanOrEqual(3);
+    expect(contrast(v2.roles.link, v2.roles.wash)).toBeGreaterThanOrEqual(3);
   });
 
   it('keeps a selected person row clearly apart from an unselected one', () => {
     // Edge vs edge is 1.49:1 and fill vs fill 1.12:1 in luminance, so colour alone is not relied on:
     // the tick in the filled circle is the shape cue, and the state is also read as checked.
-    expect(contrast(colors['accent-700'], colors['neutral-600'])).toBeGreaterThanOrEqual(1.4);
-    expect(colors['accent-100']).not.toBe(colors.surface);
+    expect(contrast(v2.roles.link, v2.recipes.field.edge)).toBeGreaterThanOrEqual(1.4);
+    expect(v2.roles.wash).not.toBe(v2.recipes.field.fill);
   });
 
   it('keeps person row text readable on the selected fill', () => {
-    expect(contrast(colors.ink, colors['accent-100'])).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(colors['neutral-700'], colors['accent-100'])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(v2.roles.ink, v2.roles.wash)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(v2.roles.muted, v2.roles.wash)).toBeGreaterThanOrEqual(4.5);
   });
 });

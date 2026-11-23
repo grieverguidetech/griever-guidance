@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { ButtonNode } from '../ui';
 import { Body, Button, focusNode, SerifText as Text } from '../ui';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import type { Session } from '@griever/hooks';
 import { screenCopy } from '@griever/copy';
 import { PrimaryButton, ScreenHeader } from '../components/authForm';
@@ -111,13 +111,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
+    borderColor: v2.recipes.field.edge,
     borderRadius: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: v2.recipes.field.fill,
     marginBottom: 12,
   },
-  rowPressed: { backgroundColor: colors['accent-100'] },
-  rowName: { fontSize: 17, color: colors.ink, fontWeight: '600' },
+  rowPressed: { backgroundColor: v2.roles.wash },
+  rowName: { fontSize: 17, color: v2.roles.ink, fontWeight: '600' },
   create: { marginTop: 8 },
   account: { width: '100%', marginTop: 32 },
   importBelow: { width: '100%', marginTop: 12 },
