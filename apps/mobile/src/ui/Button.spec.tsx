@@ -216,11 +216,27 @@ describe('Button (mobile)', () => {
       }
     });
 
-    it('aria-disabled primary keeps its state: focusable, and unavailable only on native when announced', () => {
+    it('aria-disabled primary keeps its accessibilityState: not disabled by default, disabled when announceDisabled is set', () => {
       const { rerender } = render(<Button label="Save" onPress={jest.fn()} ariaDisabled />);
       expect(screen.getByRole('button', { name: 'Save' }).props.accessibilityState?.disabled).toBeFalsy();
       rerender(<Button label="Save" onPress={jest.fn()} ariaDisabled announceDisabled />);
       expect(screen.getByRole('button', { name: 'Save' }).props.accessibilityState).toMatchObject({ disabled: true });
+    });
+
+    it.each(['primary', 'secondary'] as const)('aria-disabled %s does not fade while pressed', async (variant) => {
+      render(<Button label="Save" variant={variant} onPress={jest.fn()} ariaDisabled />);
+      const before = flat(screen.getByRole('button', { name: 'Save' }));
+      await act(async () => {
+        fireEvent(screen.getByRole('button', { name: 'Save' }), 'responderGrant', { nativeEvent: { touches: [], changedTouches: [], target: 1 }, currentTarget: { measure: () => undefined }, persist: () => undefined });
+      });
+      const after = flat(screen.getByRole('button', { name: 'Save' }));
+      expect(after.opacity).toBeUndefined();
+      expect(after).toEqual(before);
+    });
+
+    it('busy aria-disabled primary spinner uses the primary recipe label colour', () => {
+      render(<Button label="Save" busyLabel="Saving…" onPress={jest.fn()} busy ariaDisabled />);
+      expect(screen.UNSAFE_getByType(ActivityIndicator).props.color).toBe(recipes.primary.text.color);
     });
 
     it('aria-disabled primary still calls onPress, so the caller can explain', () => {
