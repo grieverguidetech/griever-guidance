@@ -259,9 +259,6 @@ importers:
       '@expo-google-fonts/sora':
         specifier: 0.4.2
         version: 0.4.2
-      '@expo-google-fonts/source-serif-4':
-        specifier: 0.4.1
-        version: 0.4.1
       '@griever/api-client':
         specifier: workspace:*
         version: link:../../libs/api-client
@@ -2144,9 +2141,6 @@ packages:
 
   '@expo-google-fonts/sora@0.4.2':
     resolution: {integrity: sha512-X86Kl1cfObcSUzTLIbtmrPCLRlIbCNh0uBOo8bjmXb8gWgVVhnI8CZJEK2btsdq85JPn5k4P6sbV9JLbAm7dqQ==}
-
-  '@expo-google-fonts/source-serif-4@0.4.1':
-    resolution: {integrity: sha512-Ej4UXDjW1kwYPHG8YLq6fK1bqnJGb3K35J3S5atSL0ScKFAFLKvndxoTWeCls7mybtlS9x99hzwDeXCBkiI3rA==}
 
   '@expo/cli@58.1.15':
     resolution: {integrity: sha512-+gBvfvmttvNqs8ceJe1SdiWBa6reocb/ZC8jMxsF8qFlCijAUQNqFMGCPkT/6zasFkQLUL8ZOFhf/9DKj2XaLg==}
@@ -12307,8 +12301,6 @@ snapshots:
       levn: 0.4.1
 
   '@expo-google-fonts/sora@0.4.2': {}
-
-  '@expo-google-fonts/source-serif-4@0.4.1': {}
 
   '@expo/cli@58.1.15(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.15)(expo-constants@58.0.13(expo@58.0.19)(react-native@0.88.0(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(typescript@5.9.3))(expo-font@58.0.10(expo@58.0.19)(react-native@0.88.0(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(expo@58.0.19)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@5.9.3)':
     dependencies:

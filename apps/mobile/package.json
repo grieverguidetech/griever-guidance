@@ -52,7 +52,6 @@
     "@griever/copy": "workspace:*",
     "@griever/tokens": "workspace:*",
     "@expo-google-fonts/sora": "0.4.2",
-    "@expo-google-fonts/source-serif-4": "0.4.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.2.1",
     "@react-navigation/native": "^6.1.18",

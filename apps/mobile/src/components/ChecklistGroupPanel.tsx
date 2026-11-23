@@ -16,11 +16,12 @@ import type {
   ChecklistItemId,
   ChecklistItemState,
 } from '@griever/shared';
-import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { Button, Heading, focusNode, SerifText as Text } from '../ui';
+import { DoneMark } from '../ui/DoneMark';
 import { CHECKLIST, CHECKLIST_KEY } from '../screens/WhatYoullNeedScreen';
 import { NOT_SAVED_NOTE_TEXT } from './SavedNote';
-import { ACCENT, FIELD_BORDER, MUTED } from './colors';
+import { MUTED } from './colors';
 import type { ChecklistGroupId } from './PersonChecklistSheet';
 
 const copy = screenCopy('phoneChecklist');
@@ -249,16 +250,7 @@ function TickRow({
       onPress={onPress}
       style={({ pressed }) => [styles.tick, pressed && styles.pressed]}
     >
-      <View
-        style={[styles.box, checked && styles.boxOn]}
-        importantForAccessibility="no"
-      >
-        {checked ? (
-          <Text style={styles.mark} allowFontScaling={false}>
-            ✓
-          </Text>
-        ) : null}
-      </View>
+      <DoneMark checked={checked} />
       <View style={styles.textBlock}>
         <Text style={[styles.text, checked && styles.struck]}>{text}</Text>
       </View>
@@ -288,23 +280,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
   },
-  pressed: { backgroundColor: colors['accent-100'] },
-  box: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: FIELD_BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  boxOn: { borderColor: ACCENT, backgroundColor: ACCENT },
-  mark: { fontSize: 16, color: colors.surface, fontWeight: '700' },
+  pressed: { backgroundColor: v2.roles.wash },
   textBlock: { flex: 1 },
-  text: { fontSize: 16, color: colors.ink },
+  text: { fontSize: 16, color: v2.roles.ink },
   struck: { textDecorationLine: 'line-through', color: MUTED },
   meta: { fontSize: 15, color: MUTED, paddingHorizontal: spacing[3] },
 });

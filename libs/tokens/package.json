@@ -16,7 +16,26 @@
     }
   },
   "nx": {
-    "name": "tokens"
+    "name": "tokens",
+    "targets": {
+      "generate-css": {
+        "executor": "nx:run-commands",
+        "dependsOn": [
+          "build"
+        ],
+        "options": {
+          "command": "node tools/scripts/generate-token-css.mjs",
+          "cwd": "{workspaceRoot}"
+        },
+        "inputs": [
+          "{projectRoot}/src/**/*",
+          "{workspaceRoot}/tools/scripts/generate-token-css.mjs"
+        ],
+        "outputs": [
+          "{workspaceRoot}/apps/web/src/theme.generated.css"
+        ]
+      }
+    }
   },
   "dependencies": {
     "tslib": "^2.3.0"
