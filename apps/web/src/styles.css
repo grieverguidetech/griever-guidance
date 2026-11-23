@@ -93,9 +93,9 @@ h1 { font-weight: var(--v2-heading-weight); }
 .gg-phone-nudge:focus,
 .gg-phone-nudge:focus-visible { outline: 2px solid transparent; box-shadow: var(--shadow-md); }
 /* Fields: a 2px accent-700 ring (the 1px border plus a 1px outline right outside it).
-   accent-700 is 5.28:1 on the field (--color-surface), 5.72:1 on the page and 3.87:1 against
-   the unfocused border, so the change of state clears 3:1 too. The base accent (#0088b0) was
-   only 2.47:1 against that border. Unlayered so the global :focus-visible ring can't win. */
+   accent-700 is 5.28:1 on the field (--color-surface) and 5.72:1 on the page. Against the unfocused
+   v2 field edge it is only 1.49:1, so the change of state is the extra width (1px to 2px), which AA
+   allows. Unlayered so the global :focus-visible ring can't win; this also covers panel inputs. */
 .gg-input:focus-visible {
   border-color: var(--color-accent-700);
   outline: 1px solid var(--color-accent-700);
@@ -112,6 +112,11 @@ h1 { font-weight: var(--v2-heading-weight); }
    ring would vanish the instant a card is clicked (clicking focuses it). Keep
    it visible while focused too. */
 .gg-card-selected:focus { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+/* Keyboard focus on a selected card must still change its look (WCAG 2.4.7): the selection ring stays,
+   and a second accent-700 ring sits 2px outside it, on a page-coloured gap (5.26:1 or more on page and glows). */
+.gg-card-selected:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-v2-page), 0 0 0 4px var(--color-accent-700);
+}
 
 /* ──────────────────────────────────────────────────────────────────────
    Component layer — mirrors the Broadsheet design-system classes, scoped
@@ -196,8 +201,10 @@ h1 { font-weight: var(--v2-heading-weight); }
     flex-direction: column;
     gap: var(--space-2);
     padding: var(--space-3);
-    background: var(--color-surface);
-    border-radius: var(--radius-md);
+    background: var(--color-v2-card-fill);
+    border: var(--v2-border-thin) solid var(--color-v2-card-border);
+    border-radius: var(--v2-radius);
+    box-shadow: var(--v2-card-shadow);
   }
   .gg-card-selectable { cursor: pointer; }
   .gg-card-selected { outline: 2px solid var(--color-accent); outline-offset: -2px; }
@@ -386,8 +393,10 @@ h1 { font-weight: var(--v2-heading-weight); }
 
   /* — calm primitives (#479): panel, row, chip, hint, meta, enter — */
   .gg-panel {
-    background: var(--color-surface);
-    border-radius: var(--radius-lg);
+    background: var(--color-v2-card-fill);
+    border: var(--v2-border-thin) solid var(--color-v2-card-border);
+    border-radius: var(--v2-radius);
+    box-shadow: var(--v2-card-shadow);
     padding: var(--space-4);
   }
   /* #757: the one look for every phone nudge: soft blue, lifted. */
@@ -398,11 +407,11 @@ h1 { font-weight: var(--v2-heading-weight); }
     box-shadow: var(--shadow-md);
     padding: var(--space-3) var(--space-4);
   }
-  /* #514: an input on a panel needs a visible edge (WCAG 1.4.11, 3:1). neutral-600 is
-     3.55:1 on --color-surface (the panel) and 3.85:1 on --color-bg (the input fill). */
+  /* #514: an input on a panel needs a visible edge (WCAG 1.4.11, 3:1). It takes the v2 field recipe;
+     the edge is 3:1 or more against glass over the page and both glows (guarded by v2Styles.spec.ts). */
   .gg-panel .gg-input {
-    background: var(--color-bg);
-    border-color: var(--color-neutral-600);
+    background: var(--color-v2-field-fill);
+    border-color: var(--color-v2-field-edge);
   }
   .gg-panel .gg-input:hover { border-color: var(--color-neutral-700); }
   .gg-row {

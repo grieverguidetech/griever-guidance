@@ -110,12 +110,12 @@ export function AccountSection({ asksName, senderName, firstName, lastName, birt
         <h2 id={`${id}-payments`} className="text-[16px] m-0">
           {copy.paymentsHeading}
         </h2>
-        <div className="gg-panel !bg-[var(--color-bg)] flex flex-col gap-1">
+        <div className="gg-panel flex flex-col gap-1">
           <h3 className="gg-hint text-[14px] font-normal m-0">{copy.planHeading}</h3>
           <p className="m-0 text-[18px] font-semibold">{copy.planName}</p>
           <p className="gg-hint m-0">{copy.planBody}</p>
         </div>
-        <div className="gg-panel !bg-[var(--color-bg)] flex flex-col gap-3">
+        <div className="gg-panel flex flex-col gap-3">
           <h3 className="gg-hint text-[14px] font-normal m-0">{copy.cardHeading}</h3>
           <p className="m-0 flex items-center gap-2 text-[18px] font-semibold">
             <CreditCard aria-hidden="true" size={20} />

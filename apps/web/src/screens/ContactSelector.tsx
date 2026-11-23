@@ -82,7 +82,7 @@ export function ContactRow({
       {selected ? (
         <CheckCircle size={20} weight="fill" style={{ color: 'var(--color-accent)' }} />
       ) : (
-        <Circle size={20} weight="regular" style={{ color: 'var(--color-neutral-400)' }} />
+        <Circle size={20} weight="regular" style={{ color: 'var(--color-neutral-700)' }} />
       )}
     </button>
   );

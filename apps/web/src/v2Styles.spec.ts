@@ -174,3 +174,106 @@ describe('styles.css page ground and glows', () => {
     }
   });
 });
+
+type Rgba = { rgb: [number, number, number]; alpha: number };
+
+function parseRgba(value: string): Rgba {
+  const found = /rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)/.exec(value);
+  if (!found) {
+    throw new Error(`Not an rgba() value: ${value}`);
+  }
+  return { rgb: [Number(found[1]), Number(found[2]), Number(found[3])], alpha: Number(found[4]) };
+}
+
+function toRgb(hex: string): [number, number, number] {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+function toHex(rgb: number[]): string {
+  return `#${rgb.map((c) => Math.round(c).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Blend a translucent colour over an opaque hex ground; returns the opaque hex result. */
+function blend(top: Rgba, ground: string): string {
+  const base = toRgb(ground);
+  return toHex(top.rgb.map((c, i) => c * top.alpha + base[i] * (1 - top.alpha)));
+}
+
+function themeVar(name: string): string {
+  const found = theme.match(new RegExp(`${name}:\\s*([^;]+);`));
+  if (!found) {
+    throw new Error(`${name} is not in theme.generated.css`);
+  }
+  return found[1].trim();
+}
+
+const grounds = ['--color-v2-page', '--color-v2-glow-sun', '--color-v2-glow-sky'];
+const glass = () => parseRgba(themeVar('--color-v2-card-fill'));
+const glassOver = (ground: string) => blend(glass(), themeVar(ground));
+
+describe('styles.css glass cards and panels', () => {
+  it.each(['.gg-card', '.gg-panel'])('%s uses the glass fill, edge, shadow and radius vars', (selector) => {
+    const decl = rule(selector);
+    expect(decl).toContain('background: var(--color-v2-card-fill)');
+    expect(decl).toContain('border: var(--v2-border-thin) solid var(--color-v2-card-border)');
+    expect(decl).toContain('box-shadow: var(--v2-card-shadow)');
+    expect(decl).toContain('border-radius: var(--v2-radius)');
+  });
+
+  it('has an 8px radius and a 1px edge in the generated vars', () => {
+    expect(themeVar('--v2-radius')).toBe('8px');
+    expect(themeVar('--v2-border-thin')).toBe('1px');
+  });
+
+  it('keeps the 2px selected ring', () => {
+    expect(rule('.gg-card-selected')).toContain('outline: 2px solid var(--color-accent)');
+  });
+
+  it('gives panel inputs the v2 field fill and edge (focus comes from the unlayered .gg-input ring)', () => {
+    expect(rule('.gg-panel .gg-input')).toContain('background: var(--color-v2-field-fill)');
+    expect(rule('.gg-panel .gg-input')).toContain('border-color: var(--color-v2-field-edge)');
+  });
+
+  it('shows keyboard focus on a selected card with a second ring outside the selection ring', () => {
+    const focused = rule('.gg-card-selected:focus-visible');
+    expect(focused).toContain('var(--color-accent-700)');
+    expect(focused).toContain('box-shadow');
+    for (const ground of grounds) {
+      expect(contrast(themeVar('--color-accent-700'), themeVar(ground)), ground).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('strips the glass edge and shadow from a card nested in the checklist panel', () => {
+    const panel = readFileSync(join(__dirname, 'cms/checklist/ChecklistPanel.tsx'), 'utf8');
+    for (const cls of ['[&_.gg-card]:bg-transparent', '[&_.gg-card]:border-0', '[&_.gg-card]:shadow-none']) {
+      expect(panel).toContain(cls);
+    }
+  });
+
+  it.each(grounds)('keeps the field edge at 3:1 or more against glass over %s', (ground) => {
+    expect(contrast(themeVar('--color-v2-field-edge'), glassOver(ground))).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each(grounds)('keeps --text-muted and --text-hint at 4.5:1 or more on glass over %s', (ground) => {
+    const text = toRgb(themeVar('--color-text'));
+    const surface = glassOver(ground);
+    for (const name of ['--text-muted', '--text-hint']) {
+      const percent = /--text-(?:muted|hint):\s*color-mix\(in srgb, var\(--color-text\) (\d+)%/.exec(
+        css.match(new RegExp(`${name}:[^;]+;`))?.[0] ?? '',
+      );
+      expect(percent, name).not.toBeNull();
+      const tone = blend({ rgb: text, alpha: Number(percent?.[1]) / 100 }, surface);
+      expect(contrast(tone, surface), `${name} on ${ground}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('uses no literal colours in the card and panel rules, and defines every var they use', () => {
+    const rules = ['.gg-card', '.gg-panel', '.gg-panel .gg-input'].map(rule).join('\n');
+    expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    const used = [...rules.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(0);
+    for (const name of new Set(used)) {
+      expect(`${theme}\n${css}`, name).toMatch(new RegExp(`${name}:`));
+    }
+  });
+});

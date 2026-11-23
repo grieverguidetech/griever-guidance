@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { v2 } from '@griever/tokens';
 
 /**
  * #162: focus stays visible (WCAG 2.4.7) and the indicator clears 3:1 (WCAG 1.4.11).
@@ -128,15 +129,16 @@ describe('visible focus (#162)', () => {
     }
   });
 
-  it('an input on a panel gets a border that clears 3:1 against the panel and its fill (#514)', () => {
+  // #514, now on the v2 field recipe (#1000): the edge clears 3:1 against its own fill. The glass
+  // panel grounds are covered in v2Styles.spec.ts.
+  it('an input on a panel gets a border that clears 3:1 against its fill (#514, #1000)', () => {
     const match = CSS.match(/\.gg-panel \.gg-input\s*\{([^}]*)\}/);
-    if (!match) throw new Error('rule .gg-panel .gg-input not found in styles.css');
-    const border = token(colourIn(match[1], 'border-color'));
-    const fillName = colourIn(match[1], 'background');
-    expect(fillName).toBe('bg');
-    for (const bg of [backgrounds.surface, token(fillName)]) {
-      expect(contrast(border, bg)).toBeGreaterThanOrEqual(3);
+    if (!match) {
+      throw new Error('rule .gg-panel .gg-input not found in styles.css');
     }
+    expect(match[1]).toContain('border-color: var(--color-v2-field-edge)');
+    expect(match[1]).toContain('background: var(--color-v2-field-fill)');
+    expect(contrast(v2.recipes.field.edge, v2.recipes.field.fill)).toBeGreaterThanOrEqual(3);
   });
 
   it('computes contrast the WCAG way', () => {
