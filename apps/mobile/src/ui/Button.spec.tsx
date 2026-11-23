@@ -4,7 +4,6 @@ import { AccessibilityInfo, ActivityIndicator, Animated, StyleSheet } from 'reac
 import { minTouchTarget, v2 } from '@griever/tokens';
 import { Button, recipeShadow } from './Button';
 import { useReduceMotion } from '../lib/useReduceMotion';
-import { serifFamily, serifWeight } from './typography';
 import { LinearSwirl } from './Swirl';
 
 describe('Button (mobile)', () => {
@@ -66,10 +65,9 @@ describe('Button (mobile)', () => {
       expect(swirl.props.driftMs).toBe(recipe.driftMs);
       const label = StyleSheet.flatten(screen.getByText('Save').props.style);
       expect(label.color).toBe(recipe.text.color);
-      // The weight comes from the typography helper: regular for secondary, semibold for primary.
-      const face = variant === 'secondary' ? 'regular' : 'semibold';
-      expect(label.fontFamily).toBe(serifFamily(face));
-      expect(label.fontWeight).toBe(serifWeight(face));
+      // Native picks the weight by family name: Sora 500 for primary, Sora 400 for secondary.
+      expect(label.fontFamily).toBe(variant === 'secondary' ? 'Sora_400Regular' : 'Sora_500Medium');
+      expect(label.fontWeight).toBeUndefined();
       const frame = flat(screen.getByRole('button', { name: 'Save' }));
       expect(frame).toMatchObject({ borderWidth: recipe.border.width, borderColor: recipe.border.color, borderRadius: 8 });
     });
