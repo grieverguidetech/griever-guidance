@@ -41,15 +41,18 @@ describe('CmsShell save line', () => {
         <p>Body</p>
       </CmsShell>,
     );
-    expect(screen.getByText(/and to your account as you type/)).toBeInTheDocument();
-    expect(screen.queryByText(/Nothing is sent from here/)).toBeNull();
+    const saved = screen.getByText('Saved as you type.');
+    expect(saved).toBeInTheDocument();
+    expect(saved.textContent).not.toMatch(/phone|send|sent/i);
+    expect(screen.queryByText(/in this browser/)).toBeNull();
   });
 
-  const line = 'Saved in this browser as you type. Nothing is sent from here.';
+  const line = 'Saved in this browser as you type.';
 
   it('shows the static line in editor views, not as a live region, with one h1', () => {
     setup('service');
     const el = screen.getByText(line);
+    expect(el.textContent).not.toMatch(/phone|send|sent/i);
     expect(el.closest('[aria-live], [role="status"], [role="alert"]')).toBeNull();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });

@@ -106,7 +106,7 @@ export function MarkReady({ ready, onChange, nextSection = null, onNext, phoneNu
           {copy.markReady}
         </button>
         <p id={hintId} className="gg-hint">
-          {copy.readyHint}
+          {phoneNudge !== undefined ? copy.readyHint : copy.readyHintPerson}
         </p>
       </div>
       {blocked ? (

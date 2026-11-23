@@ -58,10 +58,19 @@ describe('MarkReady', () => {
     expect(screen.getByTestId('ready-box').querySelector('svg')).not.toBeNull();
   });
 
-  it('shows the hint and ties it to the toggle', () => {
+  it('shows the person hint without a phone nudge and ties it to the toggle', () => {
     render(<MarkReady ready={false} onChange={() => undefined} />);
-    const hint = screen.getByText('Mark as ready when these details are settled. It is a note for you and anyone helping. You can still change them.');
-    expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAccessibleDescription(hint.textContent ?? '');
+    const text = 'Mark as ready when these details are settled. You can still change them.';
+    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAccessibleDescription(text);
+  });
+
+  it('shows the phone hint with a phone nudge and ties it to the toggle', () => {
+    render(<MarkReady ready={false} onChange={() => undefined} phoneNudge="service" />);
+    const text = 'Mark as ready when you want to send this from your phone.';
+    expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.queryByText(/details are settled/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Mark as ready' })).toHaveAccessibleDescription(text);
   });
 
   it('shows no continue button when not ready', () => {
