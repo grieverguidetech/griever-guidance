@@ -18,6 +18,7 @@ export function buildRoles(p: Primitives) {
     link: p.colors.link,
     /** Tint behind a selected row. */
     wash: p.colors.wash,
+    /** Plain muted is not used on the wash; use mutedStrong there. */
     muted: p.colors.muted,
     /** Secondary text that can sit on the wash. */
     mutedStrong: p.colors.mutedStrong,

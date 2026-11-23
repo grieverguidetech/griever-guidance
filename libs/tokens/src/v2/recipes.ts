@@ -47,7 +47,6 @@ export function buildRecipes(r: Roles, p: Primitives) {
     field: {
       fill: p.colors.fieldFill,
       edge: p.colors.fieldEdge,
-      edgeOnPanel: p.colors.fieldEdge,
       focusRing: p.colors.fieldFocus,
       radius: p.radius,
     },

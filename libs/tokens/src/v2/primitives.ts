@@ -40,7 +40,8 @@ const colors = {
   error: '#b3261e', // web value, chosen over mobile's #b91c1c (D2)
   success: '#2a7048', // web value, chosen over mobile's #2f7a50 (D2)
   fieldFill: '#eae9e9', // web --color-surface
-  fieldEdge: '#7d7979', // neutral-600
+  // neutral-600: mobile's FIELD_BORDER and web's panel rule. Web's plain .gg-input border today is the 16% divider (fails 3:1); v2 uses neutral-600 everywhere on purpose.
+  fieldEdge: '#7d7979',
   fieldFocus: '#006786', // accent-700
 } as const;
 

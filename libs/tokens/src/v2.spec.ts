@@ -110,7 +110,6 @@ describe('v2 tokens: copied from the v1 look', () => {
       ['neutral-700', colors['neutral-700'], v2.roles.muted],
       ['neutral-800', colors['neutral-800'], v2.roles.mutedStrong],
       ['neutral-600', colors['neutral-600'], v2.recipes.field.edge],
-      ['neutral-600 (panel)', colors['neutral-600'], v2.recipes.field.edgeOnPanel],
       ['surface', colors.surface, v2.recipes.field.fill],
       ['accent-700 (ring)', colors['accent-700'], v2.recipes.field.focusRing],
       ['success-700', colors['success-700'], v2.roles.success],
@@ -194,15 +193,29 @@ describe('v2 tokens: contrast', () => {
 
   it('gives the field edge and focus ring at least 3:1 on every ground', () => {
     for (const [ground, bg] of Object.entries(grounds)) {
-      for (const color of [v2.recipes.field.edge, v2.recipes.field.edgeOnPanel, v2.recipes.field.focusRing]) {
+      for (const color of [v2.recipes.field.edge, v2.recipes.field.focusRing]) {
         expect(contrast(color, bg), `${color} on ${ground}`).toBeGreaterThanOrEqual(3);
       }
     }
   });
 
-  it('gives muted and link text at least 4.5:1 on the selected-row wash', () => {
+  it('gives mutedStrong and link text at least 4.5:1 on the selected-row wash', () => {
     for (const color of [v2.roles.mutedStrong, v2.roles.link]) {
       expect(contrast(color, v2.roles.wash), color).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe('v2 tokens: contrast on the field fill', () => {
+  const { fill, edge } = v2.recipes.field;
+
+  it('gives the field edge at least 3:1 against the fill', () => {
+    expect(contrast(edge, fill)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('gives muted, link and error text at least 4.5:1 on the fill', () => {
+    for (const [role, color] of Object.entries({ muted: v2.roles.muted, link: v2.roles.link, error: v2.roles.error })) {
+      expect(contrast(color, fill), `${role} on fill`).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
