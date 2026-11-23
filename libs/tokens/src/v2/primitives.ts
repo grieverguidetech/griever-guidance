@@ -25,8 +25,6 @@ const colors = {
 
   primaryText: '#2a1f12',
   primaryBorder: '#a7774b',
-  secondaryText: '#10324d',
-  secondaryBorder: '#4f86ad',
   nudgeText: '#0f2f4a',
   nudgeBorder: 'rgba(30,123,184,0.35)',
   openRing: '#6f6a62',
@@ -50,7 +48,6 @@ const swirlAngle = 120;
 
 const gradients = {
   sunset: { stops: ['#f9d697', '#f7cd94', '#f9d9bd'], angle: swirlAngle },
-  softOcean: { stops: ['#a5cbe3', '#a9d6d0', '#c6c0eb'], angle: swirlAngle },
   pastel: { stops: ['#dcebf5', '#e3f1ee', '#e9e6f8'], angle: swirlAngle },
 } as const satisfies Record<string, Gradient>;
 
