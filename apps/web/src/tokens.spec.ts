@@ -11,6 +11,13 @@ const V1_UTILITY = /\b(bg|text|border(-[xytrbl])?|ring(-offset)?|inset-ring|shad
 /** A web spec reading a v1 token by name, e.g. token('ink') or token('accent-700'). */
 const V1_TOKEN_CALL = /\btoken\('(ink|bg|surface|white|error|divider|(accent|accent-2|neutral|success)(-[0-9]+)?)'\)/;
 
+/** Joins parts with dashes. Used so a spec string never holds a whole Tailwind class or deleted var name that Tailwind would scan into the build. */
+const dash = (...parts: string[]) => parts.join('-');
+/** `--` plus the parts, dashed. */
+const varName = (...parts: string[]) => `--${dash(...parts)}`;
+/** A deleted v1 theme var: the radius family or the serif font var. */
+const deletedVar = new RegExp(`--(radius-|${dash('font', 'serif')})`);
+
 function usesV1Colour(source: string): boolean {
   return V1_VAR.test(source) || V1_UTILITY.test(source) || V1_TOKEN_CALL.test(source);
 }
@@ -34,7 +41,7 @@ describe('tokens match the web theme', () => {
   });
 
   it('theme.generated.css holds no v1 var (#1010)', () => {
-    expect(generated).not.toMatch(/--radius-|--font-serif/);
+    expect(generated).not.toMatch(deletedVar);
     expect(generated).not.toMatch(/--color-(accent|neutral|success|surface|bg|white|ink)/);
   });
 
@@ -43,11 +50,11 @@ describe('tokens match the web theme', () => {
     expect(css).toContain("@import './theme.generated.css';");
     expect(css).not.toContain('@theme {');
     const names = [
-      '--font-serif',
+      varName('font', 'serif'),
       ...Object.keys(spacing).map((name) => `--space-${name}`),
-      '--radius-sm',
-      '--radius-md',
-      '--radius-lg',
+      varName('radius', 'sm'),
+      varName('radius', 'md'),
+      varName('radius', 'lg'),
     ];
     for (const name of names) {
       expect(css, `${name} is declared in styles.css`).not.toMatch(new RegExp(`${name}\\s*:`));
@@ -55,7 +62,33 @@ describe('tokens match the web theme', () => {
     // A new family of generated tokens must not be hand-declared either.
     expect(css).not.toMatch(/--(space|radius)-[\w-]+\s*:/);
     // Nothing in styles.css reads a deleted var either.
-    expect(css).not.toMatch(/var\(--(radius-|font-serif)/);
+    expect(css).not.toMatch(new RegExp(`var\\(${deletedVar.source}`));
+  });
+});
+
+/** Tailwind's own `rounded-*` steps read its default radius vars, not our tokens (#1010). Web uses `--v2-radius`. */
+const TAILWIND_ROUNDED = /\brounded(-[a-z]{1,2})?-(sm|md|lg|xl|2xl|3xl)\b/;
+
+describe('no Tailwind default radius or serif in web source (#1010)', () => {
+  it('flags a stock rounded step, with or without a side', () => {
+    // Built from parts so Tailwind does not scan these strings and emit the default radius vars.
+    expect(TAILWIND_ROUNDED.test(dash('rounded', 'md'))).toBe(true);
+    expect(TAILWIND_ROUNDED.test(`flex ${dash('rounded', 'xl')} p-2`)).toBe(true);
+    expect(TAILWIND_ROUNDED.test(dash('rounded', 't', 'lg'))).toBe(true);
+  });
+
+  it('accepts the token corner and a literal corner', () => {
+    expect(TAILWIND_ROUNDED.test('rounded-[var(--v2-radius)]')).toBe(false);
+    expect(TAILWIND_ROUNDED.test('rounded-[2px]')).toBe(false);
+    expect(TAILWIND_ROUNDED.test('rounded-full')).toBe(false);
+  });
+
+  it('finds none in apps/web/src, outside this guard', () => {
+    const offenders = sourceFiles(import.meta.dirname)
+      .filter((file) => !file.endsWith('theme.generated.css') && !file.endsWith('tokens.spec.ts'))
+      .filter((file) => TAILWIND_ROUNDED.test(readFileSync(file, 'utf8')))
+      .map((file) => relative(import.meta.dirname, file));
+    expect(offenders).toEqual([]);
   });
 });
 
