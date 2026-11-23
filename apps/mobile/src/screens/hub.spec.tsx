@@ -8,6 +8,7 @@ import { CHECKLIST_PHASES, templates } from '@griever/shared';
 import { colors, v2 } from '@griever/tokens';
 import { Path } from 'react-native-svg';
 import { SerifReadyContext } from '../ui';
+import { PRESSED_OPACITY } from '../ui/screens/Hub';
 import { HubScreen } from './HubScreen';
 import type { HubScreenProps } from './HubScreen';
 import { onFlowPullRequest, registerManualPull } from '../lib/requestFlowPull';
@@ -649,19 +650,29 @@ describe('HubScreen', () => {
       expect(rest.backgroundColor).toBe(recipe.fill);
       expect(rest.borderWidth).toBe(recipe.border.width);
       expect(rest.minHeight).toBeGreaterThanOrEqual(44);
-      expect(pressed.opacity).toBeLessThan(1);
+      expect(pressed.opacity).toBe(PRESSED_OPACITY);
     }
-    // Muted text, accent text and the state word keep 4.5:1 on the glass over the page and both glows.
+    // Muted text, accent text and the state word keep 4.5:1 on the glass over the page and both glows, resting and pressed.
     const [r, g, b, a] = (recipe.fill.match(/[\d.]+/g) ?? []).map(Number);
-    const blend = (ground: string) =>
-      `#${[1, 3, 5].map((i, k) => Math.round([r, g, b][k] * a + parseInt(ground.slice(i, i + 2), 16) * (1 - a)).toString(16).padStart(2, '0')).join('')}`;
+    expect(a).toBeGreaterThan(0);
+    const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    const hex = (rgb: number[]) => `#${rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+    const mix = (top: number[], bottom: number[], alpha: number) => top.map((v, k) => v * alpha + bottom[k] * (1 - alpha));
     for (const ground of [v2.primitives.colors.page, v2.primitives.colors.glowSun, v2.primitives.colors.glowSky]) {
-      const bg = blend(ground);
-      expect(contrast(colors['neutral-700'], bg)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(colors['accent-700'], bg)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(colors['neutral-800'], bg)).toBeGreaterThanOrEqual(4.5);
-      // The check is a graphic: 3:1 (WCAG 1.4.11).
-      expect(contrast(colors['success-700'], bg)).toBeGreaterThanOrEqual(3);
+      const under = channels(ground);
+      const glass = mix([r, g, b], under, a);
+      // Resting: opaque text on the glass. Pressed: the whole card, text included, drawn at PRESSED_OPACITY over the ground.
+      const cases = [
+        { card: hex(glass), text: (color: string) => color },
+        { card: hex(mix(glass, under, PRESSED_OPACITY)), text: (color: string) => hex(mix(channels(color), under, PRESSED_OPACITY)) },
+      ];
+      for (const { card, text } of cases) {
+        expect(contrast(text(colors['neutral-700']), card)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(text(colors['accent-700']), card)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(text(colors['neutral-800']), card)).toBeGreaterThanOrEqual(4.5);
+        // The check is a graphic: 3:1 (WCAG 1.4.11).
+        expect(contrast(text(colors['success-700']), card)).toBeGreaterThanOrEqual(3);
+      }
     }
   });
 
@@ -673,6 +684,9 @@ describe('HubScreen', () => {
     const style = StyleSheet.flatten(screen.getByTestId('hub-next-card').props.style);
     expect(style.borderColor).toBe(v2.roles.focus);
     expect(style.borderWidth).toBe(2);
+    // The ring is thicker, but border plus padding stays the same, so the card does not move.
+    const rest = StyleSheet.flatten(card.props.style);
+    expect((style.borderWidth as number) + (style.padding as number)).toBe((rest.borderWidth as number) + (rest.padding as number));
     fireEvent(card, 'blur');
     expect(StyleSheet.flatten(screen.getByTestId('hub-next-card').props.style).borderColor).toBe(v2.recipes.card.border.color);
   });

@@ -147,6 +147,8 @@ const stateWords = (copy: HubCopy): Record<HubRowState, string> => ({
 function SendCard(props: { row: HubRow; title: string; stateWord: string; continueWord: string; onPress: () => void }) {
   const { row } = props;
   const semibold = useSerifStyle('semibold');
+  // The ring shows for Android keyboard or D-pad and web. iOS Full Keyboard Access, Switch Control and VoiceOver draw their
+  // own system indicator and do not fire onFocus.
   const [focused, setFocused] = useState(false);
   // The "Needs ..." line replaces the summary. The check is decorative, so it is not in the name.
   const line = row.meta ?? row.summary;
@@ -193,17 +195,21 @@ function Meta({ meta }: { meta?: string }) {
   );
 }
 
+export const PRESSED_OPACITY = 0.9;
+const FOCUS_RING = 2;
+
 const styles = StyleSheet.create({
   screen: { gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   head: { gap: spacing[1] },
   rows: { gap: spacing[2] },
   // The v2 glass card (shared with Card), full width, at least 44 pt.
-  card: { ...glassCard, minHeight: minTouchTarget, padding: spacing[3], gap: 2, overflow: 'hidden' },
-  // Glass is see-through, so a press dims the whole card instead of mixing a colour in.
+  card: { ...glassCard, minHeight: minTouchTarget, padding: spacing[3] + glassCard.borderWidth, gap: 2, overflow: 'hidden' },
   // The glass edge is decorative (about 1:1), so focus gets a 2 pt ring in the v2 focus colour (3:1 on every ground).
-  cardFocused: { borderWidth: 2, borderColor: v2.roles.focus },
-  cardPressed: { opacity: 0.8 },
+  // The ring is 1 pt thicker, so the padding gives 1 pt back and the card does not move.
+  cardFocused: { borderWidth: FOCUS_RING, borderColor: v2.roles.focus, padding: spacing[3] },
+  // Glass is see-through, so a press dims the whole card. 0.9 keeps muted and accent text at 4.5:1 (hub.spec checks; 0.87 is the floor).
+  cardPressed: { opacity: PRESSED_OPACITY },
   // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
   nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors['accent-700'] },
   top: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },

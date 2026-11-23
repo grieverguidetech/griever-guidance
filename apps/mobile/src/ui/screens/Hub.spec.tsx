@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { screenCopy } from '@griever/copy';
 import { v2 } from '@griever/tokens';
+import { glassShadow } from '../Card';
 import { Hub } from './Hub';
 import type { HubProps, HubRow } from './Hub';
 
@@ -97,7 +98,7 @@ describe('Hub cards', () => {
       expect(style.borderColor).toBe(recipe.border.color);
       expect(style.borderWidth).toBe(recipe.border.width);
       expect(style.borderRadius).toBe(8);
-      expect(style.boxShadow).toBeTruthy();
+      expect(style.boxShadow).toEqual(glassShadow);
     }
     expect(StyleSheet.flatten(screen.getByTestId('next-bar').props.style).width).toBe(3);
   });
