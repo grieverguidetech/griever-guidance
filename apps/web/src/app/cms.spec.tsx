@@ -592,6 +592,8 @@ describe('editor on, signed in (#395)', () => {
     signedInAs('owner');
     renderApp(<App />);
     expect(await screen.findByRole('heading', { level: 1, name: "Who you've lost" })).toBeInTheDocument();
+    // The region keeps its own name, so the h1 and the region do not read the same twice in a row.
+    expect(screen.getByRole('region', { name: 'People' })).toBeInTheDocument();
   });
 });
 

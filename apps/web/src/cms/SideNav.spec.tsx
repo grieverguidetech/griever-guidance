@@ -219,6 +219,12 @@ describe('SideNav', () => {
       expect(nav.getByRole('link', { name: "Who you've lost" })).not.toHaveAttribute('aria-current');
     });
 
+    it('on a person page the Who you\'ve lost link keeps aria-current (#954)', () => {
+      setup({ hrefFor: (key) => (key === 'people' ? '/people' : `/people/abc/${key}`), section: 'person' });
+      const nav = within(screen.getByRole('navigation', { name: /^Sections/ }));
+      expect(nav.getByRole('link', { name: "Who you've lost" })).toHaveAttribute('aria-current', 'page');
+    });
+
     it('a plain click or Enter on a link chooses it in the app, without following the href', async () => {
       const user = userEvent.setup();
       const { onSelect } = setup({ hrefFor });
