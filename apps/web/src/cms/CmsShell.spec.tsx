@@ -119,6 +119,8 @@ describe('CmsShell', () => {
 
   it('moves focus to the h1 after a menu choice on a phone', async () => {
     setup();
+    // The menu opener navigates, so it is a secondary button.
+    expect(screen.getByRole('button', { name: 'Sections · Service' })).toHaveClass('gg-btn-secondary');
     await userEvent.click(screen.getByRole('button', { name: 'Sections · Service' }));
     await userEvent.click(screen.getByRole('button', { name: 'Overview' }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();

@@ -673,6 +673,8 @@ describe('Delete account panel', () => {
     const names = screen.getAllByRole('button').map((b) => b.textContent);
     expect(names.indexOf('Cancel')).toBeGreaterThanOrEqual(0);
     expect(names.indexOf('Cancel')).toBeLessThan(names.indexOf('Yes, delete my account'));
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveClass('gg-btn-primary');
+    expect(screen.getByRole('button', { name: 'Yes, delete my account' })).toHaveClass('gg-btn-secondary');
   });
 
   it('Cancel returns focus to the opener and still does not delete', async () => {

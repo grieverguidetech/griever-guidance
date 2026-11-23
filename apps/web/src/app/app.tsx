@@ -185,7 +185,7 @@ function AccountsUnavailable({ onRetry }: { onRetry: () => void }) {
         <p className="text-[14px] leading-[1.6] m-0" style={{ color: 'var(--text-muted)' }}>
           Nothing you've written is lost. You can try again in a moment.
         </p>
-        <button type="button" className="gg-btn gg-btn-secondary gg-btn-block" onClick={onRetry}>
+        <button type="button" className="gg-btn gg-btn-primary gg-btn-block" onClick={onRetry}>
           Try again
         </button>
       </div>

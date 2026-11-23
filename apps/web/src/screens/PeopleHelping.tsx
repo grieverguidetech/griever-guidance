@@ -310,19 +310,19 @@ export function PeopleHelping({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="gg-btn gg-btn-secondary"
-              aria-disabled={leaving}
-              onClick={() => void leave()}
-            >
-              {leaving ? 'Stopping…' : 'Stop helping'}
-            </button>
-            <button
-              type="button"
               className="gg-btn gg-btn-primary"
               aria-disabled={leaving}
               onClick={keepHelping}
             >
               Keep helping
+            </button>
+            <button
+              type="button"
+              className="gg-btn gg-btn-secondary"
+              aria-disabled={leaving}
+              onClick={() => void leave()}
+            >
+              {leaving ? 'Stopping…' : 'Stop helping'}
             </button>
           </div>
         </section>

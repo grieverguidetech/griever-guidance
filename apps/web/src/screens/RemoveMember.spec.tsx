@@ -32,6 +32,17 @@ describe('RemoveMember', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'People helping you' })).toBeInTheDocument();
   });
 
+  it('makes Keep the primary first button and Remove the secondary one in the confirm step', async () => {
+    const user = userEvent.setup();
+    setup();
+    await user.click(screen.getByRole('button', { name: 'Remove Sam Lee' }));
+    const keep = screen.getByRole('button', { name: 'Keep' });
+    const remove = screen.getByRole('button', { name: 'Remove' });
+    expect(keep).toHaveClass('gg-btn-primary');
+    expect(remove).toHaveClass('gg-btn-secondary');
+    expect(keep.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('does not remove until confirmed', async () => {
     const user = userEvent.setup();
     const onRemove = setup();
