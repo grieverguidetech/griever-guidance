@@ -4,6 +4,15 @@ import { screenCopy } from '@griever/copy';
 import { CHECKLIST_PHASES, DISPOSITIONS } from '@griever/shared';
 import { z } from 'zod';
 
+/** A strict object that never repeats an unknown key name back to the caller. */
+const strict = <T extends z.ZodRawShape>(shape: T) =>
+  z.strictObject(shape, {
+    error: (issue) =>
+      issue.code === 'unrecognized_keys'
+        ? 'This field is not accepted.'
+        : undefined,
+  });
+
 const STEP_IDS = CHECKLIST_PHASES.flatMap((phase) => [...phase.itemIds]) as [
   string,
   ...string[],
@@ -14,15 +23,15 @@ const PHASE_KEYS = CHECKLIST_PHASES.map((phase) => phase.key) as [
 ];
 
 /** Inputs are a choice from a fixed list and step ids. No names, contacts or free text (C8). */
-const situationInput = z.strictObject({
-  situation: z.strictObject({ disposition: z.enum(DISPOSITIONS) }),
+const situationInput = strict({
+  situation: strict({ disposition: z.enum(DISPOSITIONS) }),
 });
-const nextStepInput = z.strictObject({
-  situation: z.strictObject({ disposition: z.enum(DISPOSITIONS) }),
+const nextStepInput = strict({
+  situation: strict({ disposition: z.enum(DISPOSITIONS) }),
   done: z.array(z.enum(STEP_IDS)).max(STEP_IDS.length),
 });
 
-const stepSchema = z.strictObject({
+const stepSchema = strict({
   id: z.string(),
   phase: z.enum(PHASE_KEYS),
   title: z.string(),
@@ -34,9 +43,9 @@ const stepSchema = z.strictObject({
   doesNotApplyWhen: z.string().optional(),
   handOff: z.string().optional(),
 });
-const listItemSchema = z.strictObject({ id: z.string(), title: z.string() });
+const listItemSchema = strict({ id: z.string(), title: z.string() });
 
-const startOutput = z.strictObject({
+const startOutput = strict({
   instruction: z.string(),
   steps: z.array(
     listItemSchema.extend({
@@ -49,7 +58,7 @@ const startOutput = z.strictObject({
   obituaryNote: z.string(),
   first: stepSchema.nullable(),
 });
-const nextOutput = z.strictObject({
+const nextOutput = strict({
   next: stepSchema.nullable(),
   phase: z.enum(PHASE_KEYS).nullable(),
   message: z.string(),

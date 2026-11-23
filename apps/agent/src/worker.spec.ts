@@ -56,15 +56,44 @@ describe('agent worker', () => {
     expect(body.result.tools).toHaveLength(2);
   });
 
-  it('answers 413 for a body over 16 KiB', async () => {
-    const big = JSON.stringify({
+  const bodyOfBytes = (bytes: number) => {
+    const base = JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
       method: 'tools/list',
-      params: { pad: 'x'.repeat(17000) },
+      params: { pad: '' },
     });
-    const res = await call('/mcp', post({}, big));
-    expect(res.status).toBe(413);
+    return base.replace(
+      '"pad":""',
+      `"pad":"${'x'.repeat(bytes - base.length)}"`,
+    );
+  };
+
+  it('accepts a body of exactly 16384 bytes and answers 413 for 16385', async () => {
+    const exact = bodyOfBytes(16384);
+    expect(new TextEncoder().encode(exact).length).toBe(16384);
+    expect((await call('/mcp', post({}, exact))).status).not.toBe(413);
+    const over = bodyOfBytes(16385);
+    expect(new TextEncoder().encode(over).length).toBe(16385);
+    expect((await call('/mcp', post({}, over))).status).toBe(413);
+  });
+
+  it('writes nothing to the console while loading the handler and serving a request', async () => {
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map(
+      (m) => vi.spyOn(console, m).mockImplementation(() => undefined),
+    );
+    vi.resetModules();
+    const fresh = (await import('./worker.js')).default;
+    const res = await fresh.fetch(
+      new Request('https://agent.test/mcp', { ...post() }),
+      {},
+    );
+    expect(res.status).toBe(200);
+    await res.text();
+    for (const spy of spies) {
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    }
   });
 
   describe('rate limit', () => {

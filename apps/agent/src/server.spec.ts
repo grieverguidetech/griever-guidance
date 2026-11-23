@@ -1,6 +1,10 @@
 import { nextStep, startWorkflow } from '@griever/agent-workflow';
 import { screenCopy } from '@griever/copy';
-import { CHECKLIST_PHASES } from '@griever/shared';
+import { CHECKLIST_PHASES, DISPOSITIONS } from '@griever/shared';
+import {
+  CLIENT_CAPABILITIES_META_KEY,
+  PROTOCOL_VERSION_META_KEY,
+} from '@modelcontextprotocol/server';
 import worker from './worker.js';
 
 const headers = {
@@ -139,6 +143,16 @@ describe('agent MCP tools', () => {
           done: Array.from({ length: allIds.length + 1 }, () => allIds[0]),
         },
       ],
+      ['next_step', { situation, done: [], [canary]: 1 }],
+      [
+        'next_step',
+        { situation: { disposition: 'undecided', [canary]: 1 }, done: [] },
+      ],
+      ['start_workflow', { situation, [canary]: 1 }],
+      [
+        'start_workflow',
+        { situation: { disposition: 'undecided', [canary]: 1 } },
+      ],
       ['start_workflow', { situation, name: canary }],
       ['start_workflow', { situation: { disposition: 42, note: canary } }],
     ];
@@ -168,18 +182,74 @@ describe('agent MCP tools', () => {
   });
 
   it('puts no link or message scheme and no exclamation mark in any output (C1, C7)', async () => {
-    const outputs: string[] = [
-      JSON.stringify(startWorkflow(situation as never)),
-    ];
-    for (const id of allIds) {
-      const { body } = await callTool('next_step', {
-        situation,
-        done: allIds.slice(0, allIds.indexOf(id)),
-      });
-      outputs.push(JSON.stringify(body.result.structuredContent));
+    // The JSON Schema dialect id in tools/list is protocol metadata, not text shown to the person.
+    const listed = JSON.stringify(
+      await readRpc(await rpc('tools/list')),
+    ).replaceAll(
+      '"$schema":"https://json-schema.org/draft/2020-12/schema"',
+      '',
+    );
+    const outputs: string[] = [listed];
+    for (const disposition of DISPOSITIONS) {
+      const sit = { disposition };
+      const start = await callTool('start_workflow', { situation: sit });
+      outputs.push(JSON.stringify(start.body));
+      for (const id of allIds) {
+        const { body } = await callTool('next_step', {
+          situation: sit,
+          done: allIds.slice(0, allIds.indexOf(id)),
+        });
+        outputs.push(JSON.stringify(body));
+      }
     }
     for (const text of outputs) {
       expect(text).not.toMatch(/https?:|sms:|mailto:|tel:|!/i);
     }
+  });
+
+  it('refuses subscriptions/listen', async () => {
+    const res = await rpc('subscriptions/listen', { filter: {} });
+    const text = await res.text();
+    expect(text).not.toContain('"tools"');
+    expect(res.status === 200 ? text : 'refused').toMatch(
+      /error|refused|limit/i,
+    );
+  });
+
+  it('serves a modern-envelope tools/call as JSON with no session id', async () => {
+    const res = await worker.fetch(
+      new Request('https://agent.test/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2026-07-28',
+          'Mcp-Method': 'tools/call',
+          'Mcp-Name': 'next_step',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 7,
+          method: 'tools/call',
+          params: {
+            name: 'next_step',
+            arguments: { situation, done: [] },
+            _meta: {
+              [PROTOCOL_VERSION_META_KEY]: '2026-07-28',
+              [CLIENT_CAPABILITIES_META_KEY]: {},
+            },
+          },
+        }),
+      }),
+      {},
+    );
+    expect(res.headers.get('content-type')).toContain('application/json');
+    expect(res.headers.get('mcp-session-id')).toBeNull();
+    const body = (await res.json()) as {
+      result: { structuredContent: unknown };
+    };
+    expect(body.result.structuredContent).toEqual(
+      nextStep(situation as never, []),
+    );
   });
 });

@@ -12,10 +12,10 @@ const jsonResponse = (
     headers: { 'Content-Type': 'application/json', ...headers },
   });
 
-/** Stateless: no session id, a body cap of 16 KiB, and nothing reported out of band. */
+/** Stateless: no session id, no subscriptions, a body cap of 16 KiB, and nothing reported out of band. */
 const mcpHandler = createMcpHandler(() => createAgentServer(), {
   legacy: 'stateless',
-  responseMode: 'json',
+  maxSubscriptions: 0,
   maxRequestBodySize: 16384,
   onerror: () => undefined,
 });
