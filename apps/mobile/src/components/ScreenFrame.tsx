@@ -24,7 +24,7 @@ export function ScreenFrame({ children, bottomInset = true }: { children: ReactN
 
 /**
  * Fades a screen in when it first shows (the top-level screens are swapped in place, not pushed on
- * a stack). Shows at once, with no animation, when Reduce Motion or a screen reader is on. Opacity only; nothing moves (C7).
+ * a stack). Shows at once, with no animation, when Reduce Motion or a screen reader is on. Opacity only; nothing moves (C7). It paints the page colour only; ScreenFrame draws the glow.
  */
 export function FadeIn({ children }: { children: ReactNode }) {
   const reduce = useNoFade();
@@ -43,7 +43,6 @@ export function FadeIn({ children }: { children: ReactNode }) {
   }, [reduce, opacity]);
   return (
     <Animated.View style={{ flex: 1, backgroundColor: v2.roles.page.color, opacity }}>
-      <PageGlow />
       {children}
     </Animated.View>
   );

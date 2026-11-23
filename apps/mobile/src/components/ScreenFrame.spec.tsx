@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Animated, Text } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet, Text, View } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 import { v2 } from '@griever/tokens';
 import { FadeIn, ScreenFrame } from './ScreenFrame';
@@ -58,6 +58,10 @@ describe('FadeIn', () => {
   });
 });
 
+// True when some view in the tree paints the page colour.
+const paintedPage = () =>
+  screen.UNSAFE_getAllByType(View).some((v) => StyleSheet.flatten(v.props.style as never)?.backgroundColor === v2.roles.page.color);
+
 describe('ScreenFrame', () => {
   it('draws the page glow behind the children, hidden from screen readers and ignoring touches', () => {
     render(
@@ -70,9 +74,27 @@ describe('ScreenFrame', () => {
     expect(glow.props.accessible).toBe(false);
     expect(glow.props.accessibilityElementsHidden).toBe(true);
     expect(glow.props.importantForAccessibility).toBe('no-hide-descendants');
-    const root = screen.toJSON() as { props: { style: { backgroundColor?: string } }; children: { props: { testID?: string } | null }[] };
-    expect(root.props.style.backgroundColor).toBe(v2.roles.page.color);
-    expect(root.children[0]?.props?.testID).toBe('page-glow');
+    expect(paintedPage()).toBe(true);
     expect(screen.getByText('Hello')).toBeTruthy();
+  });
+
+  it('FadeIn paints the page colour and draws no glow of its own', async () => {
+    setup(true, false);
+    await show();
+    expect(screen.queryByTestId('page-glow', { includeHiddenElements: true })).toBeNull();
+    expect(paintedPage()).toBe(true);
+  });
+
+  it('FadeIn wrapping ScreenFrame draws exactly one glow', async () => {
+    setup(true, false);
+    render(
+      <FadeIn>
+        <ScreenFrame>
+          <Text>Hello</Text>
+        </ScreenFrame>
+      </FadeIn>,
+    );
+    await act(async () => undefined);
+    expect(screen.getAllByTestId('page-glow', { includeHiddenElements: true })).toHaveLength(1);
   });
 });
