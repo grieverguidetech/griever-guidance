@@ -2,17 +2,18 @@ import { useCallback, useEffect } from 'react';
 import type { ComponentRef, Ref } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { AccessibilityInfo, ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, minTouchTarget, spacing } from '@griever/tokens';
+import { colors, minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { applyAriaDisabled } from './ariaDisabled';
 import { Phrasing } from './phrasing';
+import { LinearSwirl } from './Swirl';
 import { useSerifStyle } from './typography';
 
 /** The element a button renders: a DOM node on web, a host instance on native. */
 export type ButtonNode = ComponentRef<typeof Pressable>;
 
 /**
- * Looks follow the mobile app's buttons (decision by Peter, 2026-10-25): rounded 10px corners,
- * a solid accent-700 primary, an accent outline for secondary, and a tinted outlined "link" button
+ * `primary` and `secondary` are the v2 swirl buttons (#976): a sunset or soft ocean LinearSwirl fill, radius, border,
+ * text and shadow from `v2.recipes.button`. The other variants keep the 2026-10-25 look (decision by Peter): rounded 10px corners, and a tinted outlined "link" button
  * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: an
  * accent-700 label with an underline, no fill and no border, and a pale accent wash while pressed.
  * `header` is Back and What you'll need (#362): the page shows through, a thin accent-600 outline,
@@ -21,6 +22,37 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
 export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
 
 const BUTTON_RADIUS = 10;
+
+/** Primary and secondary are the v2 swirl buttons: a sliding gradient fill, drawn from the recipes. */
+const RECIPES = { primary: v2.recipes.button.primary, secondary: v2.recipes.button.secondary } as const;
+const PAGE = v2.roles.page.color;
+// An unavailable primary has no swirl. v2 has no "disabled" role yet, so it is solid ink with page-coloured text.
+const UNAVAILABLE_FILL = v2.roles.ink;
+
+type Recipe = (typeof RECIPES)[keyof typeof RECIPES];
+
+/** The recipe's shadow as native shadow props (the first shadow only: the swirl buttons have one). */
+function recipeShadow(recipe: Recipe) {
+  const shadow = recipe.shadow[0];
+  return {
+    shadowColor: shadow.color,
+    shadowOffset: { width: shadow.x, height: shadow.y },
+    shadowRadius: shadow.blur / 2,
+    shadowOpacity: 1,
+  };
+}
+
+/** The recipe's border, radius and shadow as one outer style. */
+function recipeFrame(recipe: Recipe) {
+  return {
+    borderWidth: recipe.border.width,
+    borderColor: recipe.border.color,
+    borderRadius: recipe.radius,
+    // A shadow needs a fill on the view that casts it; the swirl sits on top and hides this.
+    backgroundColor: recipe.swirl.stops[0],
+    ...recipeShadow(recipe),
+  };
+}
 
 export interface ButtonProps {
   label: string;
@@ -133,12 +165,39 @@ export function Button({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [working]);
   const unavailableFill = ariaDisabled && variant === 'primary';
+  const recipe = variant === 'primary' || variant === 'secondary' ? RECIPES[variant] : undefined;
+  const swirled = recipe !== undefined && !unavailableFill;
+  const labelColor = unavailableFill ? PAGE : recipe && !ariaDisabled ? recipe.text.color : undefined;
   const text = (
     <Phrasing>
-      <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled), (variant === 'tertiary' || variant === 'ghost') && styles.labelTertiary]}>
+      <Text
+        style={[
+          styles.label,
+          font,
+          variant === 'primary' ? styles.labelPrimary : styles.labelLink,
+          labelStyle(variant, ariaDisabled),
+          (variant === 'tertiary' || variant === 'ghost') && styles.labelTertiary,
+          recipe && { fontWeight: String(recipe.text.weight) as '400' | '500' },
+          labelColor !== undefined && { color: labelColor },
+        ]}
+      >
         {working && busyLabel ? busyLabel : label}
       </Text>
     </Phrasing>
+  );
+  const spinnerColor = labelColor ?? colors['accent-700'];
+  const body = working ? (
+    <View style={styles.content}>
+      <ActivityIndicator
+        size="small"
+        color={spinnerColor}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      />
+      {text}
+    </View>
+  ) : (
+    text
   );
   return (
     <Pressable
@@ -151,24 +210,20 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         styles[variant],
+        recipe && recipeFrame(recipe),
+        swirled && styles.swirlFrame,
         unavailableFill && styles.unavailableFill,
         minHeight !== undefined && { minHeight },
         pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : styles.pressed),
       ]}
       {...extra}
     >
-      {working ? (
-        <View style={styles.content}>
-          <ActivityIndicator
-            size="small"
-            color={variant === 'primary' ? colors.bg : colors['accent-700']}
-            importantForAccessibility="no-hide-descendants"
-            accessibilityElementsHidden
-          />
-          {text}
-        </View>
+      {swirled ? (
+        <LinearSwirl stops={[...recipe.swirl.stops]} angle={recipe.swirl.angle} driftMs={recipe.driftMs} style={styles.swirl}>
+          {body}
+        </LinearSwirl>
       ) : (
-        text
+        body
       )}
     </Pressable>
   );
@@ -211,10 +266,9 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     borderRadius: BUTTON_RADIUS,
   },
-  // Fills behind text use accent-700 (5.72:1 with the page colour); the base accent is decorative.
-  primary: { backgroundColor: colors['accent-700'], paddingVertical: 14 },
-  // Outlined with the accent, as mobile's secondary button. accent-700 on the page is 5.72:1.
-  secondary: { borderColor: colors['accent-700'], paddingVertical: 14 },
+  // Primary and secondary get their fill, border and shadow from the v2 recipes (recipeFrame).
+  primary: { paddingVertical: 14 },
+  secondary: { paddingVertical: 14 },
   tinted: { borderColor: colors['accent-700'], backgroundColor: colors['accent-100'] },
   ghost: {},
   // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
@@ -224,15 +278,18 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
   pressedWash: { backgroundColor: colors['accent-100'] },
-  // Unavailable is a solid muted look, not a fade: opacity would drop the label below 4.5:1.
-  // Primary: bg on neutral-700 (see Button.spec for the numbers). Others: neutral-700 text on the page.
-  unavailableFill: { backgroundColor: colors['neutral-700'] },
+  // Unavailable is a solid look, not a fade: opacity would drop the label below 4.5:1.
+  // Primary: page-coloured text on ink. Others: neutral-700 text.
+  unavailableFill: { backgroundColor: UNAVAILABLE_FILL },
+  // The swirl fills the frame and carries the padding, so the whole button is gradient. The first stop shows behind it for the shadow.
+  swirlFrame: { paddingVertical: 0, paddingHorizontal: 0, alignItems: 'stretch' },
+  swirl: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: 14, borderRadius: BUTTON_RADIUS },
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] },
   label: {
   },
   labelPrimary: { fontSize: 15 },
   labelLink: { fontSize: 15 },
-  labelOnFill: { color: colors.bg },
+  labelOnFill: { color: PAGE },
   labelTertiary: { textDecorationLine: 'underline' },
   labelAccent: { color: colors['accent-700'] },
   labelUnavailable: { color: colors['neutral-700'] },
