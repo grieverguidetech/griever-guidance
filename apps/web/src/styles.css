@@ -586,13 +586,17 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
   .gg-done-mark-swirl { background: var(--v2-done-mark-swirl); }
   .gg-done-mark-ring { border: var(--v2-done-mark-ring-width) solid var(--color-v2-open-ring); }
-  /* One pass, then rest, and only when the visitor allows motion (WCAG 2.2.2). */
+  /* One pass when the visitor ticks the row, then rest, and only when they allow motion (WCAG 2.2.2). */
   @media (prefers-reduced-motion: no-preference) {
-    .gg-done-mark-swirl { animation: gg-done-mark-turn var(--v2-settle-ms) ease-out forwards; }
+    .gg-done-mark-turn { animation: gg-done-mark-turn var(--v2-settle-ms) ease-out forwards; }
     @keyframes gg-done-mark-turn {
       from { transform: rotate(0deg); }
       to { transform: rotate(var(--v2-done-mark-turn)); }
     }
+  }
+  /* Forced colours drop gradients, so the done swirl would show blank: paint it in the system text colour instead. */
+  @media (forced-colors: active) {
+    .gg-done-mark-swirl { background: CanvasText; }
   }
   /* #514: an input on a panel needs a visible edge (WCAG 1.4.11, 3:1). It takes the v2 field recipe;
      the edge is 3:1 or more against glass over the page and both glows (guarded by v2Styles.spec.ts). */

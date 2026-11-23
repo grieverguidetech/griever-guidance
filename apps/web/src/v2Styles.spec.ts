@@ -672,7 +672,10 @@ describe('styles.css phone nudge (#1003)', () => {
 
 describe('styles.css done mark (#1004)', () => {
   const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  const mediaStart = bare.indexOf('@media (prefers-reduced-motion: no-preference) {\n    .gg-done-mark-swirl');
+  const mediaStart = bare.indexOf('@media (prefers-reduced-motion: no-preference) {\n    .gg-done-mark-turn');
+  it('finds the no-preference block, so the slices below test the right text', () => {
+    expect(mediaStart).toBeGreaterThan(0);
+  });
   /** The text of the braces that open at `open`, without the braces themselves. */
   const block = (open: number) => {
     let depth = 0;
@@ -718,13 +721,18 @@ describe('styles.css done mark (#1004)', () => {
   it('turns one pass of the settle var (4.5 s at most) and rests (forwards), only inside a no-preference block', () => {
     expect(outside).not.toMatch(/\.gg-done-mark[^{}]*\{[^{}]*\banimation/);
     expect(outside).not.toMatch(/@keyframes gg-done-mark-turn/);
-    const anim = /animation:\s*([^;]+);/.exec(decls('.gg-done-mark-swirl', noPref))?.[1] ?? '';
+    const anim = /animation:\s*([^;]+);/.exec(decls('.gg-done-mark-turn', noPref))?.[1] ?? '';
     expect(anim).toContain('gg-done-mark-turn var(--v2-settle-ms)');
     expect(anim).toMatch(/\bforwards\b/);
     expect(anim).not.toMatch(/infinite|\bboth\b|alternate/);
     expect(ms('--v2-settle-ms')).toBeLessThanOrEqual(4500);
     expect(noPref).toMatch(/@keyframes gg-done-mark-turn/);
     expect(noPref).toContain('rotate(var(--v2-done-mark-turn))');
+  });
+
+  it('paints the swirl in CanvasText under forced colours, where gradients are dropped', () => {
+    const forced = bare.slice(bare.indexOf('@media (forced-colors: active) {\n    .gg-done-mark-swirl'));
+    expect(forced).toMatch(/^@media \(forced-colors: active\) \{\n    .gg-done-mark-swirl \{ background: CanvasText; \}/);
   });
 
   it('turns by settle / spin of a full turn, capped at one turn', () => {
@@ -761,6 +769,27 @@ describe('styles.css done mark (#1004)', () => {
   it.each(grounds)('keeps the open ring at 3:1 or more on the hover and pressed row fill over glass on %s', (ground) => {
     for (const alpha of [0.07, 0.14]) {
       expect(contrast(ring(), wash(alpha, glassOver(ground)))).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
+
+describe('done mark swirl contrast (#1004)', () => {
+  const stops = () => [...themeVar('--v2-done-mark-swirl').matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+  const behind = (): Array<[string, string]> => [
+    ...grounds.map((g): [string, string] => [g, themeVar(g)]),
+    ...grounds.map((g): [string, string] => [`glass over ${g}`, glassOver(g)]),
+    ['sheet and field fill', themeVar('--color-v2-field-fill')],
+    ['accent-100', themeVar('--color-accent-100')],
+  ];
+
+  it('has the three recipe stops', () => {
+    // The gradient blends the last stop back into the first, so it lists the first stop twice.
+    expect(stops()).toEqual([...v2.recipes.doneMark.swirl, v2.recipes.doneMark.swirl[0]]);
+  });
+
+  it.each(behind())('keeps every swirl stop at 3:1 or more (non-text) on %s', (_name, ground) => {
+    for (const stop of stops()) {
+      expect(contrast(stop, ground), `${stop} on ${ground}`).toBeGreaterThanOrEqual(3);
     }
   });
 });

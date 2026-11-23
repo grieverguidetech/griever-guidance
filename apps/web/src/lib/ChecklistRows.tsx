@@ -77,7 +77,7 @@ function ChecklistRow({ item, checked, loaded, onToggle }: RowProps) {
         onClick={onToggle}
         className="flex items-start gap-3 text-left min-h-[44px]"
       >
-        <DoneMark checked={checked} />
+        <DoneMark checked={checked} className="text-[14px] mt-[calc((1.55em-var(--v2-done-mark-size))/2)]" />
         <div>
           <div className={`text-[14px]${checked ? ' line-through' : ''}`}>{item.label}</div>
           {item.meta && <div className="gg-card-meta">{item.meta}</div>}

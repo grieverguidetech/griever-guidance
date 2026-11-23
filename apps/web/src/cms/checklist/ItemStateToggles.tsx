@@ -17,7 +17,7 @@ interface Props {
   groupLabel: string;
   /**
    * `detail` (default): one full Done button.
-   * `row`: a leading check-circle for Done, then `children` (the row label). No not-applicable button here.
+   * `row`: a leading done mark for Done, then `children` (the row label). No not-applicable button here.
    * A row saved as not_applicable shows as done-like: the circle is checked and pressing it clears the state.
    */
   variant?: 'detail' | 'row';

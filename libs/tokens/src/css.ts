@@ -93,6 +93,11 @@ function conicCss(stops: readonly string[]): string {
   return `conic-gradient(${[...stops, stops[0]].join(', ')})`;
 }
 
+/** Degrees of one pass: settle time of a full turn, never more than one turn (the cap mobile's ConicSwirl uses). */
+function oneTurnDeg(settleMs: number, spinMs: number): string {
+  return `${(360 * settleMs) / Math.max(spinMs, settleMs)}deg`;
+}
+
 /** `0 1px 9px rgba(...)`, one entry per shadow, joined by commas. */
 function shadowCss(shadows: readonly Shadow[]): string {
   return shadows.map((s) => `${s.x}px ${s.y}px ${s.blur}px ${s.color}`).join(', ');
@@ -205,12 +210,12 @@ export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): stri
     ['nudge-orb', conicCss(nudge.orb.conic)],
     ['nudge-orb-size', `${nudge.orb.size}px`],
     // One pass of the orb: settle time of a full turn, never more than one turn (the cap mobile's ConicSwirl uses).
-    ['nudge-orb-turn', `${(360 * primary.settleMs) / Math.max(roles.doneMark.spinMs, primary.settleMs)}deg`],
+    ['nudge-orb-turn', oneTurnDeg(primary.settleMs, roles.doneMark.spinMs)],
     // The done mark on a ticked checklist row: a 16px conic swirl that turns once (same cap as the orb), and the open ring's width.
     ['done-mark-size', `${roles.doneMark.size}px`],
     ['done-mark-ring-width', `${roles.doneMark.openWidth}px`],
     ['done-mark-swirl', conicCss(roles.doneMark.swirl)],
-    ['done-mark-turn', `${(360 * primary.settleMs) / Math.max(roles.doneMark.spinMs, primary.settleMs)}deg`],
+    ['done-mark-turn', oneTurnDeg(primary.settleMs, roles.doneMark.spinMs)],
     ['radius', `${card.radius}px`],
     ['border-thin', `${primitives.border.thin}px`],
     ['border-medium', `${primitives.border.medium}px`],

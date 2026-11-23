@@ -20,3 +20,32 @@ describe('DoneMark (#1004)', () => {
     expect(screen.getByTestId('done-mark')).toHaveClass('gg-done-mark');
   });
 });
+
+describe('DoneMark turn (#1004)', () => {
+  it('does not turn a row that renders already ticked', () => {
+    render(<DoneMark checked />);
+    expect(screen.getByTestId('done-mark-swirl')).not.toHaveClass('gg-done-mark-turn');
+  });
+
+  it('turns when the row goes from open to ticked, and keeps the class on a re-render with no change', () => {
+    const { rerender } = render(<DoneMark checked={false} />);
+    rerender(<DoneMark checked />);
+    expect(screen.getByTestId('done-mark-swirl')).toHaveClass('gg-done-mark-turn');
+    rerender(<DoneMark checked />);
+    expect(screen.getByTestId('done-mark-swirl')).toHaveClass('gg-done-mark-turn');
+  });
+
+  it('does not turn a ticked row that re-renders, and turns again after untick and tick', () => {
+    const { rerender } = render(<DoneMark checked />);
+    rerender(<DoneMark checked className="x" />);
+    expect(screen.getByTestId('done-mark-swirl')).not.toHaveClass('gg-done-mark-turn');
+    rerender(<DoneMark checked={false} />);
+    rerender(<DoneMark checked />);
+    expect(screen.getByTestId('done-mark-swirl')).toHaveClass('gg-done-mark-turn');
+  });
+
+  it('puts an extra class on the wrapper', () => {
+    render(<DoneMark checked={false} className="extra" />);
+    expect(screen.getByTestId('done-mark')).toHaveClass('gg-done-mark', 'extra');
+  });
+});

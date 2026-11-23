@@ -52,7 +52,7 @@ describe('Checklist rows (#176)', () => {
     await loaded();
     await user.click(row('Life insurance policies'));
     expect(row('Life insurance policies')).toHaveAttribute('aria-pressed', 'true');
-    // Strikethrough is not the only cue: the pressed state and the filled icon change too.
+    // Strikethrough is not the only cue: the pressed state and the done mark change too.
     expect(screen.getByText('Life insurance policies')).toHaveClass('line-through');
     expect(row('Life insurance policies').querySelector('[data-testid="done-mark-swirl"]')).toBeInTheDocument();
     expect(row('Life insurance policies').querySelector('svg')).toBeNull();
