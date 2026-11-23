@@ -71,3 +71,5 @@ export const radius = { sm: 1, md: 2, lg: 4 } as const;
 
 /** The smallest touch target, in pixels (REQUIREMENTS.md accessibility rules). */
 export const minTouchTarget = 44;
+
+export { v2 } from './v2/index.js';

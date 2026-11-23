@@ -254,6 +254,8 @@ Grievers Guidance helps people who have just lost a loved one send funeral and s
 
 Hooks (`libs/hooks`), shared logic (`libs/shared` and the other logic libs), copy (`libs/copy`) and tokens (`libs/tokens`) are shared by web and mobile. UI is per app: mobile owns `apps/mobile/src/ui` and must not import `@griever/ui`; web uses `libs/ui`. A spec in `apps/mobile` fails if mobile imports `@griever/ui`.
 
+Tokens v2 (`libs/tokens/src/v2`) has three layers: primitives (raw values), roles (what each is for) and recipes (finished looks for card, buttons, nudge and done mark). Roles and recipes point at primitives and hold no colour literals (hex or rgba). A brand change edits primitives only. Mobile reads v2; web reads v1 until its own ticket.
+
 ---
 
 ### Monorepo structure
@@ -304,7 +306,7 @@ libs/
   data-aws/         AWS SDK clients and config, the local DynamoDB and SES stand-ins, and table
                     setup and seed.
   copy/             User-facing copy shared by web and mobile.
-  tokens/           Design tokens shared by web and mobile.
+  tokens/           Design tokens shared by web and mobile. v1 (web today) is flat; v2 has three layers in src/v2.
   ui/               Web UI components. Mobile must not import it (see "UI is per app").
 
 infra/
