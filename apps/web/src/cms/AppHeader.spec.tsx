@@ -38,7 +38,9 @@ describe('AppHeader', () => {
     const svg = screen.getByRole('banner').querySelector('svg');
     expect(svg).toHaveAttribute('aria-hidden', 'true');
     expect(svg).toHaveAttribute('focusable', 'false');
-    expect(screen.getByTestId('wordmark-name').parentElement?.className).toContain('whitespace-nowrap');
+    // The name may wrap with large text (no horizontal scroll at 200%); the mark keeps its size.
+    expect(screen.getByTestId('wordmark-name').parentElement?.className).not.toContain('whitespace-nowrap');
+    expect(screen.getByTestId('wordmark-name').parentElement?.className).toContain('min-w-0');
   });
 
   it('has no literal colours in the source', () => {
