@@ -74,7 +74,7 @@ function shadowCss(shadows: readonly Shadow[]): string {
 
 /** The `--gg-*` lines for marketing, grouped by what they style. */
 export function marketingLines({ roles, recipes }: MarketingInput): string[] {
-  const { primary, secondary } = recipes.button;
+  const { primary, outline } = recipes.button;
   const card = recipes.card;
   const lines: Array<[string, string]> = [
     ['page', roles.page.color],
@@ -98,12 +98,10 @@ export function marketingLines({ roles, recipes }: MarketingInput): string[] {
     ['primary-border', `${primary.border.width}px solid ${primary.border.color}`],
     ['primary-shadow', shadowCss(primary.shadow)],
     ['primary-radius', `${primary.radius}px`],
-    ['secondary-bg', gradientCss(secondary.swirl)],
-    ['secondary-text', secondary.text.color],
-    ['secondary-weight', String(secondary.text.weight)],
-    ['secondary-border', `${secondary.border.width}px solid ${secondary.border.color}`],
-    ['secondary-shadow', shadowCss(secondary.shadow)],
-    ['secondary-radius', `${secondary.radius}px`],
+    ['outline-text', outline.text.color],
+    ['outline-weight', String(outline.text.weight)],
+    ['outline-border', `${outline.border.width}px solid ${outline.border.color}`],
+    ['outline-radius', `${outline.radius}px`],
     ['card-bg', card.fill],
     ['card-border', `${card.border.width}px solid ${card.border.color}`],
     ['card-shadow', shadowCss(card.shadow)],
@@ -140,7 +138,7 @@ export function webEyebrowFontStack(p: Pick<Primitives, 'font'>, eyebrowFamily: 
 
 /** `--font-v2-heading`, `--font-v2-body`, `--font-v2-eyebrow` and the v2 colours (Tailwind reads these). Every name starts `v2`, except ink, which is `--color-text`. */
 export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): string[] {
-  const { primary, secondary, outline } = recipes.button;
+  const { primary, outline } = recipes.button;
   const { card, nudge, field } = recipes;
   const lines: Array<[string, string]> = [
     ['font-v2-heading', webHeadingFontStack(primitives)],
@@ -165,8 +163,6 @@ export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): str
     ['color-v2-field-focus', field.focusRing],
     ['color-v2-primary-text', primary.text.color],
     ['color-v2-primary-border', primary.border.color],
-    ['color-v2-secondary-text', secondary.text.color],
-    ['color-v2-secondary-border', secondary.border.color],
     ['color-v2-outline-text', outline.text.color],
     ['color-v2-outline-border', outline.border.color],
     ['color-v2-card-fill', card.fill],
@@ -181,14 +177,12 @@ export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): str
 
 /** The v2 gradients, shadows, radius, border widths and motion times, as plain custom properties. */
 export function webV2RootLines({ primitives, roles, recipes }: WebV2Input): string[] {
-  const { primary, secondary } = recipes.button;
+  const { primary } = recipes.button;
   const { card, nudge } = recipes;
   const lines: Array<[string, string]> = [
     ['primary-bg', gradientCss(primary.swirl)],
-    ['secondary-bg', gradientCss(secondary.swirl)],
     ['nudge-bg', gradientCss(nudge.swirl)],
     ['primary-shadow', shadowCss(primary.shadow)],
-    ['secondary-shadow', shadowCss(secondary.shadow)],
     ['card-shadow', shadowCss(card.shadow)],
     ['nudge-shadow', shadowCss(nudge.shadow)],
     ['nudge-speckle-alpha', String(nudge.speckles.alpha)],

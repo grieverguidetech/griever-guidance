@@ -87,14 +87,14 @@ h2 {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--gg-secondary-bg);
-  color: var(--gg-secondary-text);
-  border: var(--gg-secondary-border);
+  background: transparent;
+  color: var(--gg-outline-text);
+  border: var(--gg-outline-border);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  font-weight: var(--gg-secondary-weight);
+  font-weight: var(--gg-outline-weight);
 }
 .step strong {
   font-size: 15px;

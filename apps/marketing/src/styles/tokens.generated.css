@@ -23,12 +23,10 @@
   --gg-primary-border: 1px solid #a7774b;
   --gg-primary-shadow: 0px 2px 12px rgba(150,90,30,0.12);
   --gg-primary-radius: 8px;
-  --gg-secondary-bg: linear-gradient(120deg, #a5cbe3, #a9d6d0, #c6c0eb);
-  --gg-secondary-text: #10324d;
-  --gg-secondary-weight: 400;
-  --gg-secondary-border: 1.5px solid #4f86ad;
-  --gg-secondary-shadow: 0px 1px 9px rgba(20,50,80,0.065);
-  --gg-secondary-radius: 8px;
+  --gg-outline-text: #006786;
+  --gg-outline-weight: 600;
+  --gg-outline-border: 1px solid #006786;
+  --gg-outline-radius: 8px;
   --gg-card-bg: rgba(255,255,255,0.65);
   --gg-card-border: 1px solid rgba(255,255,255,0.95);
   --gg-card-shadow: 0px 1px 9px rgba(20,50,80,0.065);
