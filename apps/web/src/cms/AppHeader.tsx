@@ -47,7 +47,7 @@ export function AppHeader({ checklist }: { checklist?: HeaderChecklistToggle } =
       {checklist ? (
         <button
           type="button"
-          className="gg-btn gg-btn-secondary hidden lg:inline-flex"
+          className="gg-btn gg-btn-primary hidden lg:inline-flex"
           aria-expanded={checklist.open}
           aria-controls={checklist.panelId}
           onClick={checklist.onToggle}

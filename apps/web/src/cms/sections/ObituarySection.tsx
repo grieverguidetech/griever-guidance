@@ -116,7 +116,7 @@ export function ObituarySection({ values, onChange, onServiceChange, onReadyChan
         {edited && (
           <button
             type="button"
-            className="gg-btn gg-btn-secondary"
+            className="gg-btn gg-btn-tertiary"
             onClick={() => {
               onChange({ obituaryText: undefined });
               // The button goes away on reset, so keep focus on the text.

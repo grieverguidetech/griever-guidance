@@ -172,7 +172,7 @@ function FinishNoteCard({ note, onClose }: { note: FinishNote | null; onClose: (
         type="button"
         onClick={onClose}
         aria-label={copy.finishNote.closeLabel}
-        className="gg-btn gg-btn-secondary gg-btn-bar self-start"
+        className="gg-btn gg-btn-secondary self-start"
       >
         {copy.finishNote.close}
       </button>

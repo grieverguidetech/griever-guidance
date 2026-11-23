@@ -24,7 +24,7 @@ export function Tooltip({ text, children }: { text: string; children: (id: strin
 /** "Back" button: a visible border, at least 44 by 44, with the shared focus ring (#176). */
 export function BackButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="gg-btn gg-btn-secondary gg-btn-bar self-start">
+    <button type="button" onClick={onClick} className="gg-btn gg-btn-secondary self-start">
       <ArrowLeft size={16} weight="regular" aria-hidden="true" />
       Back
     </button>
@@ -47,7 +47,7 @@ export function TopBar({ onBack, hideChecklist = false }: { onBack?: () => void;
           type="button"
           aria-haspopup="dialog"
           onClick={() => setSheetOpen(true)}
-          className="gg-btn gg-btn-secondary gg-btn-bar ml-auto"
+          className="gg-btn gg-btn-primary ml-auto"
         >
           <ListChecks size={16} weight="duotone" aria-hidden="true" />
           What you'll need

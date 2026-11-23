@@ -59,7 +59,7 @@ export function StartAgain({ flow }: { flow: Flow }) {
           >
             Clear it
           </button>
-          <button type="button" className="gg-btn gg-btn-ghost" onClick={() => go('idle')}>
+          <button type="button" className="gg-btn gg-btn-primary" onClick={() => go('idle')}>
             Keep it
           </button>
         </div>
@@ -68,7 +68,7 @@ export function StartAgain({ flow }: { flow: Flow }) {
   }
 
   return (
-    <button ref={linkRef} type="button" className="gg-btn gg-btn-ghost self-start !px-0" onClick={() => go('confirm')}>
+    <button ref={linkRef} type="button" className="gg-btn gg-btn-tertiary self-start !px-0" onClick={() => go('confirm')}>
       Start this message again
     </button>
   );

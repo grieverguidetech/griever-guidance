@@ -205,7 +205,7 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
               </div>
               <button
                 type="button"
-                className="gg-btn gg-btn-secondary justify-self-start md:col-span-2 min-h-[44px] min-w-[44px] max-w-full [overflow-wrap:anywhere]"
+                className="gg-btn gg-btn-tertiary justify-self-start md:col-span-2 min-h-[44px] min-w-[44px] max-w-full [overflow-wrap:anywhere]"
                 onClick={() => removeRow(index)}
               >
                 {removeName}
@@ -220,7 +220,7 @@ export function ObituaryPeople({ heading, relations, value, onChange }: Props) {
           <button
             type="button"
             ref={addRef}
-            className="gg-btn gg-btn-secondary self-start min-h-[44px]"
+            className="gg-btn gg-btn-tertiary self-start min-h-[44px]"
             onClick={addRow}
           >
             {copy.addPerson}

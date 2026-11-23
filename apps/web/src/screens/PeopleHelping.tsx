@@ -269,7 +269,7 @@ export function PeopleHelping({
             <button
               type="submit"
               aria-disabled={pending}
-              className="gg-btn gg-btn-secondary gg-btn-block"
+              className="gg-btn gg-btn-primary gg-btn-block"
             >
               {pending ? 'Sending…' : 'Send an invitation'}
             </button>
@@ -310,7 +310,7 @@ export function PeopleHelping({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="gg-btn gg-btn-primary"
+              className="gg-btn gg-btn-secondary"
               aria-disabled={leaving}
               onClick={() => void leave()}
             >
@@ -318,7 +318,7 @@ export function PeopleHelping({
             </button>
             <button
               type="button"
-              className="gg-btn gg-btn-secondary"
+              className="gg-btn gg-btn-primary"
               aria-disabled={leaving}
               onClick={keepHelping}
             >
@@ -371,7 +371,7 @@ export function PeopleHelping({
                 </span>
                 <button
                   type="button"
-                  className="gg-btn gg-btn-ghost self-start !px-0"
+                  className="gg-btn gg-btn-tertiary self-start !px-0"
                   aria-disabled={revokingId === invite.id}
                   onClick={() => void revoke(invite.id)}
                 >

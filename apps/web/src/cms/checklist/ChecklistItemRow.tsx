@@ -30,7 +30,7 @@ export function ChecklistItemRow({ id, state, onOpen, onChange, current, readOnl
       id={labelId}
       data-checklist-item={id}
       aria-current={current ? 'true' : undefined}
-      className={`gg-btn gg-btn-ghost gg-btn-ghost-plain min-w-0 flex-1 justify-start text-left ${handled ? 'text-[color:var(--text-muted)]' : ''}`}
+      className={`gg-btn gg-btn-plain min-w-0 flex-1 justify-start text-left ${handled ? 'text-[color:var(--text-muted)]' : ''}`}
       onClick={() => onOpen(id)}
     >
       {label}

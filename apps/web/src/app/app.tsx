@@ -998,7 +998,7 @@ function AppBody({
               rememberNext(location.pathname);
               navigate(paths.signIn(location.pathname), { replace: true });
             }}
-            className="gg-btn gg-btn-ghost self-start !px-0"
+            className="gg-btn gg-btn-secondary self-start"
           >
             Sign in
           </button>
@@ -2506,11 +2506,11 @@ function AppBody({
       />
       <div className="flex flex-col items-start gap-2 mt-4">
         {auth && !sessionEnded && (
-          <button type="button" onClick={() => openProfile(false)} className="gg-btn gg-btn-ghost !px-0">
+          <button type="button" onClick={() => openProfile(false)} className="gg-btn gg-btn-secondary">
             Your account
           </button>
         )}
-        <button type="button" onClick={() => setView('settings')} className="gg-btn gg-btn-ghost !px-0">
+        <button type="button" onClick={() => setView('settings')} className="gg-btn gg-btn-secondary">
           Settings
         </button>
       </div>

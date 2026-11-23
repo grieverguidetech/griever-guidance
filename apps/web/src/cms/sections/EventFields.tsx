@@ -78,7 +78,7 @@ function SuggestionButton({
       type="button"
       id={buttonId}
       aria-labelledby={`${legendId} ${buttonId}`}
-      className="gg-link-button"
+      className="gg-btn gg-btn-tertiary self-start !px-0"
       onClick={() => {
         suggestion.onUse();
         document.getElementById(fieldId)?.focus();

@@ -119,7 +119,7 @@ export function RemoveMember({ members, message, onRemove, headingLevel = 2 }: P
                     </p>
                     <button
                       type="button"
-                      className="gg-btn gg-btn-primary gg-btn-block"
+                      className="gg-btn gg-btn-secondary gg-btn-block"
                       aria-disabled={pending}
                       onClick={() => void remove(m)}
                     >
@@ -127,7 +127,7 @@ export function RemoveMember({ members, message, onRemove, headingLevel = 2 }: P
                     </button>
                     <button
                       type="button"
-                      className="gg-btn gg-btn-secondary gg-btn-block"
+                      className="gg-btn gg-btn-primary gg-btn-block"
                       aria-disabled={pending}
                       onClick={() => {
                         if (!pending) close({ row: m.id });
