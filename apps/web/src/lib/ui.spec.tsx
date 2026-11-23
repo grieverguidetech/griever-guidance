@@ -159,10 +159,10 @@ describe('top buttons (#176)', () => {
   });
 
   it('the shared styles keep them at least 44 by 44 with a border', () => {
-    expect(css).toMatch(/\.gg-btn\s*{[^}]*min-height:\s*44px/);
+    expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*{[^}]*min-height:\s*44px/);
     expect(css).toMatch(/\.gg-btn-bar\s*{[^}]*min-width:\s*44px/);
-    expect(css).toMatch(/\.gg-btn-secondary\s*{[^}]*border-color:/);
-    expect(css).toMatch(/\.gg-btn\s*{[^}]*border:\s*1px solid/);
+    expect(css).toMatch(/\.gg-btn-secondary,\s*\[data-gg-btn='secondary'\]\s*{[^}]*border-color:/);
+    expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*{[^}]*border:\s*1px solid/);
   });
 
   it('the top-bar border is accent-600, the same outline as the mobile header button', () => {

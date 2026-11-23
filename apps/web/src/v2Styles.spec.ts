@@ -335,6 +335,24 @@ describe('styles.css swirl buttons', () => {
   const noPref = block('@media (prefers-reduced-motion: no-preference)');
   const enabled = ":not(:disabled):not([aria-disabled='true'])";
 
+  it('gives every swirl selector its data-gg-btn twin in the same list, so the libs/ui Button (data attribute, no class) gets the same look', () => {
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const lists = [...bare.matchAll(/([^{}]+)\{/g)].map((m) => m[1].split(',').map((part) => part.trim()));
+    let checked = 0;
+    for (const list of lists) {
+      for (const variant of ['primary', 'secondary']) {
+        const classParts = list.filter((part) => part.startsWith(`.gg-btn-${variant}`) && !part.includes('.gg-enter'));
+        for (const part of classParts) {
+          const twin = part.replace(`.gg-btn-${variant}`, `[data-gg-btn='${variant}']`);
+          expect(list, `${part} needs ${twin} in the same list`).toContain(twin);
+          checked += 1;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(10);
+    expect(css).toMatch(/\[data-gg-btn\]\s*\{/);
+  });
+
   it('declares every animation that touches a button, and the swirl keyframes, only inside a no-preference block', () => {
     const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
     const noPrefBlocks = [...bare.matchAll(/@media \(prefers-reduced-motion: no-preference\)/g)].map((m) => block(m[0]));

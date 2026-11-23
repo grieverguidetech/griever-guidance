@@ -97,7 +97,9 @@ export function Button({
   }
 
   const font = useSerifStyle('semibold');
-  const unavailableFill = ariaDisabled && variant === 'primary';
+  // Web primary and secondary take the swirl look from apps/web/src/styles.css, found through data-gg-btn.
+  const swirl = Platform.OS === 'web' && (variant === 'primary' || variant === 'secondary');
+  const unavailableFill = ariaDisabled && variant === 'primary' && !swirl;
   return (
     <Pressable
       ref={setRef}
@@ -107,14 +109,16 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
-        styles[variant],
+        !swirl && styles.v1Edge,
+        swirl ? styles.swirl : styles[variant],
         unavailableFill && styles.unavailableFill,
-        pressed && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : styles.pressed),
+        pressed && !swirl && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : styles.pressed),
       ]}
+      {...(swirl ? { dataSet: { ggBtn: variant } } : {})}
       {...extra}
     >
       <Phrasing>
-        <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, labelStyle(variant, ariaDisabled), variant === 'tertiary' && styles.labelTertiary]}>
+        <Text style={[styles.label, font, variant === 'primary' ? styles.labelPrimary : styles.labelLink, swirl ? styles.labelSwirl : labelStyle(variant, ariaDisabled), variant === 'tertiary' && styles.labelTertiary]}>
           {label}
         </Text>
       </Phrasing>
@@ -148,10 +152,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
-    borderRadius: BUTTON_RADIUS,
   },
+  // The v1 outline and corners. Web swirl buttons leave them out: styles.css draws the edge and radius.
+  v1Edge: { borderWidth: 1, borderColor: 'transparent', borderRadius: BUTTON_RADIUS },
+  // Web swirl: padding stays here because react-native-web zeroes it.
+  swirl: { paddingVertical: 14 },
   // Fills behind text use accent-700 (5.72:1 with the page colour); the base accent is decorative.
   primary: { backgroundColor: colors['accent-700'], paddingVertical: 14 },
   // Outlined with the accent, as mobile's secondary button. accent-700 on the page is 5.72:1.
@@ -173,6 +178,8 @@ const styles = StyleSheet.create({
   labelPrimary: { fontSize: 15 },
   labelLink: { fontSize: 14 },
   labelOnFill: { color: colors.bg },
+  // Web swirl: the label takes the button's own text colour from styles.css.
+  labelSwirl: { color: 'inherit' },
   labelTertiary: { textDecorationLine: 'underline' },
   labelAccent: { color: colors['accent-700'] },
   labelUnavailable: { color: colors['neutral-700'] },

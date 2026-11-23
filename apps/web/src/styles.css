@@ -144,7 +144,8 @@ h1 { font-weight: var(--v2-heading-weight); }
   .gg-tooltip:focus-within .gg-tooltip-text { opacity: 1; }
 
   /* — buttons — */
-  .gg-btn {
+  .gg-btn,
+  [data-gg-btn] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -164,17 +165,22 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
   .gg-btn:disabled,
   .gg-btn[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+  [data-gg-btn]:disabled,
+  [data-gg-btn][aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
   /* Primary and secondary are the v2 swirl buttons (same look as mobile Button.tsx): a gradient fill drawn from the generated vars.
      The fill is twice the button size so the one-pass drift below has room to slide. Hover and pressed keep the edge at full strength
      and only wash the fill: a translucent page-colour layer over the swirl (8% hover, 15% pressed). v2Styles.spec checks the label
      against every stop and midpoint under that wash, and the edge against the page, both glows and glass. */
   .gg-btn-primary,
-  .gg-btn-secondary {
+  [data-gg-btn='primary'],
+  .gg-btn-secondary,
+  [data-gg-btn='secondary'] {
     background-size: 200% 200%;
     background-position: 0% 50%;
     border-radius: var(--v2-radius);
   }
-  .gg-btn-primary {
+  .gg-btn-primary,
+  [data-gg-btn='primary'] {
     background-image: var(--v2-primary-bg);
     color: var(--color-v2-primary-text);
     font-weight: var(--v2-weight-medium);
@@ -182,7 +188,8 @@ h1 { font-weight: var(--v2-heading-weight); }
     border-color: var(--color-v2-primary-border);
     box-shadow: var(--v2-primary-shadow);
   }
-  .gg-btn-secondary {
+  .gg-btn-secondary,
+  [data-gg-btn='secondary'] {
     background-image: var(--v2-secondary-bg);
     color: var(--color-v2-secondary-text);
     font-weight: var(--v2-weight-regular);
@@ -192,21 +199,26 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
   /* Hover only where a pointer can hover, so it does not stick after a tap on a phone. */
   @media (hover: hover) {
-    .gg-btn-primary:not(:disabled):not([aria-disabled='true']):hover {
+    .gg-btn-primary:not(:disabled):not([aria-disabled='true']):hover,
+    [data-gg-btn='primary']:not(:disabled):not([aria-disabled='true']):hover {
       background-image: linear-gradient(color-mix(in srgb, var(--color-v2-page) 8%, transparent), color-mix(in srgb, var(--color-v2-page) 8%, transparent)), var(--v2-primary-bg);
     }
-    .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):hover {
+    .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):hover,
+    [data-gg-btn='secondary']:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):hover {
       background-image: linear-gradient(color-mix(in srgb, var(--color-v2-page) 8%, transparent), color-mix(in srgb, var(--color-v2-page) 8%, transparent)), var(--v2-secondary-bg);
     }
   }
-  .gg-btn-primary:not(:disabled):not([aria-disabled='true']):active {
+  .gg-btn-primary:not(:disabled):not([aria-disabled='true']):active,
+  [data-gg-btn='primary']:not(:disabled):not([aria-disabled='true']):active {
     background-image: linear-gradient(color-mix(in srgb, var(--color-v2-page) 15%, transparent), color-mix(in srgb, var(--color-v2-page) 15%, transparent)), var(--v2-primary-bg);
   }
-  .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):active {
+  .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):active,
+  [data-gg-btn='secondary']:not(:disabled):not([aria-disabled='true']):not([aria-pressed='true']):active {
     background-image: linear-gradient(color-mix(in srgb, var(--color-v2-page) 15%, transparent), color-mix(in srgb, var(--color-v2-page) 15%, transparent)), var(--v2-secondary-bg);
   }
   /* A secondary used as a toggle (ItemStateToggles): the pressed state is a flat accent tint, not the swirl. */
-  .gg-btn-secondary[aria-pressed='true'] {
+  .gg-btn-secondary[aria-pressed='true'],
+  [data-gg-btn='secondary'][aria-pressed='true'] {
     background-image: none;
     background-color: var(--color-accent-100);
     animation: none;
@@ -216,7 +228,9 @@ h1 { font-weight: var(--v2-heading-weight); }
      the tab order and keep the global focus ring (no pointer-events or outline rule); a native disabled button leaves the tab order,
      as the browser always does. animation: none beats the drift below (higher specificity), so the pass does not restart on re-enable. */
   .gg-btn-primary:disabled,
-  .gg-btn-primary[aria-disabled='true'] {
+  [data-gg-btn='primary']:disabled,
+  .gg-btn-primary[aria-disabled='true'],
+  [data-gg-btn='primary'][aria-disabled='true'] {
     opacity: 1;
     background-image: none;
     background-color: var(--color-v2-page);
@@ -225,7 +239,9 @@ h1 { font-weight: var(--v2-heading-weight); }
     animation: none;
   }
   .gg-btn-secondary:disabled,
-  .gg-btn-secondary[aria-disabled='true'] {
+  [data-gg-btn='secondary']:disabled,
+  .gg-btn-secondary[aria-disabled='true'],
+  [data-gg-btn='secondary'][aria-disabled='true'] {
     opacity: 1;
     background-image: none;
     background-color: var(--color-v2-page);
@@ -238,7 +254,9 @@ h1 { font-weight: var(--v2-heading-weight); }
      so the combined rules run both. */
   @media (prefers-reduced-motion: no-preference) {
     .gg-btn-primary,
-    .gg-btn-secondary {
+    [data-gg-btn='primary'],
+    .gg-btn-secondary,
+    [data-gg-btn='secondary'] {
       animation: gg-swirl-drift var(--v2-settle-ms) ease-in-out forwards;
     }
     .gg-btn-primary.gg-enter,
@@ -611,7 +629,18 @@ h1 { font-weight: var(--v2-heading-weight); }
 /* Swirl buttons: the focus ring is accent-700 (at least 5.26:1 on the page, both glows and glass), because the global accent ring is
    about 3.65:1. Unlayered so it beats nothing it should not, and cannot lose to the component layer. */
 .gg-btn-primary:focus-visible,
-.gg-btn-secondary:focus-visible { outline-color: var(--color-accent-700); }
+[data-gg-btn='primary']:focus-visible,
+.gg-btn-secondary:focus-visible,
+[data-gg-btn='secondary']:focus-visible { outline-color: var(--color-accent-700); }
+
+/* The libs/ui Button (react-native-web) resets border, border style and background colour with unlayered classes, which beat the
+   @layer components rules above whatever their specificity. These repeat only those properties, unlayered, on button[...] (0,2,1)
+   so they win; the values are the same vars the layered rules use. Padding and min size come from the Button's own styles. */
+button[data-gg-btn='primary'] { border: var(--v2-border-thin) solid var(--color-v2-primary-border); }
+button[data-gg-btn='secondary'] { border: var(--v2-border-medium) solid var(--color-v2-secondary-border); }
+button[data-gg-btn='secondary'][aria-pressed='true'] { background-color: var(--color-accent-100); }
+button[data-gg-btn='primary'][aria-disabled='true'],
+button[data-gg-btn='secondary'][aria-disabled='true'] { border-style: dashed; background-color: var(--color-v2-page); }
 
 /* Reduced motion: gg-* transitions and animations become near-instant. Unlayered so it beats
    the component layer; it only matches gg-* classes, so nothing else changes. */
