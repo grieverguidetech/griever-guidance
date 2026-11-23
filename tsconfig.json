@@ -13,6 +13,9 @@
       "path": "./libs/hooks"
     },
     {
+      "path": "./apps/agent"
+    },
+    {
       "path": "./apps/gateway"
     },
     {
