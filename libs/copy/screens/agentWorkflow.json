@@ -1,12 +1,12 @@
 {
   "startWorkflowTitle": "Start the Grievers Guidance steps",
-  "startWorkflowDescription": "Gets the first step of the Grievers Guidance list for someone who has lost a loved one. This tool never sends messages. It takes no names, no contacts and no free text.",
+  "startWorkflowDescription": "Gets the first step of the Grievers Guidance list for someone who has lost a loved one. Pass whether the family chose burial or cremation, or undecided if they have not decided. Do not press them to decide. This tool never sends messages. It takes no names, no contacts and no free text.",
   "nextStepTitle": "Get the next Grievers Guidance step",
-  "nextStepDescription": "Gets the next step on the list, once the person says the last one is done. This tool never sends messages. It takes no names, no contacts and no free text.",
-  "agentInstruction": "Give the person the step text exactly as written. Do not reword it. Show one step at a time, and wait until they say it is done before you ask for the next.",
-  "handOff": "Text them yourself, from your own phone, one person at a time.",
+  "nextStepDescription": "Gets the next step on the list. Pass the ids of every step the person has finished. This tool remembers nothing between calls. It never sends messages and takes no names, no contacts and no free text.",
+  "agentInstruction": "Give the person the step text exactly as written. Do not reword it. Show one step at a time, and wait until they say it is done, or that it does not apply, before you ask for the next. Do not send messages or contact anyone for them.",
+  "handOff": "Call or text them yourself, from your own phone, one person at a time.",
   "actorYou": "You",
   "actorAssistant": "Assistant",
-  "whatDoneMeans": "This step is done when you have finished it and are ready to go on.",
-  "allDone": "There are no more steps right now. You can come back to this list whenever you like."
+  "whatDoneMeans": "This step is done when you have finished it, or when it does not apply to you.",
+  "allDone": "There are no more steps on this list. Take whatever time you need."
 }

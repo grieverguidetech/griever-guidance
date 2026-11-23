@@ -16,15 +16,16 @@
     "allDone"
   ],
   "properties": {
-    "startWorkflowTitle": { "type": "string", "minLength": 1 },
-    "startWorkflowDescription": { "type": "string", "minLength": 1 },
-    "nextStepTitle": { "type": "string", "minLength": 1 },
-    "nextStepDescription": { "type": "string", "minLength": 1 },
-    "agentInstruction": { "type": "string", "minLength": 1 },
-    "handOff": { "type": "string", "minLength": 1 },
-    "actorYou": { "type": "string", "minLength": 1 },
-    "actorAssistant": { "type": "string", "minLength": 1 },
-    "whatDoneMeans": { "type": "string", "minLength": 1 },
-    "allDone": { "type": "string", "minLength": 1 }
-  }
+    "startWorkflowTitle": { "$ref": "#/$defs/text" },
+    "startWorkflowDescription": { "$ref": "#/$defs/text" },
+    "nextStepTitle": { "$ref": "#/$defs/text" },
+    "nextStepDescription": { "$ref": "#/$defs/text" },
+    "agentInstruction": { "$ref": "#/$defs/text" },
+    "handOff": { "$ref": "#/$defs/text" },
+    "actorYou": { "$ref": "#/$defs/text" },
+    "actorAssistant": { "$ref": "#/$defs/text" },
+    "whatDoneMeans": { "$ref": "#/$defs/text" },
+    "allDone": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
 }
