@@ -8,7 +8,6 @@ import type { Session } from '@griever/hooks';
 import { focusNode, ShareObituary } from '../ui';
 import type { ButtonNode } from '../ui';
 import type { TextInputNode } from '../ui/screens/ShareObituary';
-import { colors } from '@griever/tokens';
 import { PersonChecklistSheet } from '../components/PersonChecklistSheet';
 import { copyText, pasteText } from '../lib/clipboard';
 import { checkPublisherEmail, loadPublisherEmail, openMailDraft, savePublisherEmail } from '../lib/mailCompose';
@@ -308,5 +307,5 @@ export function ShareObituaryScreen({ session, onChange, onSetItem, onBack, onCo
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
 });

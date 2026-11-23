@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
 import { AccessibilityInfo, BackHandler, Platform, StyleSheet, View } from 'react-native';
-import { colors } from '@griever/tokens';
+import { colors, v2 } from '@griever/tokens';
 import { fill, screenCopy } from '@griever/copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -107,7 +107,7 @@ const AccountFromHub = ({ onBack }: { onBack: () => void }) => {
 };
 
 const Opening = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: v2.roles.page.color }}>
     <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>Opening…</Text>
   </View>
 );
@@ -886,7 +886,7 @@ const sharedScreens = (leaveFirst?: () => void) => (
 // One calm fade between screens, none with Reduce Motion or a screen reader on. The page colour shows between screens.
 const useScreenOptions = () => {
   const noFade = useNoFade();
-  return useMemo(() => ({ headerShown: false, contentStyle: { backgroundColor: colors.bg }, ...screenTransition(noFade) }), [noFade]);
+  return useMemo(() => ({ headerShown: false, contentStyle: { backgroundColor: v2.roles.page.color }, ...screenTransition(noFade) }), [noFade]);
 };
 
 const HomeNavigation = ({
@@ -1207,7 +1207,7 @@ const JoinedNote = ({ getToken, onDone }: { getToken: () => Promise<string | nul
   return (
     <View
       pointerEvents="none"
-      style={[{ position: 'absolute', top: 0, left: 0, right: 0 }, text !== '' && { backgroundColor: colors.bg, paddingTop: insets.top + 8, paddingBottom: 8, paddingHorizontal: 24 }]}
+      style={[{ position: 'absolute', top: 0, left: 0, right: 0 }, text !== '' && { backgroundColor: v2.roles.page.color, paddingTop: insets.top + 8, paddingBottom: 8, paddingHorizontal: 24 }]}
     >
       <Body live>{text}</Body>
     </View>

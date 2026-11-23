@@ -321,7 +321,7 @@ export function ReadyToSend({ copy, heading, headingRef, kind, lead, message, on
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg },
+  screen: { flex: 1 },
   scroll: { flex: 1 },
   content: { padding: spacing[3], paddingTop: spacing[4], gap: spacing[3] },
   topBar: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },

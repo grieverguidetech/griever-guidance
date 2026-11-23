@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { StyleSheet, View } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { ActionBar } from './ActionBar';
 import { Button } from './Button';
 
@@ -42,7 +42,7 @@ describe('ActionBar', () => {
     const bar = screen.UNSAFE_getAllByType(View).find((v) => flat(v).paddingBottom !== undefined);
     const style = flat(bar as never);
     expect(style.paddingBottom).toBeGreaterThanOrEqual(34);
-    expect(style.backgroundColor).toBe(colors.bg);
+    expect(style.backgroundColor).toBe(v2.roles.page.color);
     expect(style.borderTopWidth).toBeGreaterThan(0);
   });
 

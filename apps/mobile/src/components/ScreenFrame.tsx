@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Animated, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
+import { PageGlow } from '../ui/PageGlow';
 import { FADE_MS } from '../lib/useReduceMotion';
 import { useNoFade } from '../lib/useScreenReader';
 
@@ -13,7 +14,12 @@ import { useNoFade } from '../lib/useScreenReader';
  */
 export function ScreenFrame({ children, bottomInset = true }: { children: ReactNode; /** Off when the screen's own bottom bar pads by the inset (the hub's ActionBar). */ bottomInset?: boolean }) {
   const insets = useSafeAreaInsets();
-  return <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: bottomInset ? insets.bottom : 0, backgroundColor: colors.bg }}>{children}</View>;
+  return (
+    <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: bottomInset ? insets.bottom : 0, backgroundColor: v2.roles.page.color }}>
+      <PageGlow />
+      {children}
+    </View>
+  );
 }
 
 /**
@@ -35,5 +41,10 @@ export function FadeIn({ children }: { children: ReactNode }) {
     played.current = true;
     Animated.timing(opacity, { toValue: 1, duration: FADE_MS, useNativeDriver: true }).start();
   }, [reduce, opacity]);
-  return <Animated.View style={{ flex: 1, backgroundColor: colors.bg, opacity }}>{children}</Animated.View>;
+  return (
+    <Animated.View style={{ flex: 1, backgroundColor: v2.roles.page.color, opacity }}>
+      <PageGlow />
+      {children}
+    </Animated.View>
+  );
 }
