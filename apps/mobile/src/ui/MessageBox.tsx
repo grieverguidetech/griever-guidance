@@ -54,7 +54,7 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
   const [refocusText, setRefocusText] = useState(false);
   const [editing, setEditing] = useState(toggle === undefined);
   const [focused, setFocused] = useState(false);
-  // Set once, when editing starts, so the cursor lands at the end. Typing moves it from there.
+  // Set once, when editing starts, so the cursor lands at the start, a sign the text is now editable. Typing moves it from there.
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   // On web, pressing Done blurs the box first. Without this the blur would end editing and the same click would start it again.
   const donePressed = useRef(false);
@@ -75,7 +75,7 @@ export function MessageBox({ label, caption, value, onChangeText, toggle, placeh
 
   const startEditing = () => {
     donePressed.current = false;
-    setSelection({ start: value.length, end: value.length });
+    setSelection({ start: 0, end: 0 });
     setEditing(true);
   };
   const stopEditing = () => {

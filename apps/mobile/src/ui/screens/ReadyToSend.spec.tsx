@@ -6,7 +6,8 @@ import { AccessibilityInfo, Keyboard, Platform, ScrollView, StyleSheet, TextInpu
 import { screenCopy } from '@griever/copy';
 import { Text } from 'react-native';
 import { MessageBox } from '../MessageBox';
-import { ReadyToSend } from './ReadyToSend';
+import { BAR_TEST_ID, ReadyToSend } from './ReadyToSend';
+import { typeMessage } from '../../testing/messageBox';
 import type { ReadyToSendProps } from './ReadyToSend';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle per node shows where focus went.
@@ -61,7 +62,7 @@ const edit = () => fireEvent.press(screen.getByRole('button', { name: 'Edit mess
 const SUGGESTED = 'Anna has passed away.';
 
 /** Holds the message the way the app does: edited when it differs from the suggested wording. */
-function Harness({ details, lead }: { details?: ReadyToSendProps['details']; lead?: string } = {}) {
+function Harness({ details, lead, onSend = jest.fn() }: { details?: ReadyToSendProps['details']; lead?: string; onSend?: () => void } = {}) {
   const [override, setOverride] = useState<string | null>(null);
   const message = override ?? SUGGESTED;
   return (
@@ -84,7 +85,7 @@ function Harness({ details, lead }: { details?: ReadyToSendProps['details']; lea
       hasRecipients
       onChoose={jest.fn()}
       onBack={jest.fn()}
-      onSend={jest.fn()}
+      onSend={onSend}
     />
   );
 }
@@ -224,14 +225,14 @@ describe('ReadyToSend: the message box reads until Edit is tapped (#968)', () =>
     expect(StyleSheet.flatten(style)).toMatchObject({ minHeight: 44, minWidth: 44 });
   });
 
-  it('one tap on Edit makes the box editable, focused, with the cursor at the end', () => {
+  it('one tap on Edit makes the box editable, focused, with the cursor at the start', () => {
     render(<Harness />);
     edit();
     const box = screen.getByLabelText('Your message');
     expect(box.type).toBe('TextInput');
     expect(box.props.multiline).toBe(true);
     expect(box.props.autoFocus).toBe(true);
-    expect(box.props.selection).toEqual({ start: SUGGESTED.length, end: SUGGESTED.length });
+    expect(box.props.selection).toEqual({ start: 0, end: 0 });
     expect(box.props.value).toBe(SUGGESTED);
     expect(screen.getByRole('button', doneName)).toBeTruthy();
     expect(screen.queryByRole('button', editName)).toBeNull();
@@ -283,8 +284,8 @@ describe('ReadyToSend: the message box reads until Edit is tapped (#968)', () =>
     render(<Harness />);
     edit();
     const box = screen.getByLabelText('Your message');
-    expect(box.props.selection).toEqual({ start: SUGGESTED.length, end: SUGGESTED.length });
-    fireEvent(box, 'selectionChange', { nativeEvent: { selection: { start: SUGGESTED.length, end: SUGGESTED.length } } });
+    expect(box.props.selection).toEqual({ start: 0, end: 0 });
+    fireEvent(box, 'selectionChange', { nativeEvent: { selection: { start: 0, end: 0 } } });
     expect(screen.getByLabelText('Your message').props.selection).toBeUndefined();
   });
 
@@ -378,5 +379,35 @@ describe('ReadyToSend: the message box reads until Edit is tapped (#968)', () =>
     const order = ['Your message', 'Dee,', 'Read it one last time', 'Softer tone', 'Change details'].map(at);
     expect(order.every((n) => n >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+});
+
+describe('ReadyToSend: the send bar waits while the message is edited (#985)', () => {
+  const sendName = { name: 'Text 2 people' };
+
+  it('shows the bar while the message is read', () => {
+    render(<Harness />);
+    expect(screen.getByTestId(BAR_TEST_ID)).toBeTruthy();
+    expect(screen.getByRole('button', sendName)).toBeTruthy();
+  });
+
+  it('hides the bar after Edit and brings it back after Done, with the same label', () => {
+    render(<Harness />);
+    edit();
+    expect(screen.queryByTestId(BAR_TEST_ID)).toBeNull();
+    expect(screen.queryByRole('button', sendName)).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.getByTestId(BAR_TEST_ID)).toBeTruthy();
+    expect(screen.getByRole('button', sendName)).toBeTruthy();
+  });
+
+  it('keeps the typed words, and send is called after Done', () => {
+    const onSend = jest.fn();
+    render(<Harness onSend={onSend} />);
+    typeMessage('My own words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.getByText('My own words.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', sendName));
+    expect(onSend).toHaveBeenCalledTimes(1);
   });
 });
