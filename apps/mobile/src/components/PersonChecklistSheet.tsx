@@ -9,7 +9,7 @@ import type {
   ChecklistItemState,
   ChecklistPhaseKey,
 } from '@griever/shared';
-import { colors, minTouchTarget, radius, spacing } from '@griever/tokens';
+import { minTouchTarget, spacing, v2 } from '@griever/tokens';
 import { Sheet, focusNode, SerifText as Text } from '../ui';
 import { DoneMark } from '../ui/DoneMark';
 import type { ButtonNode } from '../ui';
@@ -154,15 +154,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing[2],
   },
-  pressed: { backgroundColor: colors['accent-100'] },
-  label: { flex: 1, fontSize: 16, color: colors.ink },
+  pressed: { backgroundColor: v2.roles.wash },
+  label: { flex: 1, fontSize: 16, color: v2.roles.ink },
   done: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  doneText: { fontSize: 14, color: colors['success-700'] },
+  doneText: { fontSize: 14, color: v2.roles.success },
 });

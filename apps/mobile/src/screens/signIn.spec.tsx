@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, Platform, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { v2 } from '@griever/tokens';
 import { SignInScreen } from './SignInScreen';
 import { SignUpScreen } from './SignUpScreen';
 
@@ -356,7 +357,7 @@ describe('sign in', () => {
     expect(StyleSheet.flatten(screen.getByLabelText('Email').props.style)).toMatchObject({ borderWidth: 1 });
     press('Sign in');
     const alert = await screen.findByRole('alert');
-    expect(StyleSheet.flatten(alert.props.style).color).toBe('#b91c1c');
+    expect(StyleSheet.flatten(alert.props.style).color).toBe(v2.roles.error);
     // No polite live region around or inside the alert.
     expect(screen.UNSAFE_queryAllByProps({ accessibilityLiveRegion: 'polite' })).toHaveLength(0);
     expect(StyleSheet.flatten(screen.getByRole('heading', { name: 'Sign in' }).props.style).fontFamily).toBe('Sora_300Light');

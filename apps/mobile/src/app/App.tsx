@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject, ReactNode } from 'react';
 import { AccessibilityInfo, BackHandler, Platform, StyleSheet, View } from 'react-native';
-import { colors, v2 } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { fill, screenCopy } from '@griever/copy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -108,7 +108,7 @@ const AccountFromHub = ({ onBack }: { onBack: () => void }) => {
 
 const Opening = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: v2.roles.page.color }}>
-    <Text accessibilityLiveRegion="polite" style={{ color: colors.ink }}>Opening…</Text>
+    <Text accessibilityLiveRegion="polite" style={{ color: v2.roles.ink }}>Opening…</Text>
   </View>
 );
 

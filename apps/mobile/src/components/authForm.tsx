@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentProps, ComponentRef, ReactNode, Ref } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, StyleSheet, View } from 'react-native';
-import { colors, minTouchTarget } from '@griever/tokens';
+import { minTouchTarget, v2 } from '@griever/tokens';
 import { ERROR } from './colors';
 import { Body, Button, Heading, useSerifStyle, SerifText as Text, SerifTextInput as TextInput } from '../ui';
 
 /** Errors use the app's one danger red (also the ui Status and Body tone="danger"); 6.47:1 on white. */
 const DANGER = ERROR;
 /** Focus ring, as web's Clerk colorRing. */
-const RING = colors['accent-700'];
-const FIELD_BORDER = colors['neutral-600'];
+const RING = v2.recipes.field.focusRing;
+const FIELD_BORDER = v2.recipes.field.edge;
 
 /** iOS only: Android reads the live region / alert role, so announcing there would say it twice. */
 export function announce(message: string) {
@@ -97,7 +97,7 @@ export function Field({
         accessibilityHint={hint}
         value={value}
         onChangeText={onChangeText}
-        placeholderTextColor={colors['neutral-700']}
+        placeholderTextColor={v2.roles.muted}
         {...input}
         // After the spread, so nothing a caller passes can drop the focus ring.
         onFocus={(event) => {
@@ -190,25 +190,25 @@ export function LinkButton({ label, onPress, pending = false }: ActionProps) {
 
 /** Plain body text for the other screens that share this form kit. */
 export const authStyles = StyleSheet.create({
-  body: { fontSize: 14, color: colors['neutral-700'], marginBottom: 24 },
+  body: { fontSize: 14, color: v2.roles.muted, marginBottom: 24 },
 });
 
 const styles = StyleSheet.create({
   header: { marginBottom: 8 },
   intro: { marginBottom: 24 },
   fieldGroup: { marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '500', color: colors['neutral-800'], marginBottom: 6 },
+  label: { fontSize: 14, fontWeight: '500', color: v2.roles.mutedStrong, marginBottom: 6 },
   hint: { marginTop: 6 },
   input: {
     minHeight: minTouchTarget,
     borderWidth: 1,
     borderColor: FIELD_BORDER,
     borderRadius: 10,
-    backgroundColor: colors['neutral-100'],
+    backgroundColor: v2.recipes.field.fill,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: colors.ink,
+    color: v2.roles.ink,
   },
   // The ring is a thicker border in the same box, so the field does not shift when focused.
   inputFocused: { borderColor: RING, borderWidth: 2, paddingHorizontal: 15, paddingVertical: 11 },

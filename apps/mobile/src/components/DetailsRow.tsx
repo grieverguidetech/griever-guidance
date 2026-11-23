@@ -8,7 +8,7 @@ import { DateField } from './DateField';
 import { PlaceField } from './PlaceField';
 import { TimeField } from './TimeField';
 import type { TimeFieldCopy } from './TimeField';
-import { colors, radius, spacing } from '@griever/tokens';
+import { spacing, v2 } from '@griever/tokens';
 
 export interface DetailsField {
   key: string;
@@ -161,7 +161,7 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
               ]}
               accessibilityLabel={accessibleName}
               placeholder={field.placeholder}
-              placeholderTextColor={colors['neutral-700']}
+              placeholderTextColor={v2.roles.muted}
               value={values[field.key] ?? ''}
               onChangeText={(text) => onChange(field.key, text)}
               onFocus={() => setFocusedKey(field.key)}
@@ -190,22 +190,22 @@ export function DetailsRow({ copy, fields, values, onChange, headingRef }: Props
 
 const styles = StyleSheet.create({
   row: { gap: spacing[2] },
-  heading: { fontSize: 16, color: colors.ink },
+  heading: { fontSize: 16, color: v2.roles.ink },
   field: { gap: spacing[1] },
-  label: { fontSize: 15, color: colors.ink },
+  label: { fontSize: 15, color: v2.roles.ink },
   input: {
     minHeight: 44,
     paddingHorizontal: spacing[2],
     borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
+    borderColor: v2.recipes.field.edge,
+    borderRadius: v2.recipes.field.radius,
+    backgroundColor: v2.recipes.field.fill,
+    color: v2.roles.ink,
     fontSize: 15,
   },
   inputMultiline: { minHeight: 88, textAlignVertical: 'top', paddingVertical: spacing[2] },
   // Missing: dashed border plus the "Needed" text. Focus: a solid 2px accent border, so the two never look alike.
-  inputMissing: { borderStyle: 'dashed', borderColor: colors.ink },
-  inputFocused: { borderStyle: 'solid', borderColor: colors['accent-700'], borderWidth: 2 },
-  needed: { fontSize: 15, color: colors.ink },
+  inputMissing: { borderStyle: 'dashed', borderColor: v2.roles.ink },
+  inputFocused: { borderStyle: 'solid', borderColor: v2.recipes.field.focusRing, borderWidth: 2 },
+  needed: { fontSize: 15, color: v2.roles.ink },
 });

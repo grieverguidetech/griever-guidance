@@ -2,7 +2,10 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import type { Session } from '@griever/hooks';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
+
+// ui/Button.tsx (#1008) still draws the header button border in v1 accent-600; swap this when #1008 moves it.
+const HEADER_BORDER = '#1186ac';
 import { HomeScreen } from './HomeScreen';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see focus sent.
@@ -46,14 +49,14 @@ describe('HomeScreen layout (#363)', () => {
     render(<HomeScreen {...props} />);
     const style = flat(screen.getByRole('button', { name: 'Your account' }));
     expect(style.borderWidth).toBeGreaterThan(0);
-    expect(style.borderColor).toBe(colors['accent-600']);
+    expect(style.borderColor).toBe(HEADER_BORDER);
     expect(style.backgroundColor ?? 'transparent').toBe('transparent');
   });
 
   it('draws a person title in ink, 17px, semibold', () => {
     render(<HomeScreen {...props} />);
     const style = flat(screen.getByText('Anna'));
-    expect(style.color).toBe(colors.ink);
+    expect(style.color).toBe(v2.roles.ink);
     expect(style.fontSize).toBe(17);
     expect(style.fontFamily).toBe('Sora_500Medium');
   });
@@ -61,9 +64,9 @@ describe('HomeScreen layout (#363)', () => {
   it('washes a person row accent-100 while pressed', () => {
     render(<HomeScreen {...props} />);
     const row = screen.getByRole('button', { name: 'Anna' });
-    expect(flat(row).backgroundColor).toBe(colors.surface);
+    expect(flat(row).backgroundColor).toBe(v2.recipes.field.fill);
     fireEvent(row, 'responderGrant', { nativeEvent: { touches: [], changedTouches: [] }, persist: () => undefined });
-    expect(flat(screen.getByRole('button', { name: 'Anna' })).backgroundColor).toBe(colors['accent-100']);
+    expect(flat(screen.getByRole('button', { name: 'Anna' })).backgroundColor).toBe(v2.roles.wash);
   });
 
   it('leaves the page colour and glows to the screen frame', () => {
@@ -83,7 +86,7 @@ describe('HomeScreen import button (#379)', () => {
     render(<HomeScreen {...props} />);
     for (const [name, row] of [['Your account', 'home-account-row'], ['Add from your contacts', 'home-import-row']]) {
       const button = screen.getByRole('button', { name });
-      expect(flat(button).borderColor).toBe(colors['accent-600']);
+      expect(flat(button).borderColor).toBe(HEADER_BORDER);
       expect(flat(button).backgroundColor ?? 'transparent').toBe('transparent');
       expect(flat(screen.getByTestId(row)).width).toBe('100%');
     }

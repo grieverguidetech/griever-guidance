@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet } from 'react-native';
 import { fill, screenCopy } from '@griever/copy';
 import type { Session } from '@griever/hooks';
-import { colors } from '@griever/tokens';
+import { v2 } from '@griever/tokens';
 import { Button, focusNode, Sheet, SerifText as Text } from '../ui';
 import type { ButtonNode } from '../ui';
 import { personLabel } from './PersonSwitcher';
@@ -86,8 +86,8 @@ export function NameSwitcher({ name, others, onPick, onEdit, onAdd }: NameSwitch
 }
 
 const styles = StyleSheet.create({
-  name: { fontSize: 28, lineHeight: 34, color: colors.ink, fontWeight: '600', flexShrink: 1 },
+  name: { fontSize: 28, lineHeight: 34, color: v2.roles.ink, fontWeight: '600', flexShrink: 1 },
   press: { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
-  pressed: { backgroundColor: colors['accent-100'] },
-  chevron: { fontSize: 22, color: colors.ink },
+  pressed: { backgroundColor: v2.roles.wash },
+  chevron: { fontSize: 22, color: v2.roles.ink },
 });
