@@ -179,7 +179,7 @@ export function Button({
           styles.labelSize,
           { color: labelColor },
           labelStyle(variant, ariaDisabled),
-          variant === 'tertiary' && TERTIARY.underline && styles.labelTertiary,
+          variant === 'tertiary' && TERTIARY.underline && !ariaDisabled && styles.labelTertiary,
         ]}
       >
         {working && busyLabel ? busyLabel : label}
@@ -208,16 +208,18 @@ export function Button({
       accessibilityState={buttonState(busy, ariaDisabled && announceDisabled, pressed, expanded)}
       onPress={onPress}
       onPressIn={onPressIn}
-      style={({ pressed }) => [
+      style={({ pressed: touching }) => [
         styles.base,
         styles[variant],
         variant === 'primary' && primaryFrame(),
         variant === 'secondary' && OUTLINE_FRAME,
         swirled && styles.swirlFrame,
         unavailableOutline && styles.unavailableOutline,
+        // A toggle that is on keeps the pressed wash, so on and off differ (secondary only; matches web).
+        variant === 'secondary' && pressed === true && !ariaDisabled && styles.pressedWash,
         minHeight !== undefined && { minHeight },
         // No press fade while unavailable: opacity would drop the dashed edge under 3:1 (web skips it too).
-        pressed && !ariaDisabled && (variant === 'primary' ? styles.pressedSwirl : styles.pressedWash),
+        touching && !ariaDisabled && (variant === 'primary' ? styles.pressedSwirl : styles.pressedWash),
       ]}
       {...extra}
     >

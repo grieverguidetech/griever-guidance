@@ -252,7 +252,7 @@ export function Account({
       </View>
       <AddressFields copy={copy} values={values} errors={errors} onChange={onChange} editable={!fieldDisabled} onNext={next} registerRef={register} />
       <Status id={statusId} message={status?.message} tone={status?.tone} />
-      {onRetry ? <Button label={copy.retry} variant="secondary" onPress={onRetry} /> : null}
+      {onRetry ? <Button label={copy.retry} onPress={onRetry} /> : null}
       <Button label={primaryLabel} ariaDisabled={primaryBusy === true} announceDisabled onPress={submit} />
       {email || onManageSignIn ? (
         <View style={styles.group}>

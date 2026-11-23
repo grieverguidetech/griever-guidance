@@ -101,7 +101,7 @@ export function marketingLines({ roles, recipes }: MarketingInput): string[] {
     ['outline-text', outline.text.color],
     ['outline-weight', String(outline.text.weight)],
     ['outline-border', `${outline.border.width}px solid ${outline.border.color}`],
-    ['outline-radius', `${outline.radius}px`],
+    ['wash', roles.wash],
     ['card-bg', card.fill],
     ['card-border', `${card.border.width}px solid ${card.border.color}`],
     ['card-shadow', shadowCss(card.shadow)],

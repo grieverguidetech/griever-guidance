@@ -87,14 +87,14 @@ h2 {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: transparent;
-  color: var(--gg-outline-text);
-  border: var(--gg-outline-border);
+  /* A number, not a control: a flat tinted circle, no edge. */
+  background: var(--gg-wash);
+  color: var(--gg-heading);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  font-weight: var(--gg-outline-weight);
+  font-weight: 400;
 }
 .step strong {
   font-size: 15px;

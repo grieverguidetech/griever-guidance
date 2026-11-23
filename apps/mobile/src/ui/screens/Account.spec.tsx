@@ -5,6 +5,7 @@ import { screenCopy } from '@griever/copy';
 import { Account } from './Account';
 import { Heading } from '../Heading';
 import type { AccountCopy, AccountProps, DetailValues } from './Account';
+import { tierOfButton } from '../buttonTier.testkit';
 
 // Jest has no native view tree, so findNodeHandle returns null; the focus test needs a handle. Same replacement as screens/account.spec.tsx.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
@@ -198,6 +199,11 @@ describe('Account personal details (#717)', () => {
     setup({ onRetry });
     fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws Try again as primary (the only action)', () => {
+    setup({ onRetry: jest.fn() });
+    expect(tierOfButton('Try again')).toBe('primary');
   });
 
   it('shows no Try again by default', () => {

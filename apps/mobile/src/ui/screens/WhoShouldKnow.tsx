@@ -583,7 +583,7 @@ function AddByHand({
           hint={empty ? copy.fillBoth : undefined}
           onPress={submit}
         />
-        <Button label={copy.cancel} variant="tertiary" onPress={close} />
+        <Button label={copy.cancel} variant="secondary" onPress={close} />
       </View>
       {empty ? (
         <Body id={reasonId} hidden small>

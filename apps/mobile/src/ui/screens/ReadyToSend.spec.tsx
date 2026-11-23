@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BAR_TEST_ID, ReadyToSend } from './ReadyToSend';
 import { typeMessage } from '../../testing/messageBox';
 import type { ReadyToSendProps } from './ReadyToSend';
+import { tierOfButton } from '../buttonTier.testkit';
 
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: jest.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })) }));
 
@@ -66,7 +67,13 @@ const edit = () => fireEvent.press(screen.getByRole('button', { name: 'Edit mess
 const SUGGESTED = 'Anna has passed away.';
 
 /** Holds the message the way the app does: edited when it differs from the suggested wording. */
-function Harness({ details, lead, onSend }: { details?: ReadyToSendProps['details']; lead?: string; onSend?: () => void } = {}) {
+function Harness({
+  details,
+  lead,
+  onSend,
+  tone = 'plain',
+  share,
+}: { details?: ReadyToSendProps['details']; lead?: string; onSend?: () => void; tone?: ReadyToSendProps['tone']; share?: ReadyToSendProps['share'] } = {}) {
   const [override, setOverride] = useState<string | null>(null);
   const message = override ?? SUGGESTED;
   return (
@@ -80,7 +87,8 @@ function Harness({ details, lead, onSend }: { details?: ReadyToSendProps['detail
       onMessageChange={setOverride}
       edited={override !== null}
       onUseSuggested={() => setOverride(null)}
-      tone="plain"
+      tone={tone}
+      share={share}
       onToneChange={jest.fn()}
       changePeople={{ label: "Change who you're texting", onPress: jest.fn() }}
       sendLabel="Text 2 people"
@@ -93,6 +101,28 @@ function Harness({ details, lead, onSend }: { details?: ReadyToSendProps['detail
     />
   );
 }
+
+describe('ReadyToSend: button tiers (#1065)', () => {
+  it('draws the Softer tone toggle as secondary, with a different background on and off', () => {
+    const background = () => {
+      const node = screen.getByRole('button', { name: 'Softer tone' });
+      return StyleSheet.flatten(typeof node.props.style === 'function' ? node.props.style({ pressed: false }) : node.props.style).backgroundColor;
+    };
+    const { unmount } = render(<Harness tone="plain" />);
+    expect(tierOfButton('Softer tone')).toBe('secondary');
+    const off = background();
+    expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState).toMatchObject({ selected: false });
+    unmount();
+    render(<Harness tone="softer" />);
+    expect(background()).not.toBe(off);
+    expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it('draws Share as secondary', () => {
+    render(<Harness share={{ label: 'Share', onPress: jest.fn() }} />);
+    expect(tierOfButton('Share')).toBe('secondary');
+  });
+});
 
 describe('ReadyToSend: Change details', () => {
   const details = {
