@@ -505,8 +505,7 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
   /* #757, #1003: the one look for every phone nudge, the v2 nudge recipe (same as mobile WebNudge.tsx): the pastel swirl, a thin
      edge, two tight shadows, faint speckles and a small colour-wheel orb. The swirl is twice the card so the one-pass drift below can
-     slide it. Text, edge, shadow, radius and swirl come from the generated vars. The generator does not emit the speckle colours, the
-     speckle alpha or the orb stops, so the decorations take their colours from the nearest generated colour vars (see the PR). */
+     slide it. Text, edge, shadow, radius, swirl, speckle colours, speckle alpha and the orb all come from the generated vars. */
   .gg-phone-nudge {
     position: relative;
     overflow: hidden;
@@ -527,7 +526,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     margin-top: 1px;
     border-radius: 9999px;
     pointer-events: none;
-    background-image: conic-gradient(var(--color-v2-secondary-border), var(--color-v2-success), var(--color-v2-primary-border), var(--color-v2-link), var(--color-v2-secondary-border));
+    background: var(--v2-nudge-orb);
   }
   .gg-phone-nudge-speckles {
     position: absolute;
@@ -540,22 +539,23 @@ h1 { font-weight: var(--v2-heading-weight); }
     width: 5px;
     height: 5px;
     border-radius: 9999px;
-    opacity: 0.28;
-    background-color: var(--color-v2-secondary-border);
+    opacity: var(--v2-nudge-speckle-alpha);
+    background-color: var(--color-v2-nudge-speckle-1);
   }
   .gg-phone-nudge-speckles > span:nth-child(1) { right: 5px; top: 14%; }
-  .gg-phone-nudge-speckles > span:nth-child(2) { right: 9px; top: 58%; background-color: var(--color-v2-success); }
-  .gg-phone-nudge-speckles > span:nth-child(3) { right: 4px; top: 86%; background-color: var(--color-v2-primary-border); }
-  .gg-phone-nudge-speckles > span:nth-child(4) { right: 38%; top: 4px; background-color: var(--color-v2-link); }
+  .gg-phone-nudge-speckles > span:nth-child(2) { right: 9px; top: 58%; background-color: var(--color-v2-nudge-speckle-2); }
+  .gg-phone-nudge-speckles > span:nth-child(3) { right: 4px; top: 86%; background-color: var(--color-v2-nudge-speckle-3); }
+  .gg-phone-nudge-speckles > span:nth-child(4) { right: 38%; top: 4px; background-color: var(--color-v2-nudge-speckle-4); }
   .gg-phone-nudge-speckles > span:nth-child(5) { right: 70%; top: 5px; }
-  .gg-phone-nudge-speckles > span:nth-child(6) { right: 22%; bottom: 4px; background-color: var(--color-v2-success); }
-  .gg-phone-nudge-speckles > span:nth-child(7) { right: 62%; bottom: 5px; background-color: var(--color-v2-primary-border); }
+  .gg-phone-nudge-speckles > span:nth-child(6) { right: 22%; bottom: 4px; background-color: var(--color-v2-nudge-speckle-2); }
+  .gg-phone-nudge-speckles > span:nth-child(7) { right: 62%; bottom: 5px; background-color: var(--color-v2-nudge-speckle-3); }
   /* One pass of the swirl and the orb, then rest, and only when the visitor allows motion (WCAG 2.2.2). */
   @media (prefers-reduced-motion: no-preference) {
     .gg-phone-nudge { animation: gg-swirl-drift var(--v2-settle-ms) ease-in-out forwards; }
     .gg-phone-nudge.gg-enter { animation: gg-enter var(--dur-2) var(--ease-calm) both, gg-swirl-drift var(--v2-settle-ms) ease-in-out forwards; }
     .gg-phone-nudge-orb { animation: gg-orb-turn var(--v2-settle-ms) ease-out forwards; }
-    /* 135deg is one pass of the orb: settle 4500ms of a 12000ms (--v2-spin-ms) turn, as on mobile. */
+    /* 135deg = settle / spin * 360 (4500 / 12000 of a turn), as on mobile. A calc() of ms / ms is unitless only in newer browsers, so the
+       angle is fixed here and v2Styles.spec checks it against the token values. */
     @keyframes gg-orb-turn {
       from { transform: rotate(0deg); }
       to { transform: rotate(135deg); }

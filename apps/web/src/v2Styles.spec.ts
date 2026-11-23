@@ -591,10 +591,24 @@ describe('styles.css phone nudge (#1003)', () => {
   });
 
   it('draws the orb as a conic gradient that takes no pointer events, and the speckles inside the card, faint and small', () => {
-    expect(decls('.gg-phone-nudge-orb', outside)).toMatch(/background-image:\s*conic-gradient\(/);
     expect(decls('.gg-phone-nudge-orb', outside)).toContain('pointer-events: none');
     expect(decls('.gg-phone-nudge-speckles', outside)).toContain('pointer-events: none');
-    expect(decls('.gg-phone-nudge-speckles > span', outside)).toMatch(/opacity:\s*0\.28/);
+    expect(decls('.gg-phone-nudge-speckles > span', outside)).toContain('opacity: var(--v2-nudge-speckle-alpha)');
+    expect(decls('.gg-phone-nudge-orb', outside)).toContain('background: var(--v2-nudge-orb)');
+    expect(themeVar('--v2-nudge-orb')).toMatch(/^conic-gradient\(/);
+    expect(themeVar('--v2-nudge-speckle-alpha')).toBe(String(v2.recipes.nudge.speckles.alpha));
+    // Speckles 1 to 4 take the four generated colours, in order; 5 to 7 repeat them as on mobile.
+    for (const n of [1, 2, 3, 4, 5, 6, 7]) {
+      const combined = `${decls('.gg-phone-nudge-speckles > span', outside)}\n${decls(`.gg-phone-nudge-speckles > span:nth-child(${n})`, outside)}`;
+      const colours = [...combined.matchAll(/background-color:\s*var\((--[\w-]+)\)/g)].map((m) => m[1]);
+      expect(colours.at(-1)).toBe(`--color-v2-nudge-speckle-${((n - 1) % 4) + 1}`);
+    }
+  });
+
+  it('turns the orb by settle / spin of a full turn (the fixed 135deg angle matches the token values)', () => {
+    const ms = (name: string) => parseInt(themeVar(name), 10);
+    const degrees = (ms('--v2-settle-ms') / ms('--v2-spin-ms')) * 360;
+    expect(noPref).toContain(`rotate(${degrees}deg)`);
   });
 
   it('declares every nudge animation only inside a no-preference block, as one pass of the settle var that rests (forwards)', () => {
