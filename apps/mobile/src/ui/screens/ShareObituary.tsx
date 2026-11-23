@@ -11,6 +11,7 @@ import { Card } from '../Card';
 import { Heading } from '../Heading';
 import type { HeadingProps } from '../Heading';
 import { applyUrlInputMode } from '../inputMode';
+import { MessageBox } from '../MessageBox';
 import { Status } from '../Status';
 import { Body, Eyebrow } from '../Text';
 import { useSerifStyle } from '../typography';
@@ -71,6 +72,12 @@ export interface ShareObituaryCopy {
   /** The small line under the box. */
   textCaption?: string;
   editLabel?: string;
+  /** The Edit and Done toggle (phoneReady.json). Without all four the box is always editable. */
+  messageEdit?: string;
+  messageDone?: string;
+  /** What a screen reader says for the toggle (phoneObituary.json). */
+  textEditName?: string;
+  textDoneName?: string;
   editPlaceholder?: string;
   /** The optional publisher address field in step 1 (mobile, from phoneObituary.json). */
   publisherEmailLabel?: string;
@@ -196,12 +203,14 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   const reason = empty ? copy.needLink : undefined;
   const blockedBy = reason ?? (linkValid ? undefined : copy.invalidLink);
 
-  const showDone = Boolean(emailed && onDone && copy.doneButton);
+  // While the text box is being edited its own Done shows, so this one waits: only one Done at a time.
+  const [textEditing, setTextEditing] = useState(false);
+  const showDone = Boolean(emailed && onDone && copy.doneButton && !textEditing);
 
   return (
     <>
     {/* The bar sits outside the scrolling content; with no bar, the content clears the home indicator itself. */}
-    <ScrollView style={styles.flex} contentContainerStyle={[styles.content, !showDone && { paddingBottom: spacing[3] + insets.bottom }]} keyboardShouldPersistTaps="handled" refreshControl={refreshControl}>
+    <ScrollView style={styles.flex} contentContainerStyle={[styles.content, !showDone && { paddingBottom: spacing[3] + insets.bottom }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={refreshControl}>
       {refreshNotice}
     <View style={styles.screen}>
       <View style={styles.topBar}>
@@ -216,7 +225,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
         <Body tone="muted">{copy.intro}</Body>
       </View>
       {/* The nudge takes the text card's place and hides Step 2. */}
-      {nudge ? <WebNudge {...nudge} /> : textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} /> : null}
+      {nudge ? <WebNudge {...nudge} /> : textEditor && copy.textTitle ? <TextCard copy={copy} editor={textEditor} onEditingChange={setTextEditing} /> : null}
       {!nudge && publisherEmail && copy.emailButton ? (
         <Card>
           {copy.emailTitle ? <Heading level={2}>{copy.emailTitle}</Heading> : null}
@@ -363,42 +372,23 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
   );
 }
 
-function TextCard({ copy, editor }: { copy: ShareObituaryCopy; editor: ObituaryTextEditor }) {
-  const labelId = useId();
-  const captionId = useId();
-  const font = useSerifStyle('regular');
-  const [focused, setFocused] = useState(false);
-  const input = useRef<TextInputNode | null>(null);
+function TextCard({ copy, editor, onEditingChange }: { copy: ShareObituaryCopy; editor: ObituaryTextEditor; onEditingChange: (editing: boolean) => void }) {
+  const { messageEdit, textEditName, messageDone, textDoneName } = copy;
+  const toggle = messageEdit && textEditName && messageDone && textDoneName ? { edit: messageEdit, editName: textEditName, done: messageDone, doneName: textDoneName } : undefined;
   return (
     <Card>
       <Heading level={2}>{copy.textTitle}</Heading>
-      <Body tone="strong" id={labelId} onPress={() => input.current?.focus()}>
-        {copy.editLabel}
-      </Body>
-      <TextInput
-        ref={input}
-        style={[styles.textInput, font, focused && Platform.OS !== 'web' && styles.inputFocused]}
-        {...webFieldHook}
-        aria-labelledby={labelId}
-        aria-describedby={copy.textCaption ? captionId : undefined}
-        accessibilityLabel={copy.editLabel}
-        accessibilityHint={copy.textCaption}
-        multiline
-        maxLength={editor.maxLength}
-        textAlignVertical="top"
-        autoCapitalize="sentences"
-        placeholder={copy.editPlaceholder}
-        placeholderTextColor={colors['neutral-700']}
+      <MessageBox
+        label={copy.editLabel ?? ''}
+        caption={copy.textCaption}
         value={editor.value}
         onChangeText={editor.onValueChange}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        maxLength={editor.maxLength}
+        placeholder={copy.editPlaceholder}
+        boxStyle={styles.textInput}
+        toggle={toggle}
+        onEditingChange={onEditingChange}
       />
-      {copy.textCaption ? (
-        <Body tone="muted" small id={captionId}>
-          {copy.textCaption}
-        </Body>
-      ) : null}
       {editor.memorial ? <Body>{editor.memorial}</Body> : null}
     </Card>
   );
@@ -496,16 +486,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontSize: 15,
   },
-  textInput: {
-    minHeight: 200,
-    padding: spacing[2],
-    borderWidth: 1,
-    borderColor: colors['neutral-600'],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    color: colors.ink,
-    fontSize: 16,
-  },
+  textInput: { minHeight: 200, fontSize: 16 },
   // Last, so an invalid field keeps its error border while it has focus.
   inputInvalid: { borderColor: '#b91c1c', borderWidth: 2 },
   // Native focus cue (web draws its own ring through data-gg-field).

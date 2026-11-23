@@ -414,23 +414,37 @@ function setupLive(session: Session, extra: { onBack?: () => void; onContinue?: 
 }
 
 const BOX = 'Obituary text';
+/** The text the box holds, whether it is reading (text) or editing (a field). */
+const boxShown = (): string => {
+  const box = screen.getByLabelText(BOX);
+  return box.props.value ?? box.props.accessibilityValue.text;
+};
+/** Types into the box: one tap on Edit first when it is still reading (#968). */
+const typeBox = (text: string) => {
+  const edit = screen.queryByRole('button', { name: 'Edit obituary text' });
+  if (edit) {
+    fireEvent.press(edit);
+  }
+  fireEvent.changeText(screen.getByLabelText(BOX), text);
+};
 const CAPTION = 'Read it one last time and make any last changes.';
 
-describe('ShareObituaryScreen shows the obituary text in an always-editable box (#823)', () => {
-  it('shows the saved text in the box, with the caption, and no Edit, Write, Save or Cancel button', () => {
+describe('ShareObituaryScreen shows the obituary text as read-only text with an Edit toggle (#823, #968)', () => {
+  it('shows the saved text read-only, with the caption and an Edit message button, and no Write, Save or Cancel button', () => {
     setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
-    const box = screen.getByLabelText(BOX);
-    expect(box.props.value).toBe('Anna loved the garden.');
-    expect(box.props.multiline).toBe(true);
+    expect(boxShown()).toBe('Anna loved the garden.');
+    expect(screen.getByRole('button', { name: 'Edit obituary text' })).toBeTruthy();
     expect(screen.getByText(CAPTION)).toBeTruthy();
     for (const name of ['Edit the text', 'Write the text', 'Save the text', 'Cancel']) {
       expect(screen.queryByRole('button', { name })).toBeNull();
     }
   });
 
-  it('does not take focus on arrival, so no keyboard opens', () => {
+  it('is not an input on arrival, so no keyboard opens; Edit message opens it focused', () => {
     setup({ ...base, obituaryText: 'Anna loved the garden.' } as Session);
-    expect(screen.getByLabelText(BOX).props.autoFocus).toBeFalsy();
+    expect(screen.getByLabelText(BOX).props.multiline).toBeUndefined();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit obituary text' }));
+    expect(screen.getByLabelText(BOX).props.autoFocus).toBe(true);
   });
 
   it('shows the draft built from the details when nothing was edited', () => {
@@ -438,13 +452,15 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
     const draft = obituaryTextFor(session);
     expect(draft).not.toBe('');
     setup(session);
-    expect(screen.getByLabelText(BOX).props.value).toBe(draft);
+    expect(boxShown()).toBe(draft);
   });
 
   it('with no text, keeps the come-back line and shows an empty box', () => {
     setup(linked);
     expect(screen.getByText('Write it above, or on the web.')).toBeTruthy();
-    expect(screen.getByLabelText(BOX).props.value).toBe('');
+    expect(screen.getByText('Write the obituary here.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit obituary text' }));
+    expect(boxShown()).toBe('');
   });
 
   it('keeps Step 2, Continue, Email and Copy on screen with the box', () => {
@@ -457,15 +473,15 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
 
   it('typing writes nothing until the user leaves', () => {
     const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'New text.\nSecond line.');
-    expect(screen.getByLabelText(BOX).props.value).toBe('New text.\nSecond line.');
+    typeBox('New text.\nSecond line.');
+    expect(boxShown()).toBe('New text.\nSecond line.');
     expect(onPatch).not.toHaveBeenCalled();
   });
 
   it('Back saves the typed text first, then goes back', () => {
     const onBack = jest.fn();
     const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session, { onBack });
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    typeBox('Typed words.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onPatch).toHaveBeenCalledTimes(1);
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
@@ -475,7 +491,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
   it('Continue saves the typed text first, then continues', () => {
     const onContinue = jest.fn();
     const onPatch = setupLive({ ...base, obituaryText: 'Old text.', obituaryUrl: 'https://legacy.com/anna' } as Session, { onContinue });
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    typeBox('Typed words.');
     fireEvent.press(screen.getByRole('button', { name: /Choose who to send it to/ }));
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
     expect(onContinue).toHaveBeenCalledTimes(1);
@@ -485,7 +501,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
     const session = { ...base, obituaryCity: 'Boston' } as Session;
     const onBack = jest.fn();
     const onPatch = setupLive(session, { onBack });
-    expect(screen.getByLabelText(BOX).props.value).toBe(obituaryTextFor(session));
+    expect(boxShown()).toBe(obituaryTextFor(session));
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onPatch).not.toHaveBeenCalled();
     expect(onBack).toHaveBeenCalledTimes(1);
@@ -493,22 +509,22 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
 
   it('typing and then putting the old words back writes nothing', () => {
     const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Something else');
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Old text.');
+    typeBox('Something else');
+    typeBox('Old text.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onPatch).not.toHaveBeenCalled();
   });
 
   it('changing the draft freezes it as the edited text', () => {
     const onPatch = setupLive({ ...base, obituaryCity: 'Boston' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'My own words.');
+    typeBox('My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'My own words.' });
   });
 
   it('clearing the box (or only spaces) sets obituaryText to undefined when the user leaves', () => {
     const onPatch = setupLive({ ...base, obituaryText: 'Old text.', obituaryCity: 'Boston' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), '   ');
+    typeBox('   ');
     expect(onPatch).not.toHaveBeenCalled();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: undefined });
@@ -516,6 +532,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
 
   it('the box has the caption as its hint and a 10000 character limit', () => {
     setup({ ...base, obituaryText: 'Old text.' } as Session);
+    fireEvent.press(screen.getByRole('button', { name: 'Edit obituary text' }));
     const box = screen.getByLabelText(BOX);
     expect(box.props.maxLength).toBe(10000);
     expect(box.props.accessibilityHint).toBe(CAPTION);
@@ -536,7 +553,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
       jest.spyOn(Keyboard, 'isVisible').mockReturnValue(false);
       const onBack = jest.fn();
       const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session, { onBack });
-      fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+      typeBox('Typed words.');
       let handled: boolean | null | undefined;
       act(() => {
         handled = press();
@@ -552,7 +569,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
       const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
       const onBack = jest.fn();
       const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session, { onBack });
-      fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+      typeBox('Typed words.');
       let handled: boolean | null | undefined;
       act(() => {
         handled = press();
@@ -561,7 +578,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
       expect(dismiss).toHaveBeenCalledTimes(1);
       expect(onBack).not.toHaveBeenCalled();
       expect(onPatch).not.toHaveBeenCalled();
-      expect(screen.getByLabelText(BOX).props.value).toBe('Typed words.');
+      expect(boxShown()).toBe('Typed words.');
     });
   });
 
@@ -572,7 +589,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
         <ShareObituaryScreen session={{ ...base, obituaryText: 'Old text.' } as Session} onChange={onPatch} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    typeBox('Typed words.');
     view.unmount();
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
   });
@@ -584,7 +601,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
         <ShareObituaryScreen session={{ ...base, obituaryText: 'Old text.' } as Session} onChange={onPatch} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={jest.fn()} />
       </SerifReadyContext.Provider>,
     );
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    typeBox('Typed words.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     view.unmount();
     expect(onPatch).toHaveBeenCalledTimes(1);
@@ -603,7 +620,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
 
   it('writes from empty', () => {
     const onPatch = setupLive(linked);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Anna was kind.');
+    typeBox('Anna was kind.');
     // Email shows at once, with the typed text.
     expect(screen.getByRole('button', { name: BUTTON })).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
@@ -616,13 +633,13 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
     fireEvent.changeText(box, 'Half done');
     fireEvent(box, 'blur');
     expect(onPatch).not.toHaveBeenCalled();
-    expect(screen.getByLabelText(BOX).props.value).toBe('Half done');
+    expect(boxShown()).toBe('Half done');
   });
 
   it('Email sends the text as typed, before it is saved', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     setupLive({ ...base, obituaryText: 'Old text.' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Edited text.');
+    typeBox('Edited text.');
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
     expect(decodeURIComponent(String(open.mock.calls[0][0]))).toBe('mailto:?subject=Obituary for Anna&body=Edited text.');
@@ -631,7 +648,7 @@ describe('ShareObituaryScreen shows the obituary text in an always-editable box 
   it('Copy copies the text as typed, before it is saved', async () => {
     jest.mocked(Clipboard.setStringAsync).mockResolvedValue(true);
     setupLive({ ...base, obituaryText: 'Old text.' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Edited text.');
+    typeBox('Edited text.');
     fireEvent.press(screen.getByRole('button', { name: 'Copy the text' }));
     await waitFor(() => expect(Clipboard.setStringAsync).toHaveBeenCalledWith('Edited text.'));
   });
@@ -784,10 +801,12 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
 
   const withText = { ...base, obituaryText: 'Anna loved the garden.' } as Session;
   const DONE = { name: 'Done' };
+  // While the text box is being edited its own toggle also reads Done (named Done editing), so pick the other one.
+  const doneAction = () => screen.getAllByRole('button', DONE).find((b) => b.props.accessibilityLabel !== 'Done editing') ?? screen.getByRole('button', DONE);
 
   it('a cleared box sends nothing: Email is not offered, even with details to draft from', () => {
     setupLive({ ...base, obituaryText: 'Old text.', obituaryCity: 'Austin', dateOfPassing: '2026-10-01' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), '');
+    typeBox('');
     expect(screen.queryByRole('button', { name: BUTTON })).toBeNull();
     expect(screen.getByText('Write it above, or on the web.')).toBeTruthy();
   });
@@ -800,7 +819,7 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
       return { remove };
     }) as never);
     const onPatch = setupLive({ ...base, obituaryText: 'Old text.' } as Session);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    typeBox('Typed words.');
     onState('inactive');
     expect(onPatch).not.toHaveBeenCalled();
     onState('background');
@@ -827,10 +846,12 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
         <ShareObituaryScreen session={{ ...base, obituaryText: 'Old text.' } as Session} onChange={onPatch} onSetItem={jest.fn()} onBack={jest.fn()} onContinue={jest.fn()} onEmailed={onEmailed} />
       </SerifReadyContext.Provider>,
     );
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Typed words.');
+    typeBox('Typed words.');
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await screen.findByText(OPENED);
-    fireEvent.press(screen.getByRole('button', DONE));
+    // The text box is still open, so the bar's Done is hidden until its own Done editing is tapped.
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    fireEvent.press(doneAction());
     expect(onPatch).toHaveBeenCalledTimes(1);
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Typed words.' });
     expect(onEmailed).toHaveBeenCalledTimes(1);
@@ -890,13 +911,17 @@ describe('ShareObituaryScreen Done after emailing (#726)', () => {
     expect(screen.queryByRole('button', DONE)).toBeNull();
   });
 
-  it('keeps Done on screen while the user types in the text box', async () => {
+  it('shows only one Done while the text box is open: the bar Done waits, and returns in reading mode', async () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     setup(withText);
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await screen.findByText(OPENED);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'More words.');
-    expect(screen.getByRole('button', DONE)).toBeTruthy();
+    expect(screen.getByTestId('obituary-done-bar')).toBeTruthy();
+    typeBox('More words.');
+    expect(screen.queryByTestId('obituary-done-bar')).toBeNull();
+    expect(screen.getAllByRole('button', DONE)).toHaveLength(1);
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.getByTestId('obituary-done-bar')).toBeTruthy();
   });
 });
 
@@ -907,7 +932,7 @@ describe('ShareObituaryScreen with a memorial (#781)', () => {
 
   it('shows the full text, with the memorial last', () => {
     setup(withMemorial);
-    expect(screen.getByLabelText(BOX).props.value).toBe('Anna loved the garden.');
+    expect(boxShown()).toBe('Anna loved the garden.');
     // The memorial is sent, so it is shown: read-only, after the box.
     expect(screen.getByText(memorial)).toBeTruthy();
   });
@@ -943,9 +968,8 @@ describe('ShareObituaryScreen with a memorial (#781)', () => {
 
   it('the box holds the body only, and saving never writes the memorial', () => {
     const onPatch = setupLive(withMemorial);
-    const box = screen.getByLabelText(BOX);
-    expect(box.props.value).toBe('Anna loved the garden.');
-    fireEvent.changeText(box, 'Anna loved her roses.');
+    expect(boxShown()).toBe('Anna loved the garden.');
+    typeBox('Anna loved her roses.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(onPatch).toHaveBeenCalledTimes(1);
     expect(onPatch).toHaveBeenCalledWith({ obituaryText: 'Anna loved her roses.' });
@@ -954,7 +978,7 @@ describe('ShareObituaryScreen with a memorial (#781)', () => {
   it('Email sends the typed body with the memorial last', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     setupLive(withMemorial);
-    fireEvent.changeText(screen.getByLabelText(BOX), 'Anna loved her roses.');
+    typeBox('Anna loved her roses.');
     fireEvent.press(screen.getByRole('button', { name: BUTTON }));
     await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
     expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain(`body=Anna loved her roses.\r\n\r\n${memorial}`);

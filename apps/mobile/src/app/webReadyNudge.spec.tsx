@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { findMessage, queryMessage, typeMessage } from '../testing/messageBox';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { SESSIONS_KEY } from '../lib/useDeviceSessions';
@@ -93,8 +94,8 @@ describe('the web Ready status and the announcement send screen (#949)', () => {
 
   it('shows the web\'s current wording, not the old saved copy, when Ready is on', async () => {
     await open(anna({ sectionStatus: { announcement: 'ready' }, announcementMessage: 'New web wording.', drafts: { announcement: staleDraft } }));
-    expect(await screen.findByDisplayValue('New web wording.')).toBeTruthy();
-    expect(screen.queryByDisplayValue('Old web wording.')).toBeNull();
+    expect(await findMessage('New web wording.')).toBeTruthy();
+    expect(queryMessage('Old web wording.')).toBeNull();
   });
 
   it('treats an old saved draft equal to the web wording, with no flag, as web text: the nudge shows', async () => {
@@ -106,15 +107,15 @@ describe('the web Ready status and the announcement send screen (#949)', () => {
   it('keeps an old saved draft that differs from the web wording, with no flag, as a phone edit', async () => {
     const { messageFromWeb: _flag, ...legacy } = { ...staleDraft, messageOverride: 'My own words.' };
     await open(anna({ sectionStatus: {}, drafts: { announcement: legacy } }));
-    expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
+    expect(await findMessage('My own words.')).toBeTruthy();
   });
 
   it('keeps the send screen when the words were edited on the phone, even after Ready is removed', async () => {
     await open(anna({ sectionStatus: { announcement: 'ready' } }));
-    const box = await screen.findByLabelText('Your message');
-    fireEvent.changeText(box, 'My own words.');
+    await screen.findByLabelText('Your message');
+    typeMessage('My own words.');
     webUnmarks();
-    expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
+    expect(await findMessage('My own words.')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: NUDGE })).toBeNull();
   });
 });

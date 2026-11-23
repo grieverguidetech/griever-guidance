@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AccessibilityInfo, BackHandler, Linking, Modal, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react-native';
+import { findMessage, messageNow, typeMessage } from '../testing/messageBox';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
 import { App, useSkipAnnounce } from './App';
@@ -123,7 +124,7 @@ describe('a moment with nothing written on the web (#824)', () => {
     };
     await openAnna({ ...empty, drafts: { announcement: draft } } as unknown as Session);
     await startMoment('Announce the passing');
-    expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
+    expect(await findMessage('My own words.')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Write the announcement on the web first' })).toBeNull();
   });
 
@@ -266,12 +267,12 @@ describe('picking an announcement', () => {
     expect(screen.queryByText(/She was peaceful\./)).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Add a personal note' }));
     fireEvent.changeText(await screen.findByLabelText("Anything you'd like to add (optional)"), 'She was peaceful.');
-    await waitFor(() => expect(screen.getByLabelText('Your message').props.value).toMatch(/She was peaceful\./));
+    await waitFor(() => expect(messageNow()).toMatch(/She was peaceful\./));
     // Going to the people and back keeps the note.
     fireEvent.press(screen.getByRole('button', { name: "Change who you're texting" }));
     await screen.findByText('Done · 1 chosen');
     fireEvent.press(screen.getByRole('button', { name: /^Done/ }));
-    await waitFor(() => expect(screen.getByLabelText('Your message').props.value).toMatch(/She was peaceful\./));
+    await waitFor(() => expect(messageNow()).toMatch(/She was peaceful\./));
   });
 
   it('lets people be picked on Who should get this?, and the picked people reach Review', async () => {
@@ -398,22 +399,22 @@ describe('Ready to send (announcement)', () => {
 
   it('changes the message when the tone changes', async () => {
     await toReview();
-    const plain = screen.getByLabelText('Your message').props.value;
+    const plain = messageNow();
     expect(plain).toMatch(/passed away/);
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.selected).toBe(true);
-    expect(screen.getByLabelText('Your message').props.value).not.toBe(plain);
+    expect(messageNow()).not.toBe(plain);
   });
 
   it('keeps edited words: tone is unavailable until the suggested wording is back', async () => {
     await toReview();
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    typeMessage('My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.disabled).toBe(true);
-    expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
+    expect(messageNow()).toBe('My own words.');
     expect(screen.getByText('Your own words are kept. Undo your edit to change the tone.')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
-    expect(screen.getByLabelText('Your message').props.value).not.toBe('My own words.');
+    expect(messageNow()).not.toBe('My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Softer tone' }));
     expect(screen.getByRole('button', { name: 'Softer tone' }).props.accessibilityState.selected).toBe(true);
   });
@@ -421,7 +422,7 @@ describe('Ready to send (announcement)', () => {
   it('sends the edited words to the sending step', async () => {
     jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await toReview();
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    typeMessage('My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
     fireEvent.press(await screen.findByText('Text Dee'));
     expect(decodeURIComponent(String(jest.mocked(Linking.openURL).mock.calls[0][0]))).toContain('body=Dee,\nMy own words.');
@@ -435,11 +436,11 @@ describe('Ready to send (announcement)', () => {
 
   it('keeps the edited words and the people when Back leaves and the moment is started again', async () => {
     await toReview();
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    typeMessage('My own words.');
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
     await startMoment('Announce the passing');
-    expect(await screen.findByDisplayValue('My own words.')).toBeTruthy();
+    expect(await findMessage('My own words.')).toBeTruthy();
     expect(screen.queryByText(/^To /)).toBeNull();
     expect(screen.getByRole('button', { name: "Change who you're texting" })).toBeTruthy();
   });
@@ -458,12 +459,12 @@ describe('Ready to send (announcement)', () => {
 
   it('keeps hand-edited wording when Change opens the people sheet and Close shuts it', async () => {
     await toReview();
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    typeMessage('My own words.');
     fireEvent.press(screen.getByRole('button', { name: "Change who you're texting" }));
     await screen.findByRole('heading', { name: 'Who should get this?' });
     fireEvent.press(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Who should get this?' })).toBeNull());
-    expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
+    expect(messageNow()).toBe('My own words.');
   });
 
   it('sends on to the sending step', async () => {

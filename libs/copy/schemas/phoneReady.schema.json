@@ -3,7 +3,7 @@
   "title": "Copy for the phone-only Ready to send screen (the rest comes from review.json, which web also reads)",
   "type": "object",
   "additionalProperties": false,
-  "required": ["changeThanks", "addNote", "notePlaceholder", "changeName", "choose", "fine", "shareInstead", "placesOne", "placesMany", "placesNone", "placesUnavailable", "placeFilled", "placesHint", "messageCaption"],
+  "required": ["changeThanks", "addNote", "notePlaceholder", "changeName", "choose", "fine", "shareInstead", "placesOne", "placesMany", "placesNone", "placesUnavailable", "placeFilled", "placesHint", "messageCaption", "messageEdit", "messageEditName", "messageDone", "messageDoneName"],
   "properties": {
     "changeThanks": { "$ref": "#/$defs/text" },
     "addNote": { "$ref": "#/$defs/text" },
@@ -18,7 +18,11 @@
     "placesUnavailable": { "$ref": "#/$defs/text" },
     "placeFilled": { "$ref": "#/$defs/text" },
     "placesHint": { "$ref": "#/$defs/text" },
-    "messageCaption": { "$ref": "#/$defs/text" }
+    "messageCaption": { "$ref": "#/$defs/text" },
+    "messageEdit": { "$ref": "#/$defs/text" },
+    "messageEditName": { "$ref": "#/$defs/text" },
+    "messageDone": { "$ref": "#/$defs/text" },
+    "messageDoneName": { "$ref": "#/$defs/text" }
   },
   "$defs": { "text": { "type": "string", "minLength": 1 } }
 }

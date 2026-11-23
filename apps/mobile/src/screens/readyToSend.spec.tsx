@@ -58,6 +58,19 @@ function Harness({ fields, thanks, senderName, category, ids = PICKED, onChoose 
   return flow.sendJob ? <SendingScreen flow={flow} contacts={contacts} /> : <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={onChoose} onGotIt={onGotIt} />;
 }
 
+/** The message the box holds, whether it is reading (text) or editing (a field). */
+const messageShown = (): string => {
+  const box = screen.getByLabelText('Your message');
+  return box.props.value ?? box.props.accessibilityValue.text;
+};
+/** Types into the box: one tap on Edit first when it is still reading (#968). */
+const typeMessage = (text: string) => {
+  const edit = screen.queryByRole('button', { name: 'Edit message' });
+  if (edit) {
+    fireEvent.press(edit);
+  }
+  fireEvent.changeText(screen.getByLabelText('Your message'), text);
+};
 const primary = () => screen.getByRole('button', { name: 'Text 1 person' });
 const bodyOfFirstLink = (open: jest.SpiedFunction<typeof Linking.openURL>) => decodeURIComponent(String(open.mock.calls[0][0])).split('body=')[1];
 
@@ -77,11 +90,12 @@ describe('Ready to send (Share the service)', () => {
   it('shows the message as it will go, with the first-name line', () => {
     render(<Harness />);
     expect(screen.getByText('Dee,')).toBeTruthy();
-    expect(screen.getByDisplayValue(/Oak Chapel/)).toBeTruthy();
+    expect(messageShown()).toMatch(/Oak Chapel/);
   });
 
   it('lets the message box grow to fit the whole message (#963)', () => {
     render(<Harness />);
+    fireEvent.press(screen.getByRole('button', { name: 'Edit message' }));
     const box = screen.getByLabelText('Your message');
     expect(box.props.multiline).toBe(true);
     // A line cap would stop the box at that height on iOS, so the rest would scroll inside it.
@@ -93,7 +107,7 @@ describe('Ready to send (Share the service)', () => {
   it('sends the edited text in the sms: link', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     render(<Harness />);
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are, 2 PM at Oak Chapel.');
+    typeMessage('Come as you are, 2 PM at Oak Chapel.');
     fireEvent.press(screen.getByText('Text 1 person'));
     fireEvent.press(await screen.findByText('Text Dee'));
     expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain('body=Dee,\nCome as you are, 2 PM at Oak Chapel.');
@@ -103,7 +117,7 @@ describe('Ready to send (Share the service)', () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     open.mockClear();
     render(<Harness />);
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    typeMessage('Come as you are.');
     fireEvent.press(screen.getByText('Text 1 person'));
     fireEvent.press(await screen.findByText('Text Dee'));
     const body = bodyOfFirstLink(open);
@@ -115,7 +129,7 @@ describe('Ready to send (Share the service)', () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     open.mockClear();
     render(<Harness />);
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    typeMessage('Come as you are.');
     fireEvent.press(screen.getByRole('switch', { name: 'Start with their first name' }));
     expect(screen.queryByText('Dee,')).toBeNull();
     fireEvent.press(screen.getByText('Text 1 person'));
@@ -135,22 +149,23 @@ describe('Ready to send (Share the service)', () => {
     expect(screen.getByText('Dee,')).toBeTruthy();
   });
 
-  it('always shows the message in an editable box with a caption, and no Edit or Done editing button', () => {
+  it('shows the message read-only with a caption and an Edit message button; Edit opens a focused box and Done returns', () => {
     render(<Harness />);
-    const box = screen.getByLabelText('Your message');
-    expect(box.props.multiline).toBe(true);
-    expect(box.props.autoFocus).toBeFalsy();
+    expect(screen.getByLabelText('Your message').type).toBe('Text');
     expect(screen.getByText('Read it one last time and make any last changes.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Edit wording' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Done editing' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit message' }));
+    expect(screen.getByLabelText('Your message').props.autoFocus).toBe(true);
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    expect(screen.getByLabelText('Your message').type).toBe('Text');
   });
 
   it('blocks sending a blank message and says why', () => {
     render(<Harness />);
-    fireEvent.changeText(screen.getByLabelText('Your message'), '   ');
+    typeMessage('   ');
     expect(screen.getByText('Add a message before you send it.')).toBeTruthy();
     expect(primary().props.accessibilityState?.disabled).toBe(true);
-    expect(screen.getByLabelText('Your message').props.value).toBe('   ');
+    expect(messageShown()).toBe('   ');
   });
 
   describe('The change-people button and the button', () => {
@@ -216,8 +231,9 @@ describe('Ready to send (Share the service)', () => {
       fireEvent(screen.getByTestId('date-picker'), 'change', { type: 'set' }, new Date(2026, 5, 20));
       fireEvent.press(screen.getByRole('button', { name: 'Done' }));
       // The field and the message both show the new day.
-      expect(screen.getByLabelText('Your message').props.value).toMatch(/June 20/);
-      expect(screen.queryByDisplayValue(/June 14/)).toBeNull();
+      expect(messageShown()).toMatch(/June 20/);
+      expect(messageShown()).not.toMatch(/June 14/);
+      expect(screen.queryByText(/June 14/)).toBeNull();
     });
 
     it('opens on its own, blocks the button and says why while a required field is empty', () => {
@@ -259,12 +275,12 @@ describe('Ready to send (Share the service)', () => {
 
     it('is hidden for hand-edited text, and Use the suggested wording brings it back', () => {
       render(<Harness />);
-      fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+      typeMessage('My own words.');
       expect(screen.queryByRole('button', { name: 'Change date, time or place' })).toBeNull();
       expect(screen.queryByLabelText('Service date')).toBeNull();
-      expect(screen.getByLabelText('Your message').props.value).toBe('My own words.');
+      expect(messageShown()).toBe('My own words.');
       fireEvent.press(screen.getByText('Use the suggested wording'));
-      expect(screen.getByLabelText('Your message').props.value).toContain('June 14');
+      expect(messageShown()).toContain('June 14');
     });
   });
 
@@ -280,7 +296,7 @@ describe('Ready to send (Share the service)', () => {
       const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
       open.mockClear();
       render(<Harness thanks senderName="" fields={{}} />);
-      expect(screen.getByDisplayValue(/On behalf of ______, we want/)).toBeTruthy();
+      expect(messageShown()).toMatch(/On behalf of ______, we want/);
       expect(screen.queryByText(/undefined/)).toBeNull();
       expect(primary().props.accessibilityState?.disabled).toBe(true);
       fireEvent.press(primary());
@@ -302,7 +318,7 @@ describe('Ready to send (Share the service)', () => {
       expect(screen.queryByLabelText(/Full name of the deceased/)).toBeNull();
       expect(primary().props.accessibilityState?.disabled).toBeFalsy();
       fireEvent.changeText(screen.getByLabelText('Personal note (optional)'), 'Your flowers meant a lot.');
-      expect(screen.getByLabelText('Your message').props.value).toMatch(/Your flowers meant a lot\./);
+      expect(messageShown()).toMatch(/Your flowers meant a lot\./);
     });
   });
 });
@@ -325,12 +341,12 @@ describe('Details row (Announce the passing)', () => {
     expect(input.props.placeholder).toBe('For example: It was peaceful, and we were with them.');
     expect(StyleSheet.flatten(input.props.style)).toMatchObject({ minHeight: 88, textAlignVertical: 'top' });
     fireEvent.changeText(input, 'She was peaceful.');
-    expect(screen.getByLabelText('Your message').props.value).toMatch(/She was peaceful\./);
+    expect(messageShown()).toMatch(/She was peaceful\./);
   });
 
   it('is hidden once the person edits the words themselves', () => {
     render(<Harness category="announcement" fields={{}} />);
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'My own words.');
+    typeMessage('My own words.');
     expect(screen.queryByRole('button', { name: 'Add a personal note' })).toBeNull();
   });
 });
@@ -347,7 +363,7 @@ describe('Share elsewhere', () => {
     const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
     render(<Harness />);
     expect(screen.getByText('Text 1 person')).toBeTruthy();
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'Come as you are.');
+    typeMessage('Come as you are.');
     fireEvent.press(shareButton());
     await waitFor(() => expect(share).toHaveBeenCalledWith({ message: 'Come as you are.' }));
   });
@@ -375,7 +391,7 @@ describe('Share elsewhere', () => {
   it('is disabled with a share-specific hint when the message is blank', () => {
     const share = jest.spyOn(Share, 'share').mockResolvedValue(shared);
     render(<Harness ids={NONE} />);
-    fireEvent.changeText(screen.getByLabelText('Your message'), '   ');
+    typeMessage('   ');
     expect(shareButton().props.accessibilityState?.disabled).toBe(true);
     expect(shareButton().props.accessibilityHint).toBe('Add a message before you share it.');
     expect(screen.getByText('Add a message before you share it.')).toBeTruthy();
@@ -393,7 +409,7 @@ describe('Share elsewhere', () => {
     expect(line.props.role).toBe('status');
     expect(line.props.accessibilityLiveRegion).toBe('polite');
     expect(announce).toHaveBeenCalledWith("That didn't go through. You can try again.");
-    fireEvent.changeText(screen.getByLabelText('Your message'), 'A new line.');
+    typeMessage('A new line.');
     expect(screen.queryByText("That didn't go through. You can try again.")).toBeNull();
   });
 
@@ -494,7 +510,7 @@ describe('Ready to send with nothing written on the web (#824)', () => {
       return <ReadyToSendScreen flow={flow} contacts={contacts} onChoosePeople={() => undefined} onGotIt={() => undefined} />;
     }
     render(<Resumed />);
-    expect(screen.getByDisplayValue('My own words.')).toBeTruthy();
+    expect(messageShown()).toBe('My own words.');
     expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
   });
 

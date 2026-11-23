@@ -60,6 +60,8 @@ export interface ButtonProps {
   pressed?: boolean;
   /** A button that opens something in place: open or closed. Native: accessibilityState expanded. Leave unset for a plain button. */
   expanded?: boolean;
+  /** Fires when a press starts, before onPress. For a caller that must know before a blur lands (web). */
+  onPressIn?: () => void;
   /** Opt-in: a taller minimum for the button itself, in points (for example the bottom action bar's 52). */
   minHeight?: number;
   buttonRef?: Ref<ButtonNode>;
@@ -80,6 +82,7 @@ export function Button({
   pressed,
   expanded,
   minHeight,
+  onPressIn,
   buttonRef,
 }: ButtonProps) {
   const setRef = useCallback(
@@ -144,6 +147,7 @@ export function Button({
       accessibilityHint={hint}
       accessibilityState={buttonState(busy, ariaDisabled && announceDisabled, pressed, expanded)}
       onPress={onPress}
+      onPressIn={onPressIn}
       style={({ pressed }) => [
         styles.base,
         styles[variant],
