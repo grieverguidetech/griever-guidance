@@ -33,7 +33,7 @@ export interface BodyProps {
   onPress?: () => void;
 }
 
-/** Running text. Contrast: neutral-700 and neutral-800 on the page colour both pass 4.5:1. */
+/** Running text. Contrast: roles.muted and roles.mutedStrong on the page colour both pass 4.5:1. */
 export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false, onPress }: BodyProps) {
   const font = useSerifStyle('regular');
   const extra: Record<string, unknown> = {};

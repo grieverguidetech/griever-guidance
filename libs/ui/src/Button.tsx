@@ -12,10 +12,10 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
 
 /**
  * Looks follow the mobile app's buttons (decision by Peter, 2026-10-25): rounded 10px corners,
- * a solid accent-700 primary, an accent outline for secondary, and a tinted outlined "link" button
- * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: an
- * accent-700 label with an underline, no fill and no border, and a pale accent wash while pressed.
- * `header` is Back and What you'll need (#362): the page shows through, a thin accent-600 outline,
+ * a solid roles.link primary, a roles.link outline for secondary, and a tinted outlined "link" button
+ * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: a
+ * roles.link label with an underline, no fill and no border, and a roles.wash fill while pressed.
+ * `header` is Back and What you'll need (#362): the page shows through, a thin roles.focus outline,
  * no underline, same as web's top bar. No icons. Palette and serif still follow web.
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
