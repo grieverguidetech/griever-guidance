@@ -277,3 +277,144 @@ describe('styles.css glass cards and panels', () => {
     }
   });
 });
+
+describe('styles.css swirl buttons', () => {
+  /** The body of the first block that starts with the given at-rule or selector, found by matching braces. */
+  function block(header: string): string {
+    const at = css.indexOf(header);
+    if (at < 0) {
+      throw new Error(`No block for ${header}`);
+    }
+    const open = css.indexOf('{', at);
+    let depth = 0;
+    for (let i = open; i < css.length; i += 1) {
+      if (css[i] === '{') {
+        depth += 1;
+      } else if (css[i] === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          return css.slice(open + 1, i);
+        }
+      }
+    }
+    throw new Error(`Unclosed block for ${header}`);
+  }
+
+  const hexVar = (name: string) => {
+    const found = theme.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i'));
+    if (!found) {
+      throw new Error(`${name} is not a hex var in theme.generated.css`);
+    }
+    return found[1];
+  };
+  const stopsOf = (name: string) => [...themeVar(name).matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+  const page = hexVar('--color-v2-page');
+  const swirls = [
+    { name: 'primary', bg: '--v2-primary-bg', text: '--color-v2-primary-text' },
+    { name: 'secondary', bg: '--v2-secondary-bg', text: '--color-v2-secondary-text' },
+  ];
+  const buttonRules = [
+    '.gg-btn-primary',
+    '.gg-btn-secondary',
+    ".gg-btn-primary:not(:disabled):not([aria-disabled='true']):hover,\n  .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):hover",
+    ".gg-btn-primary:not(:disabled):not([aria-disabled='true']):active,\n  .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):active",
+    ".gg-btn-primary:disabled,\n  .gg-btn-primary[aria-disabled='true']",
+    ".gg-btn-secondary:disabled,\n  .gg-btn-secondary[aria-disabled='true']",
+  ];
+  const media = block('@media (prefers-reduced-motion: no-preference)');
+
+  it('declares the animation and the keyframes only inside the no-preference block', () => {
+    const outside = css.replace(media, '');
+    expect(media).toMatch(/animation:/);
+    expect(media).toMatch(/@keyframes gg-swirl-drift/);
+    expect(outside).not.toMatch(/gg-swirl-drift/);
+    // Other animations in the file may exist; none may touch the swirl buttons outside the block.
+    expect(rule('.gg-btn-primary')).not.toMatch(/animation/);
+    expect(rule('.gg-btn-secondary')).not.toMatch(/animation/);
+  });
+
+  it('drifts one pass of the settle var, then rests (forwards), on enabled buttons only', () => {
+    const decl = /animation:\s*([^;]+);/.exec(media)?.[1] ?? '';
+    expect(decl).toContain('var(--v2-settle-ms)');
+    expect(decl).toMatch(/\bforwards\b/);
+    expect(decl).not.toMatch(/infinite|alternate/);
+    expect(decl).not.toMatch(/\b\d+\s*(?:ms|s)\b/);
+    expect(media).toContain(":not(:disabled):not([aria-disabled='true'])");
+    // Every settle value is under 5 s (WCAG 2.2.2).
+    expect(parseInt(themeVar('--v2-settle-ms'), 10)).toBeLessThanOrEqual(5000);
+  });
+
+  it('animates background-position over a fill larger than the button', () => {
+    expect(rule('.gg-btn-primary,\n  .gg-btn-secondary')).toMatch(/background-size:\s*2\d\d%/);
+    expect(block('@keyframes gg-swirl-drift')).toMatch(/background-position/);
+  });
+
+  it('gives primary and secondary their swirl, text, weight, edge, shadow and radius from the generated vars', () => {
+    const primary = rule('.gg-btn-primary');
+    expect(primary).toContain('background-image: var(--v2-primary-bg)');
+    expect(primary).toContain('color: var(--color-v2-primary-text)');
+    expect(primary).toContain('font-weight: var(--v2-weight-medium)');
+    expect(primary).toContain('border-width: var(--v2-border-thin)');
+    expect(primary).toContain('border-color: var(--color-v2-primary-border)');
+    expect(primary).toContain('box-shadow: var(--v2-primary-shadow)');
+    const secondary = rule('.gg-btn-secondary');
+    expect(secondary).toContain('background-image: var(--v2-secondary-bg)');
+    expect(secondary).toContain('color: var(--color-v2-secondary-text)');
+    expect(secondary).toContain('font-weight: var(--v2-weight-regular)');
+    expect(secondary).toContain('border-width: var(--v2-border-medium)');
+    expect(secondary).toContain('border-color: var(--color-v2-secondary-border)');
+    expect(secondary).toContain('box-shadow: var(--v2-secondary-shadow)');
+    expect(rule('.gg-btn-primary,\n  .gg-btn-secondary')).toContain('border-radius: var(--v2-radius)');
+    expect(themeVar('--v2-radius')).toBe('8px');
+  });
+
+  it.each(swirls)('keeps the $name label at 4.5:1 or more on every stop at rest, hover and pressed', ({ bg, text }) => {
+    const stops = stopsOf(bg);
+    expect(stops.length).toBeGreaterThanOrEqual(3);
+    for (const alpha of [1, 0.92, 0.85]) {
+      // The whole button dims over the page, so both the label and the stop blend with it.
+      const label = blend({ rgb: toRgb(hexVar(text)), alpha }, page);
+      for (const stop of stops) {
+        expect(contrast(label, blend({ rgb: toRgb(stop), alpha }, page)), `${bg} ${stop} at ${alpha}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('uses the same opacities in the hover and pressed rules as the spec checks', () => {
+    expect(rule(buttonRules[2])).toMatch(/opacity:\s*0\.92/);
+    expect(rule(buttonRules[3])).toMatch(/opacity:\s*0\.85/);
+  });
+
+  it('makes a disabled or aria-disabled primary a flat ink fill with page text, 4.5:1 or more, and no swirl', () => {
+    const decl = rule(buttonRules[4]);
+    expect(decl).toContain('background-image: none');
+    expect(decl).toContain('background-color: var(--color-text)');
+    expect(decl).toContain('color: var(--color-v2-page)');
+    expect(contrast(hexVar('--color-text'), page)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('makes a disabled or aria-disabled secondary a flat page fill with a dashed edge and its own text colour', () => {
+    const decl = rule(buttonRules[5]);
+    expect(decl).toContain('background-image: none');
+    expect(decl).toContain('background-color: var(--color-v2-page)');
+    expect(decl).toContain('border-style: dashed');
+    expect(decl).not.toMatch(/(?:^|[\s;])color:/);
+    expect(decl).not.toMatch(/animation/);
+    expect(contrast(hexVar('--color-v2-secondary-text'), page)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps unavailable buttons focusable: no pointer-events rule and no outline removal on them', () => {
+    const rules = buttonRules.map(rule).join('\n');
+    expect(rules).not.toMatch(/pointer-events|outline/);
+  });
+
+  it('uses no literal colours in the swirl button rules, and defines every var they use', () => {
+    const rules = `${buttonRules.map(rule).join('\n')}\n${media}`;
+    expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    const used = [...rules.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(0);
+    for (const name of new Set(used)) {
+      expect(theme, name).toMatch(new RegExp(`${name}:`));
+    }
+  });
+});
