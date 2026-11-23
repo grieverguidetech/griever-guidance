@@ -169,7 +169,9 @@ describe('toMarketingCss', () => {
     expect(vars['--gg-card-border']).toBe(`1px solid ${c.glassBorder}`);
     expect(vars['--gg-card-shadow']).toBe(`0px 1px 9px ${shadows.glass.color}`);
     expect(vars['--gg-card-radius']).toBe('8px');
-    expect(vars['--gg-drift-ms']).toBe('9000ms');
+    expect(vars['--gg-settle-ms']).toBe('4500ms');
+    expect(vars['--gg-divider']).toBe(v2.roles.divider);
+    expect(vars['--gg-drift-ms']).toBeUndefined();
   });
 
   it('is deterministic and toMarketingFile adds the header', () => {

@@ -3,6 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/marketing/src",
+  "implicitDependencies": ["tokens"],
   "targets": {
     "serve": {
       "command": "astro dev",
@@ -15,6 +16,18 @@
       "options": {
         "cwd": "apps/marketing"
       }
+    },
+    "test": {
+      "command": "node tools/scripts/generate-token-css.mjs --check",
+      "dependsOn": ["tokens:build"],
+      "options": {
+        "cwd": "{workspaceRoot}"
+      },
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/tools/scripts/generate-token-css.mjs"
+      ]
     }
   }
 }
