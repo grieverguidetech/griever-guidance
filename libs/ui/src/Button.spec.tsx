@@ -166,7 +166,7 @@ describe('header Button (Back, What you\'ll need)', () => {
     render(<Button label="What you'll need" variant="header" onPress={vi.fn()} />);
     const style = getComputedStyle(screen.getByRole('button', { name: "What you'll need" }));
     expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-    expect(style.borderTopColor).toBe('rgba(79, 134, 173, 1.00)');
+    expect(style.borderTopColor).toBe('rgba(0, 103, 134, 1.00)');
     expect(style.borderTopWidth).toBe('1px');
     expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
     expect(getComputedStyle(screen.getByText("What you'll need")).textDecoration).not.toContain('underline');

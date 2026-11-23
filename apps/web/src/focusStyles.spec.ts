@@ -142,6 +142,64 @@ describe('visible focus (#162)', () => {
     expect(contrast(v2.recipes.field.edge, v2.recipes.field.fill)).toBeGreaterThanOrEqual(3);
   });
 
+  // #1005: the global ring, the selected card's focus ring and the datebox trigger use the v2 focus colour.
+  describe('v2 focus ring (#1005)', () => {
+    const focus = token('v2-focus');
+    const grounds = { page: token('v2-page'), 'glow-sun': token('v2-glow-sun'), 'glow-sky': token('v2-glow-sky') };
+    const glassFill = THEME.match(/--color-v2-card-fill:\s*rgba\(\s*255,\s*255,\s*255,\s*([\d.]+)\s*\)/);
+    const glassAlpha = Number(glassFill?.[1]);
+    const glassOver = (ground: string) => over('#ffffff', glassAlpha, ground);
+    const ink = token('ink');
+    // The row and chip fill under the pointer: 7% (hover) or 14% (active) of the text colour, over glass.
+    const washes = [0.07, 0.14];
+    const datebox = CSS.match(/\.gg-datebox-trigger:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
+
+    it('points each changed ring at --color-v2-focus', () => {
+      expect(rule(':focus-visible')).toContain('outline: 2px solid var(--color-v2-focus)');
+      expect(rule('.gg-card-selected:focus')).toContain('outline: 2px solid var(--color-v2-focus)');
+      expect(datebox).toContain('outline: 2px solid var(--color-v2-focus)');
+    });
+
+    it('keeps the deliberate exceptions on their own colours', () => {
+      expect(rule('.gg-input:focus-visible')).toContain('var(--color-accent-700)');
+      expect(rule('[data-gg-field]:focus-visible')).toContain('var(--color-accent-700)');
+      expect(rule('.gg-card-selected:focus-visible')).toContain('var(--color-accent-700)');
+      expect(CSS).toContain('.gg-btn-primary:focus-visible');
+      expect(CSS).toMatch(/\[data-gg-btn='secondary'\]:focus-visible \{ outline-color: var\(--color-accent-700\); \}/);
+      expect(rule('.gg-phone-nudge:focus,\n.gg-phone-nudge:focus-visible')).toContain('outline: 2px solid transparent');
+    });
+
+    it.each(Object.entries(grounds))('clears 3:1 on %s, on glass over it and on the 7% and 14% washes over that glass', (_name, ground) => {
+      const glass = glassOver(ground);
+      const sits = [ground, glass, ...washes.map((alpha) => over(ink, alpha, glass))];
+      for (const bg of sits) {
+        expect({ bg, ok: contrast(focus, bg) >= 3 }).toEqual({ bg, ok: true });
+      }
+    });
+
+    it('clears 3:1 on the field fill and on the datebox hover wash (12% accent) over it', () => {
+      const field = token('v2-field-fill');
+      const hover = over(token('accent'), 0.12, field);
+      expect(contrast(focus, field)).toBeGreaterThanOrEqual(3);
+      expect(contrast(focus, hover)).toBeGreaterThanOrEqual(3);
+    });
+
+    it('draws the segmented control ring inset, in the page colour on the active option', () => {
+      // .gg-seg clips its children, and the active option is filled with the focus colour itself.
+      const inset = CSS.match(/\.gg-seg-opt:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
+      const active = CSS.match(/\.gg-seg-opt-active:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
+      expect(inset).toMatch(/outline-offset:\s*-\d+px/);
+      expect(active).toContain('outline-color: var(--color-v2-page)');
+      expect(contrast(token('v2-page'), token('accent-700'))).toBeGreaterThanOrEqual(3);
+      expect(contrast(focus, token('v2-page'))).toBeGreaterThanOrEqual(3);
+    });
+
+    it('uses no literal colours in the changed ring rules', () => {
+      const rules = [rule(':focus-visible'), rule('.gg-card-selected:focus'), datebox].join('\n');
+      expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    });
+  });
+
   it('computes contrast the WCAG way', () => {
     expect(contrast('#000000', '#ffffff')).toBeCloseTo(21, 5);
     // Matches the measured value noted in styles.css for the base accent on the page.

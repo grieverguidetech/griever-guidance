@@ -376,7 +376,7 @@ describe('toWebThemeCss with v2', () => {
     expect(t['--color-v2-glow-sun']).toBe('#fedcba');
     expect(t['--color-v2-glow-sky']).toBe('#abcdef');
     expect(t['--color-v2-error']).toBe('#0a0b0c');
-    expect(t['--color-v2-focus']).toBe('#112233');
+    expect(t['--color-v2-focus']).toBe('#010203'); // the focus role follows the link primitive (#1005)
     expect(t['--color-v2-secondary-border']).toBe('#112233');
     expect(t['--font-v2']).toMatch(/^'Fixture', /);
     expect(r['--v2-primary-bg']).toBe(

@@ -162,7 +162,7 @@ describe('Hub', () => {
     for (const name of ['Home', "What you'll need"]) {
       const style = getComputedStyle(screen.getByRole('button', { name }));
       expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(style.backgroundColor);
-      expect(style.borderTopColor).toBe('rgba(79, 134, 173, 1.00)');
+      expect(style.borderTopColor).toBe('rgba(0, 103, 134, 1.00)');
       expect(parseInt(style.minHeight, 10)).toBeGreaterThanOrEqual(44);
       expect(getComputedStyle(screen.getByText(name)).textDecoration).not.toContain('underline');
     }

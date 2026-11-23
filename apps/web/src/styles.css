@@ -77,7 +77,18 @@ h1 { font-weight: var(--v2-heading-weight); }
 
 ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
 :focus { outline: none; }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* #1005 focus colour: the global ring, the selected card's focus ring and the datebox trigger use
+   --color-v2-focus (#006786: 5.26:1 or more on the page, both glows and glass, 4.50:1 on the 14% pressed
+   wash). Deliberate exceptions, unchanged: swirl buttons pin accent-700 (see below); the phone nudge takes
+   script focus with no ring; fields keep their accent-700 field ring; the selected card's second ring
+   stays accent-700 on a page gap (#1000); an unfocused selected card keeps its accent selection ring
+   (.gg-card-selected in @layer components). Guarded by focusStyles.spec.ts. */
+:focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 2px; }
+/* Segmented control: .gg-seg clips its children (overflow: hidden), so an outset ring would be cut, and
+   on the active option (accent-700 fill, the same colour as the ring) it would vanish. Draw it inset:
+   the focus colour on an inactive option, the page colour on the active one (5.97:1 on accent-700). */
+.gg-seg-opt:focus-visible { outline-offset: -4px; }
+.gg-seg-opt-active:focus-visible { outline-color: var(--color-v2-page); }
 /* Anything focused by script (a heading after navigation, a confirm group, a status note) is
    not a keyboard stop: a quiet left bar instead of the ring, so the keyboard user still sees
    where focus went (WCAG 2.4.7). The bar is accent-700, which is 5.72:1 on --color-bg,
@@ -111,7 +122,7 @@ h1 { font-weight: var(--v2-heading-weight); }
    against the unlayered `:focus { outline: none }` reset above — the selection
    ring would vanish the instant a card is clicked (clicking focuses it). Keep
    it visible while focused too. */
-.gg-card-selected:focus { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.gg-card-selected:focus { outline: 2px solid var(--color-v2-focus); outline-offset: -2px; }
 /* Keyboard focus on a selected card must still change its look (WCAG 2.4.7): the selection ring stays,
    and a second accent-700 ring sits 2px outside it, on a page-coloured gap (5.26:1 or more on page and glows). */
 .gg-card-selected:focus-visible {
@@ -385,7 +396,7 @@ h1 { font-weight: var(--v2-heading-weight); }
     background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   }
   .gg-datebox-trigger:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-v2-focus);
     outline-offset: -2px;
   }
   /* The native <input type="date"> exists only to open the OS picker — keep it
@@ -715,8 +726,9 @@ h1 { font-weight: var(--v2-heading-weight); }
   }
 }
 
-/* Swirl buttons: the focus ring is accent-700 (at least 5.26:1 on the page, both glows and glass), because the global accent ring is
-   about 3.65:1. Unlayered so it beats nothing it should not, and cannot lose to the component layer. */
+/* Swirl buttons: the focus ring is pinned to accent-700 (at least 5.26:1 on the page, both glows and glass), so it holds on
+   the swirl whatever the focus role becomes. Today it equals --color-v2-focus. Unlayered so it beats nothing it should not,
+   and cannot lose to the component layer. */
 .gg-btn-primary:focus-visible,
 [data-gg-btn='primary']:focus-visible,
 .gg-btn-secondary:focus-visible,
