@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Copy for the agent workflow tools",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "startWorkflowTitle",
+    "startWorkflowDescription",
+    "nextStepTitle",
+    "nextStepDescription",
+    "agentInstruction",
+    "handOff",
+    "actorYou",
+    "actorAssistant",
+    "whatDoneMeans",
+    "allDone"
+  ],
+  "properties": {
+    "startWorkflowTitle": { "$ref": "#/$defs/text" },
+    "startWorkflowDescription": { "$ref": "#/$defs/text" },
+    "nextStepTitle": { "$ref": "#/$defs/text" },
+    "nextStepDescription": { "$ref": "#/$defs/text" },
+    "agentInstruction": { "$ref": "#/$defs/text" },
+    "handOff": { "$ref": "#/$defs/text" },
+    "actorYou": { "$ref": "#/$defs/text" },
+    "actorAssistant": { "$ref": "#/$defs/text" },
+    "whatDoneMeans": { "$ref": "#/$defs/text" },
+    "allDone": { "$ref": "#/$defs/text" }
+  },
+  "$defs": { "text": { "type": "string", "minLength": 1 } }
+}
