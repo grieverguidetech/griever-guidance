@@ -1,24 +1,36 @@
+import { createMcpHandler } from '@modelcontextprotocol/server';
 import { checkRateLimit } from './rateLimit.js';
+import { createAgentServer } from './server.js';
 
-const jsonResponse = (body: unknown, status: number, headers: Record<string, string> = {}) =>
+const jsonResponse = (
+  body: unknown,
+  status: number,
+  headers: Record<string, string> = {},
+) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json', ...headers },
   });
 
-/** Placeholder until the MCP handler is wired in (#1017). */
-const notImplemented = () =>
-  jsonResponse({ error: 'The assistant connection is not available yet.' }, 501);
+/** Stateless: no session id, no subscriptions, a body cap of 16 KiB, and nothing reported out of band. */
+const mcpHandler = createMcpHandler(() => createAgentServer(), {
+  legacy: 'stateless',
+  maxSubscriptions: 0,
+  maxRequestBodySize: 16384,
+  onerror: () => undefined,
+});
 
 async function handleMcp(request: Request, env: unknown): Promise<Response> {
   if (request.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed.' }, 405, { Allow: 'POST' });
+    return jsonResponse({ error: 'Method not allowed.' }, 405, {
+      Allow: 'POST',
+    });
   }
   const limited = await checkRateLimit(request, env);
   if (limited) {
     return limited;
   }
-  return notImplemented();
+  return mcpHandler.fetch(request);
 }
 
 export default {

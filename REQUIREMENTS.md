@@ -192,8 +192,8 @@ ids only. It is not routed in production yet.
 
 | ID | Requirement | Status | Notes |
 |---|---|---|---|
-| AG-1 | Stateless guided workflow (`start_workflow`, `next_step`). Inputs are enums and step ids only. Nothing is stored or logged. | Not started | #1015, #1016, #1017 |
-| AG-2 | Steps in the real C10 order from the shared checklist. Each step names who acts. Hand-off steps send the person to their own phone. | In progress | #1015, #1016, #1017 |
+| AG-1 | Stateless guided workflow (`start_workflow`, `next_step`). Inputs are enums and step ids only. Nothing is stored or logged. | Done (not deployed) | #1015, #1016, #1017 |
+| AG-2 | Steps in the real C10 order from the shared checklist. Each step names who acts. Hand-off steps send the person to their own phone. | Done (not deployed) | #1015, #1016, #1017 |
 | AG-3 | One MCP Apps step card. | Not started | #1018 (slice 3) |
 
 ---
