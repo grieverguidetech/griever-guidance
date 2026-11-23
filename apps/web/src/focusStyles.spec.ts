@@ -184,6 +184,16 @@ describe('visible focus (#162)', () => {
       expect(contrast(focus, hover)).toBeGreaterThanOrEqual(3);
     });
 
+    it('draws the segmented control ring inset, in the page colour on the active option', () => {
+      // .gg-seg clips its children, and the active option is filled with the focus colour itself.
+      const inset = CSS.match(/\.gg-seg-opt:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
+      const active = CSS.match(/\.gg-seg-opt-active:focus-visible\s*\{([^}]*)\}/)?.[1] ?? '';
+      expect(inset).toMatch(/outline-offset:\s*-\d+px/);
+      expect(active).toContain('outline-color: var(--color-v2-page)');
+      expect(contrast(token('v2-page'), token('accent-700'))).toBeGreaterThanOrEqual(3);
+      expect(contrast(focus, token('v2-page'))).toBeGreaterThanOrEqual(3);
+    });
+
     it('uses no literal colours in the changed ring rules', () => {
       const rules = [rule(':focus-visible'), rule('.gg-card-selected:focus'), datebox].join('\n');
       expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
