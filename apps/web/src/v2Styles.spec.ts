@@ -279,7 +279,7 @@ describe('styles.css glass cards and panels', () => {
 });
 
 describe('styles.css swirl buttons', () => {
-  /** The body of the first block that starts with the given at-rule or selector, found by matching braces. */
+  /** The body of the first block that starts with the given header, found by matching braces. */
   function block(header: string): string {
     const at = css.indexOf(header);
     if (at < 0) {
@@ -300,6 +300,16 @@ describe('styles.css swirl buttons', () => {
     throw new Error(`Unclosed block for ${header}`);
   }
 
+  /** Declarations of every rule whose comma-separated selector list contains this selector (comments ignored). */
+  function decls(selector: string, source = css): string {
+    const bare = source.replace(/\/\*[\s\S]*?\*\//g, '');
+    const found = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter((m) => m[1].split(',').some((part) => part.trim() === selector));
+    if (found.length === 0) {
+      throw new Error(`No rule for ${selector}`);
+    }
+    return found.map((m) => m[2]).join('\n');
+  }
+
   const hexVar = (name: string) => {
     const found = theme.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i'));
     if (!found) {
@@ -308,113 +318,182 @@ describe('styles.css swirl buttons', () => {
     return found[1];
   };
   const stopsOf = (name: string) => [...themeVar(name).matchAll(/#[0-9a-f]{6}/gi)].map((m) => m[0]);
+  const mix = (a: string, b: string, t: number) => blend({ rgb: toRgb(a), alpha: t }, b);
+  /** Every stop plus the midpoint of each neighbouring pair: the colours a drifting gradient passes through. */
+  const sampled = (name: string) => {
+    const stops = stopsOf(name);
+    return [...stops, ...stops.slice(1).map((stop, i) => mix(stop, stops[i], 0.5))];
+  };
   const page = hexVar('--color-v2-page');
+  const grounds = ['--color-v2-page', '--color-v2-glow-sun', '--color-v2-glow-sky'].map(hexVar);
+  // Glass cards sit over each ground: white at 65% (primitives.glassFill).
+  const glassOver = grounds.map((g) => blend({ rgb: [255, 255, 255], alpha: 0.65 }, g));
   const swirls = [
-    { name: 'primary', bg: '--v2-primary-bg', text: '--color-v2-primary-text' },
-    { name: 'secondary', bg: '--v2-secondary-bg', text: '--color-v2-secondary-text' },
+    { name: 'primary', bg: '--v2-primary-bg', text: '--color-v2-primary-text', edge: '--color-v2-primary-border', base: '.gg-btn-primary' },
+    { name: 'secondary', bg: '--v2-secondary-bg', text: '--color-v2-secondary-text', edge: '--color-v2-secondary-border', base: '.gg-btn-secondary' },
   ];
-  const buttonRules = [
-    '.gg-btn-primary',
-    '.gg-btn-secondary',
-    ".gg-btn-primary:not(:disabled):not([aria-disabled='true']):hover,\n  .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):hover",
-    ".gg-btn-primary:not(:disabled):not([aria-disabled='true']):active,\n  .gg-btn-secondary:not(:disabled):not([aria-disabled='true']):active",
-    ".gg-btn-primary:disabled,\n  .gg-btn-primary[aria-disabled='true']",
-    ".gg-btn-secondary:disabled,\n  .gg-btn-secondary[aria-disabled='true']",
-  ];
-  const media = block('@media (prefers-reduced-motion: no-preference)');
+  const noPref = block('@media (prefers-reduced-motion: no-preference)');
+  const enabled = ":not(:disabled):not([aria-disabled='true'])";
 
-  it('declares the animation and the keyframes only inside the no-preference block', () => {
-    const outside = css.replace(media, '');
-    expect(media).toMatch(/animation:/);
-    expect(media).toMatch(/@keyframes gg-swirl-drift/);
-    expect(outside).not.toMatch(/gg-swirl-drift/);
-    // Other animations in the file may exist; none may touch the swirl buttons outside the block.
-    expect(rule('.gg-btn-primary')).not.toMatch(/animation/);
-    expect(rule('.gg-btn-secondary')).not.toMatch(/animation/);
-  });
-
-  it('drifts one pass of the settle var, then rests (forwards), on enabled buttons only', () => {
-    const decl = /animation:\s*([^;]+);/.exec(media)?.[1] ?? '';
-    expect(decl).toContain('var(--v2-settle-ms)');
-    expect(decl).toMatch(/\bforwards\b/);
-    expect(decl).not.toMatch(/infinite|alternate/);
-    expect(decl).not.toMatch(/\b\d+\s*(?:ms|s)\b/);
-    expect(media).toContain(":not(:disabled):not([aria-disabled='true'])");
-    // Every settle value is under 5 s (WCAG 2.2.2).
-    expect(parseInt(themeVar('--v2-settle-ms'), 10)).toBeLessThanOrEqual(5000);
-  });
-
-  it('animates background-position over a fill larger than the button', () => {
-    expect(rule('.gg-btn-primary,\n  .gg-btn-secondary')).toMatch(/background-size:\s*2\d\d%/);
+  it('declares every animation that touches a button, and the swirl keyframes, only inside a no-preference block', () => {
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const noPrefBlocks = [...bare.matchAll(/@media \(prefers-reduced-motion: no-preference\)/g)].map((m) => block(m[0]));
+    const outside = noPrefBlocks.reduce((rest, inner) => rest.replace(inner, ''), bare);
+    for (const [, selector] of [...outside.matchAll(/([^{}]+)\{[^{}]*\banimation(?:-name)?:\s*(?!\s*none)[^;}]*/g)]) {
+      expect(selector, 'animation outside no-preference').not.toMatch(/gg-btn/);
+    }
+    expect(outside).not.toMatch(/@keyframes gg-swirl-drift/);
+    expect(noPref).toMatch(/@keyframes gg-swirl-drift/);
     expect(block('@keyframes gg-swirl-drift')).toMatch(/background-position/);
   });
 
+  it('drifts one pass of the settle var, then rests (forwards), from the base classes so a re-enable does not replay it', () => {
+    const decl = /animation:\s*([^;]+);/.exec(decls('.gg-btn-primary', noPref))?.[1] ?? '';
+    expect(decl).toContain('var(--v2-settle-ms)');
+    expect(decl).toMatch(/\bforwards\b/);
+    expect(decl).not.toMatch(/infinite|alternate/);
+    expect(decls('.gg-btn-secondary', noPref)).toContain(decl);
+    expect(parseInt(themeVar('--v2-settle-ms'), 10)).toBeLessThanOrEqual(5000);
+    expect(decls('.gg-btn-primary:disabled')).toContain('animation: none');
+    expect(decls(".gg-btn-secondary[aria-disabled='true']")).toContain('animation: none');
+  });
+
+  it('runs the enter fade and the drift together on a swirl button that also has gg-enter', () => {
+    for (const base of ['.gg-btn-primary', '.gg-btn-secondary']) {
+      const decl = decls(`${base}.gg-enter`, noPref);
+      expect(decl).toMatch(/animation:\s*gg-enter [^,;]+,\s*gg-swirl-drift var\(--v2-settle-ms\) ease-in-out forwards/);
+    }
+  });
+
+  it('animates background-position over a fill larger than the button', () => {
+    expect(decls('.gg-btn-primary')).toMatch(/background-size:\s*2\d\d%/);
+  });
+
   it('gives primary and secondary their swirl, text, weight, edge, shadow and radius from the generated vars', () => {
-    const primary = rule('.gg-btn-primary');
+    const primary = decls('.gg-btn-primary');
     expect(primary).toContain('background-image: var(--v2-primary-bg)');
     expect(primary).toContain('color: var(--color-v2-primary-text)');
     expect(primary).toContain('font-weight: var(--v2-weight-medium)');
     expect(primary).toContain('border-width: var(--v2-border-thin)');
     expect(primary).toContain('border-color: var(--color-v2-primary-border)');
     expect(primary).toContain('box-shadow: var(--v2-primary-shadow)');
-    const secondary = rule('.gg-btn-secondary');
+    const secondary = decls('.gg-btn-secondary');
     expect(secondary).toContain('background-image: var(--v2-secondary-bg)');
     expect(secondary).toContain('color: var(--color-v2-secondary-text)');
     expect(secondary).toContain('font-weight: var(--v2-weight-regular)');
     expect(secondary).toContain('border-width: var(--v2-border-medium)');
     expect(secondary).toContain('border-color: var(--color-v2-secondary-border)');
     expect(secondary).toContain('box-shadow: var(--v2-secondary-shadow)');
-    expect(rule('.gg-btn-primary,\n  .gg-btn-secondary')).toContain('border-radius: var(--v2-radius)');
+    expect(decls('.gg-btn-primary')).toContain('border-radius: var(--v2-radius)');
     expect(themeVar('--v2-radius')).toBe('8px');
   });
 
-  it.each(swirls)('keeps the $name label at 4.5:1 or more on every stop at rest, hover and pressed', ({ bg, text }) => {
-    const stops = stopsOf(bg);
-    expect(stops.length).toBeGreaterThanOrEqual(3);
-    for (const alpha of [1, 0.92, 0.85]) {
-      // The whole button dims over the page, so both the label and the stop blend with it.
-      const label = blend({ rgb: toRgb(hexVar(text)), alpha }, page);
-      for (const stop of stops) {
-        expect(contrast(label, blend({ rgb: toRgb(stop), alpha }, page)), `${bg} ${stop} at ${alpha}`).toBeGreaterThanOrEqual(4.5);
+  it('washes only the fill on hover and pressed (8% and 15% page colour), keeps opacity 1, and hovers only where a pointer can', () => {
+    const hover = block('@media (hover: hover)');
+    for (const { base } of swirls) {
+      const hoverSelector = base === '.gg-btn-secondary' ? `${base}${enabled}:not([aria-pressed='true']):hover` : `${base}${enabled}:hover`;
+      expect(decls(hoverSelector, hover)).toMatch(/color-mix\(in srgb, var\(--color-v2-page\) 8%, transparent\)/);
+      const pressed = base === '.gg-btn-secondary' ? `${base}${enabled}:not([aria-pressed='true']):active` : `${base}${enabled}:active`;
+      expect(decls(pressed)).toMatch(/color-mix\(in srgb, var\(--color-v2-page\) 15%, transparent\)/);
+    }
+    expect(css.replace(hover, '')).not.toMatch(/\.gg-btn-(?:primary|secondary)[^{}]*:hover/);
+    expect(css).not.toMatch(/\.gg-btn-(?:primary|secondary)[^{}]*\{[^}]*opacity:\s*0\.\d+/);
+  });
+
+  it.each(swirls)('keeps the $name label at 4.5:1 or more on every stop and midpoint at rest, hover (8%) and pressed (15%)', ({ bg, text }) => {
+    for (const wash of [0, 0.08, 0.15]) {
+      for (const colour of sampled(bg)) {
+        expect(contrast(hexVar(text), mix(page, colour, wash)), `${bg} ${colour} wash ${wash}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
 
-  it('uses the same opacities in the hover and pressed rules as the spec checks', () => {
-    expect(rule(buttonRules[2])).toMatch(/opacity:\s*0\.92/);
-    expect(rule(buttonRules[3])).toMatch(/opacity:\s*0\.85/);
+  it.each(swirls)('keeps the $name edge at 3:1 or more on the page, both glows and glass over each, in every state', ({ edge }) => {
+    // The edge colour and its opacity do not change between states (only the fill is washed), so one check covers rest, hover and pressed.
+    for (const ground of [...grounds, ...glassOver]) {
+      expect(contrast(hexVar(edge), ground), `${edge} on ${ground}`).toBeGreaterThanOrEqual(3);
+    }
   });
 
-  it('makes a disabled or aria-disabled primary a flat ink fill with page text, 4.5:1 or more, and no swirl', () => {
-    const decl = rule(buttonRules[4]);
+  it('makes a disabled or aria-disabled primary quiet: flat page fill, dashed edge, no swirl, shadow or animation, its own label colour', () => {
+    const decl = decls(".gg-btn-primary[aria-disabled='true']");
     expect(decl).toContain('background-image: none');
-    expect(decl).toContain('background-color: var(--color-text)');
-    expect(decl).toContain('color: var(--color-v2-page)');
-    expect(contrast(hexVar('--color-text'), page)).toBeGreaterThanOrEqual(4.5);
+    expect(decl).toContain('background-color: var(--color-v2-page)');
+    expect(decl).toContain('border-style: dashed');
+    expect(decl).toContain('box-shadow: none');
+    expect(decl).toContain('animation: none');
+    expect(decl).not.toMatch(/(?:^|[\s;])color:|border-color/);
+    expect(decls('.gg-btn-primary:disabled')).toBe(decl);
+    expect(contrast(hexVar('--color-v2-primary-text'), page)).toBeGreaterThanOrEqual(4.5);
+    // The dashed edge keeps the primary edge colour; it holds 3:1 on the page, both glows and glass over each.
+    for (const ground of [...grounds, ...glassOver]) {
+      expect(contrast(hexVar('--color-v2-primary-border'), ground), ground).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it('makes a disabled or aria-disabled secondary a flat page fill with a dashed edge and its own text colour', () => {
-    const decl = rule(buttonRules[5]);
+    const decl = decls(".gg-btn-secondary[aria-disabled='true']");
     expect(decl).toContain('background-image: none');
     expect(decl).toContain('background-color: var(--color-v2-page)');
     expect(decl).toContain('border-style: dashed');
     expect(decl).not.toMatch(/(?:^|[\s;])color:/);
-    expect(decl).not.toMatch(/animation/);
     expect(contrast(hexVar('--color-v2-secondary-text'), page)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps unavailable buttons focusable: no pointer-events rule and no outline removal on them', () => {
-    const rules = buttonRules.map(rule).join('\n');
+  it('keeps a pressed toggle secondary as a flat accent-100 tint with no swirl or animation, label 4.5:1 or more', () => {
+    const decl = decls(".gg-btn-secondary[aria-pressed='true']");
+    expect(decl).toContain('background-image: none');
+    expect(decl).toContain('background-color: var(--color-accent-100)');
+    expect(decl).toContain('animation: none');
+    expect(contrast(hexVar('--color-v2-secondary-text'), hexVar('--color-accent-100'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('draws the swirl focus ring in accent-700 (4.5:1 or more on the page, glows and glass), unlayered, with no outline removal', () => {
+    const selector = '.gg-btn-primary:focus-visible';
+    const at = css.indexOf(selector);
+    const layerEnd = css.lastIndexOf('\n}\n', at);
+    // Unlayered: the @layer block that holds the components has closed before this rule.
+    expect(block('@layer components')).not.toContain(selector);
+    expect(layerEnd).toBeGreaterThan(0);
+    expect(decls(selector)).toContain('outline-color: var(--color-accent-700)');
+    expect(decls('.gg-btn-secondary:focus-visible')).toContain('outline-color: var(--color-accent-700)');
+    for (const ground of [...grounds, ...glassOver]) {
+      expect(contrast(hexVar('--color-accent-700'), ground)).toBeGreaterThanOrEqual(4.5);
+    }
+    const rules = ['.gg-btn-primary', '.gg-btn-secondary', ".gg-btn-primary[aria-disabled='true']", ".gg-btn-secondary[aria-disabled='true']"].map((s) => decls(s)).join('\n');
     expect(rules).not.toMatch(/pointer-events|outline/);
   });
 
   it('uses no literal colours in the swirl button rules, and defines every var they use', () => {
-    const rules = `${buttonRules.map(rule).join('\n')}\n${media}`;
-    expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    const rules = [
+      '.gg-btn-primary',
+      '.gg-btn-secondary',
+      ".gg-btn-primary[aria-disabled='true']",
+      ".gg-btn-secondary[aria-disabled='true']",
+      ".gg-btn-secondary[aria-pressed='true']",
+      `.gg-btn-primary${enabled}:active`,
+      '.gg-btn-primary:focus-visible',
+    ]
+      .map((s) => decls(s))
+      .join('\n');
+    expect(`${rules}\n${block('@media (hover: hover)')}\n${noPref}`).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
     const used = [...rules.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
     expect(used.length).toBeGreaterThan(0);
     for (const name of new Set(used)) {
       expect(theme, name).toMatch(new RegExp(`${name}:`));
     }
+  });
+
+  it('has no swirl button in a TSX file that adds its own animate- or bg- utility, apart from the aria-pressed tint handled in CSS', () => {
+    const offenders = sourceFiles(__dirname).flatMap((file) => {
+      if (!file.endsWith('.tsx')) {
+        return [];
+      }
+      return readFileSync(file, 'utf8')
+        .split('\n')
+        .filter((line) => /gg-btn-(?:primary|secondary)/.test(line) && /(?:^|[\s'"`:])(?:animate-|bg-)/.test(line.replace(/aria-pressed:bg-accent-100/g, '')))
+        .map((line) => `${file}: ${line.trim()}`);
+    });
+    expect(offenders).toEqual([]);
   });
 });
