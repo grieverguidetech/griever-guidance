@@ -58,7 +58,7 @@ export function Row({ children, onPress, ariaDisabled = false, describedBy, hint
 
 const styles = StyleSheet.create({
   row: { minHeight: minTouchTarget, paddingVertical: spacing[2], gap: 2 },
-  // neutral-600 on the page is 3:1 or more.
+  // recipes.field.edge on the page is 3:1 or more.
   bordered: { paddingHorizontal: spacing[3], borderWidth: 1, borderColor: v2.recipes.field.edge, borderRadius: v2.recipes.field.radius },
   withTrailing: { paddingRight: spacing[6] },
 });

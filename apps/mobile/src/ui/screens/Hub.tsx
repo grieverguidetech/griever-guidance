@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   cardFocused: { borderWidth: FOCUS_RING, borderColor: v2.roles.focus, padding: spacing[3] },
   // Glass is see-through, so a press dims the whole card. 0.9 keeps muted and accent text at 4.5:1 (hub.spec checks; 0.87 is the floor).
   cardPressed: { opacity: PRESSED_OPACITY },
-  // Web's NEXT_BAR: 3 pt of accent-700 down the left edge, drawn inside so nothing shifts.
+  // Web's NEXT_BAR: 3 pt of roles.link down the left edge, drawn inside so nothing shifts.
   nextBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: v2.roles.link },
   top: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[1], justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 15, lineHeight: 22, color: v2.roles.ink },

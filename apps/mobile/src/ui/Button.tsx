@@ -15,7 +15,7 @@ export type ButtonNode = ComponentRef<typeof Pressable>;
  * `primary` and `secondary` are the v2 swirl buttons (#976): a sunset or soft ocean LinearSwirl fill, radius, border,
  * text and shadow from `v2.recipes.button`. The other variants keep the 2026-10-25 look (decision by Peter): rounded 10px corners, and a tinted outlined "link" button
  * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: an
- * accent-700 label with an underline, no fill and no border, and a pale accent wash while pressed.
+ * roles.link label with an underline, no fill and no border, and a pale accent wash while pressed.
  * `header` is Back and What you'll need (#362): the page shows through, a thin v2 focus-colour outline,
  * no underline, same as web's top bar. No icons. Palette and serif still follow web.
  */
@@ -167,7 +167,7 @@ export function Button({
   const swirled = recipe !== undefined && !ariaDisabled;
   // An unavailable secondary has no swirl: a flat page fill with a dashed border, so it reads as different yet keeps its text colour.
   const unavailableOutline = ariaDisabled && variant === 'secondary';
-  // The recipe colour in every state: the muted neutral-700 was under 4.5:1 on the soft ocean swirl.
+  // The recipe colour in every state: plain roles.muted was under 4.5:1 on the soft ocean swirl.
   const labelColor = unavailableFill ? PAGE : recipe?.text.color;
   const text = (
     <Phrasing>
@@ -278,10 +278,10 @@ const styles = StyleSheet.create({
   header: { borderColor: v2.roles.focus },
   pressed: { opacity: 0.7 },
   pressedSwirl: { opacity: SWIRL_PRESSED_OPACITY },
-  // accent-700 on accent-100 is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
+  // roles.link on roles.wash is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
   pressedWash: { backgroundColor: v2.roles.wash },
   // Unavailable is a solid look, not a fade: opacity would drop the label below 4.5:1.
-  // Primary: page-coloured text on ink. Secondary: flat page, dashed border, recipe text. The rest: neutral-700 text.
+  // Primary: page-coloured text on ink. Secondary: flat page, dashed border, recipe text. The rest: roles.muted text.
   unavailableFill: { backgroundColor: UNAVAILABLE_FILL },
   unavailableOutline: { backgroundColor: PAGE, borderStyle: 'dashed', boxShadow: 'none' },
   // The swirl fills the frame and carries the padding, so the whole button is gradient. The first stop shows behind it for the shadow.

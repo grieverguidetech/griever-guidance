@@ -5,7 +5,7 @@ import { useSerifStyle } from './typography';
 
 export interface EyebrowProps {
   children: ReactNode;
-  /** `accent2` is the second accent (a magenta), for the Announce screen. */
+  /** `accent2` is the eyebrow tone for the Announce screen (v2 heading navy; v2 has no magenta). */
   tone?: 'accent' | 'accent2';
 }
 
@@ -35,7 +35,7 @@ export interface BodyProps {
   textRef?: Ref<ComponentRef<typeof Text>>;
 }
 
-/** Running text. Contrast: neutral-700 and neutral-800 on the page colour both pass 4.5:1. */
+/** Running text. Contrast: roles.muted and roles.mutedStrong on the page colour both pass 4.5:1. */
 export function Body({ children, tone = 'default', small = false, id, hidden = false, live = false, onPress, textRef }: BodyProps) {
   const font = useSerifStyle('regular');
   const extra: Record<string, unknown> = {};

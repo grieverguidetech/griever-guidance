@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: v2.recipes.field.edge,
   },
-  // Selected: accent-700 edge and a pale accent fill, so it differs from an unselected row by more than a thin line (see colors.spec).
+  // Selected: roles.link edge and the roles.wash fill, so it differs from an unselected row by more than a thin line (see colors.spec).
   rowSelected: { borderColor: v2.roles.link, backgroundColor: v2.roles.wash },
   box: {
     position: 'absolute',

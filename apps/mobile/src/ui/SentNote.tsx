@@ -11,7 +11,7 @@ export interface SentNoteProps {
 
 /**
  * The calm note after a send, for example "Everyone has been told. We don't keep a copy...".
- * Plain text with no border or card. Contrast: neutral-800 on the
+ * Plain text with no border or card. Contrast: roles.mutedStrong on the
  * page colour passes 4.5:1 (same as Body).
  */
 export function SentNote({ lead, rest }: SentNoteProps) {
