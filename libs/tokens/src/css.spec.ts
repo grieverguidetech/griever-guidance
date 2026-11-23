@@ -7,6 +7,7 @@ import {
   toMarketingCss,
   toMarketingFile,
   toWebThemeCss,
+  webFontStack,
 } from './css.js';
 import { colors, fontSerifStack, radius, spacing } from './index.js';
 import { v2 } from './v2/index.js';
@@ -194,5 +195,83 @@ describe('toMarketingCss', () => {
     expect(vars['--gg-primary-bg']).toBe('linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)');
     expect(vars['--gg-primary-radius']).toBe('3px');
     expect(vars['--gg-card-radius']).toBe('3px');
+  });
+});
+
+describe('toWebThemeCss with v2', () => {
+  const css = toWebThemeCss({ ...input, v2 });
+  const theme = declarations(css, '@theme {');
+  const root = declarations(css, ':root {');
+
+  it('keeps the v1 text as an exact prefix of each block', () => {
+    const v1 = toWebThemeCss(input);
+    const v1Theme = v1.slice(0, v1.indexOf('}\n'));
+    const v1Root = v1.slice(v1.indexOf(':root {'), v1.lastIndexOf('}'));
+    expect(css).toContain(v1Theme);
+    expect(css).toContain(v1Root);
+    expect(css.indexOf(v1Theme)).toBe(0);
+  });
+
+  it('puts colours and the font in @theme, and gradients, shadows, radius and ms in :root', () => {
+    expect(theme['--color-v2-error']).toBe('#b3261e');
+    expect(theme['--color-v2-success']).toBe('#2a7048');
+    expect(theme['--font-v2']).toBe(webFontStack(v2.primitives));
+    expect(root['--v2-primary-bg']).toMatch(/^linear-gradient\(120deg, /);
+    expect(root['--v2-secondary-bg']).toMatch(/^linear-gradient\(120deg, /);
+    expect(root['--v2-card-shadow']).toBe(`0px 1px 9px ${v2.primitives.shadows.glass.color}`);
+    expect(root['--v2-radius']).toBe('8px');
+    expect(root['--v2-settle-ms']).toBe('4500ms');
+    expect(root['--v2-drift-ms']).toBe('9000ms');
+  });
+
+  it('leaves ink out', () => {
+    const names = [...Object.keys(theme), ...Object.keys(root)].filter((n) => n.includes('v2'));
+    expect(names.some((n) => /-ink(-|$)/.test(n))).toBe(false);
+  });
+
+  it('no v2 name collides with a v1 name, and every v2 name starts with v2', () => {
+    const v1 = { ...declarations(toWebThemeCss(input), '@theme {'), ...declarations(toWebThemeCss(input), ':root {') };
+    const added = [...Object.keys(theme), ...Object.keys(root)].filter((n) => !(n in v1));
+    expect(added.length).toBeGreaterThan(30);
+    const all = [...Object.keys(theme), ...Object.keys(root)];
+    expect(new Set(all).size).toBe(all.length);
+    for (const name of added) {
+      expect(name, name).toMatch(/^--(color-v2-|v2-|font-v2$)/);
+    }
+    expect(all.length - added.length).toBe(Object.keys(v1).length);
+  });
+
+  it('is deterministic', () => {
+    expect(toWebThemeCss({ ...input, v2 })).toBe(css);
+  });
+
+  it('a primitive change cascades into the emitted vars', () => {
+    const p = structuredClone(v2.primitives) as unknown as Parameters<typeof buildRoles>[0];
+    p.colors.link = '#010203';
+    p.colors.error = '#0a0b0c';
+    p.colors.secondaryBorder = '#112233';
+    p.gradients.sunset.stops = ['#aaaaaa', '#bbbbbb', '#cccccc'];
+    p.radius = 3;
+    p.motion.settleMs = 3000;
+    p.font.family = 'Fixture';
+    const roles = buildRoles(p);
+    const changed = toWebThemeCss({ ...input, v2: { primitives: p, roles, recipes: buildRecipes(roles, p) } });
+    const t = declarations(changed, '@theme {');
+    const r = declarations(changed, ':root {');
+    expect(t['--color-v2-link']).toBe('#010203');
+    expect(t['--color-v2-error']).toBe('#0a0b0c');
+    expect(t['--color-v2-focus']).toBe('#112233');
+    expect(t['--color-v2-secondary-border']).toBe('#112233');
+    expect(t['--font-v2']).toMatch(/^'Fixture', /);
+    expect(r['--v2-primary-bg']).toBe('linear-gradient(120deg, #aaaaaa, #bbbbbb, #cccccc)');
+    expect(r['--v2-radius']).toBe('3px');
+    expect(r['--v2-settle-ms']).toBe('3000ms');
+  });
+});
+
+describe('webFontStack', () => {
+  it('starts with the primitive family and ends in a generic family', () => {
+    expect(webFontStack(v2.primitives)).toBe("'Sora', system-ui, -apple-system, 'Segoe UI', sans-serif");
+    expect(webFontStack({ font: { ...v2.primitives.font, family: 'Other' } })).toMatch(/^'Other', .*sans-serif$/);
   });
 });
