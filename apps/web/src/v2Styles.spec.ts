@@ -102,3 +102,75 @@ describe('styles.css type roles', () => {
     expect(contrast(v2.roles.eyebrow.color, surface as string)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+describe('styles.css page ground and glows', () => {
+  const glow = rule('body::before');
+
+  it('paints the body with the generated page colour and ink', () => {
+    const body = rule('body');
+    expect(body).toContain('background: var(--color-v2-page)');
+    expect(body).toContain('color: var(--color-text)');
+    expect(theme).toContain(`--color-v2-page: ${v2.roles.page.color};`);
+    expect(theme).toContain(`--color-text: ${v2.roles.ink};`);
+  });
+
+  it('drops the hand-written --color-text alias', () => {
+    expect(css).not.toMatch(/--color-text\s*:/);
+  });
+
+  it('puts both glows on one fixed layer behind content that takes no pointer events', () => {
+    expect(glow).toMatch(/position:\s*fixed/);
+    expect(glow).toMatch(/inset:\s*0/);
+    expect(glow).toMatch(/pointer-events:\s*none/);
+    expect(glow).toMatch(/z-index:\s*-1/);
+    expect(glow).toContain('var(--color-v2-glow-sun)');
+    expect(glow).toContain('var(--color-v2-glow-sky)');
+    expect(glow).toMatch(/radial-gradient\(80% 60% at 100% 0%/);
+    expect(glow).toMatch(/radial-gradient\(80% 60% at 0% 100%/);
+  });
+
+  it('does not animate the glow, use background-attachment, or make body a stacking context', () => {
+    expect(glow).not.toMatch(/animation|transition|transform/);
+    expect(`${rule('body')}\n${glow}`).not.toMatch(/background-attachment/);
+    expect(rule('body')).not.toMatch(/z-index|transform|filter|isolation|will-change|position/);
+  });
+
+  it('keeps html free of a background, so the body colour sits on the canvas under the glow layer', () => {
+    const rootRules = [...css.matchAll(/(?:^|\n)\s*(?:html|:root)\s*\{[^}]*\}/g)].map((m) => m[0]).join('\n');
+    expect(rootRules).not.toMatch(/background/);
+  });
+
+  it('gives plain inputs the v2 field edge, 3:1 or more on the page and both glows', () => {
+    const hex = (name: string) => {
+      const found = theme.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i'));
+      if (!found) {
+        throw new Error(`${name} is not a hex var in theme.generated.css`);
+      }
+      return found[1];
+    };
+    expect(rule('.gg-input')).toContain('border: 1px solid var(--color-v2-field-edge)');
+    for (const ground of ['--color-v2-page', '--color-v2-glow-sun', '--color-v2-glow-sky']) {
+      expect(contrast(hex('--color-v2-field-edge'), hex(ground)), ground).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('lets the glow show: no full-page wrapper paints an opaque background over it', () => {
+    const offenders = sourceFiles(__dirname).filter((file) => {
+      const text = readFileSync(file, 'utf8');
+      // Inline styles or Tailwind bg classes, in any attribute order, on any full-height wrapper.
+      const wrapper = /<\w+[^>]*\b(?:min-h-screen|h-screen|min-h-dvh)\b[^>]*>/g;
+      return [...text.matchAll(wrapper)].some((m) => /background|!?\bbg-/.test(m[0])) && !file.endsWith('v2Styles.spec.ts');
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('uses no literal colours in the page and glow rules, and defines every var they use', () => {
+    const rules = `${rule('body')}\n${glow}`;
+    expect(rules).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    const used = [...rules.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
+    expect(used.length).toBeGreaterThan(0);
+    for (const name of new Set(used)) {
+      expect(`${theme}\n${css}`, name).toMatch(new RegExp(`${name}:`));
+    }
+  });
+});

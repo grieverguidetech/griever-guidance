@@ -147,12 +147,16 @@ export function webFontStack(p: Pick<Primitives, 'font'>): string {
   return `'${p.font.family}', system-ui, -apple-system, 'Segoe UI', sans-serif`;
 }
 
-/** `--font-v2` and the v2 colours (Tailwind reads these). Every name starts `v2`, so none meets a v1 name. Ink waits for the page ticket. */
+/** `--font-v2` and the v2 colours (Tailwind reads these). Every name starts `v2`, so none meets a v1 name. Ink is the one name without v2: it is `--color-text`, which no v1 colour uses. */
 export function webV2ThemeLines({ primitives, roles, recipes }: WebV2Input): string[] {
   const { primary, secondary } = recipes.button;
   const { card, nudge, field } = recipes;
   const lines: Array<[string, string]> = [
     ['font-v2', webFontStack(primitives)],
+    ['color-text', roles.ink],
+    ['color-v2-page', roles.page.color],
+    ['color-v2-glow-sun', roles.page.glows.topRight],
+    ['color-v2-glow-sky', roles.page.glows.bottomLeft],
     ['color-v2-heading', roles.heading.color],
     ['color-v2-eyebrow', roles.eyebrow.color],
     ['color-v2-link', roles.link],
