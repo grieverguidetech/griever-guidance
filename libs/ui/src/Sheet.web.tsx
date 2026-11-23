@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { colors, fontSerifStack, spacing } from '@griever/tokens';
+import { colors, spacing } from '@griever/tokens';
 import { Button } from './Button';
 import type { SheetProps } from './sheetProps';
+import { webFontFamily } from './typography';
 
 export type { SheetProps } from './sheetProps';
 
@@ -148,7 +149,7 @@ function OpenSheet({ title, closeLabel, onClose, returnFocusRef, fallbackFocusRe
           background: colors.surface,
           borderRadius: '16px 16px 0 0',
           color: colors.ink,
-          fontFamily: fontSerifStack,
+          fontFamily: webFontFamily,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] }}>

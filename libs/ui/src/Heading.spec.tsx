@@ -17,4 +17,15 @@ describe('Heading', () => {
     render(<Heading level={3}>Subtitle</Heading>);
     expect(screen.getByRole('heading', { level: 3 }).tagName).toBe('H3');
   });
+
+  it('level 1 is weight 300 and level 2 is weight 400 on web', () => {
+    render(
+      <>
+        <Heading level={1}>Big</Heading>
+        <Heading level={2}>Smaller</Heading>
+      </>,
+    );
+    expect(getComputedStyle(screen.getByRole('heading', { level: 1 })).fontWeight).toBe('300');
+    expect(getComputedStyle(screen.getByRole('heading', { level: 2 })).fontWeight).toBe('400');
+  });
 });

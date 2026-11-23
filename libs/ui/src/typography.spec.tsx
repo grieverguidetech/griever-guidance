@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import { fonts } from '@griever/tokens';
 import { Body, Eyebrow } from './Text';
 import { Button } from './Button';
-import { SerifReadyContext } from './typography';
+import { SerifReadyContext, serifWeight, webFontFamily } from './typography';
 
 function family(text: string): string {
   return getComputedStyle(screen.getByText(text)).fontFamily;
@@ -19,11 +19,23 @@ function renderAll(ready: boolean) {
   );
 }
 
+describe('serifWeight on web', () => {
+  it('maps the three steps to Sora 300, 400 and 500', () => {
+    expect(serifWeight('light')).toBe('300');
+    expect(serifWeight('regular')).toBe('400');
+    expect(serifWeight('semibold')).toBe('500');
+  });
+
+  it('uses the --font-v2 var for the family', () => {
+    expect(webFontFamily).toBe('var(--font-v2)');
+  });
+});
+
 describe('one serif for all text', () => {
   it('Body, Eyebrow and Button labels use the serif family once it is ready', () => {
     renderAll(true);
     for (const text of ['Eyebrow text', 'Body text', 'Go']) {
-      expect(family(text)).toContain('Source Serif 4');
+      expect(family(text)).toContain('var(--font-v2)');
     }
   });
 

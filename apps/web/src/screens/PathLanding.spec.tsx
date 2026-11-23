@@ -120,7 +120,7 @@ describe('PathLanding finish note (#176)', () => {
     renderPath({}, { note: { moment, told: 2, total: 2 } });
     const lead = screen.getByText(words);
     const rest = screen.getByText(/^We don't keep a copy of what was sent/);
-    expect(getComputedStyle(lead).fontWeight).toBe('600');
+    expect(getComputedStyle(lead).fontWeight).toBe('500');
     expect(getComputedStyle(lead).fontStyle).toBe('italic');
     expect(getComputedStyle(rest).fontStyle).toBe('italic');
     expect(lead.closest('.gg-card')).toBeNull();

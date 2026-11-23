@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { Platform, StyleSheet, Text, TextInput } from 'react-native';
 import { useSerifStyle } from './typography';
 
-// The web stack has only 400 and 600, so 500 reads as semibold too.
+// Sora is loaded at 300, 400 and 500 only, so every weight of 500 or more maps to the one medium step.
 const SEMIBOLD = new Set(['500', '600', '700', '800', '900', 'bold']);
 
 /**

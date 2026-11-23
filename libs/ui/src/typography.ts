@@ -2,14 +2,19 @@ import { createContext, useContext } from 'react';
 import { Platform } from 'react-native';
 import { fonts } from '@griever/tokens';
 
+/** The web family: Sora, from the generated --font-v2 var (apps/web/src/theme.generated.css). */
+export const webFontFamily = 'var(--font-v2)';
+
+export type SerifWeight = 'light' | 'regular' | 'semibold';
+
 /**
  * The serif family for a weight. Web uses the CSS stack (the font loads from index.html). Native
  * uses the face apps/mobile registers with expo-font. Until it has loaded (or if it fails) React
  * Native shows the system font, because a family name that is not registered is ignored.
  */
-export function serifFamily(weight: 'regular' | 'semibold', italic = false): string {
+export function serifFamily(weight: SerifWeight, italic = false): string {
   if (Platform.OS === 'web') {
-    return fonts.serifWeb;
+    return webFontFamily;
   }
   if (italic) {
     return weight === 'semibold' ? fonts.serifSemiBoldItalic : fonts.serifItalic;
@@ -18,11 +23,14 @@ export function serifFamily(weight: 'regular' | 'semibold', italic = false): str
 }
 
 /** `fontWeight` is only meant for the web stack; native picks the weight through the family name. */
-export function serifWeight(weight: 'regular' | 'semibold'): '400' | '600' | undefined {
+export function serifWeight(weight: SerifWeight): '300' | '400' | '500' | undefined {
   if (Platform.OS !== 'web') {
     return undefined;
   }
-  return weight === 'semibold' ? '600' : '400';
+  if (weight === 'light') {
+    return '300';
+  }
+  return weight === 'semibold' ? '500' : '400';
 }
 
 /**
@@ -33,7 +41,7 @@ export function serifWeight(weight: 'regular' | 'semibold'): '400' | '600' | und
 export const SerifReadyContext = createContext(true);
 
 /** `fontFamily` and `fontWeight` for the serif. Until it is ready on native, the system font. */
-export function useSerifStyle(weight: 'regular' | 'semibold', italic = false): { fontFamily?: string; fontWeight?: '400' | '600' } {
+export function useSerifStyle(weight: SerifWeight, italic = false): { fontFamily?: string; fontWeight?: '300' | '400' | '500' } {
   const ready = useContext(SerifReadyContext);
   if (Platform.OS !== 'web' && !ready) {
     return {};

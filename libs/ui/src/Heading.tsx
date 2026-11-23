@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Platform, StyleSheet, Text } from 'react-native';
 import { colors } from '@griever/tokens';
 import { useSerifStyle } from './typography';
 
@@ -24,7 +24,9 @@ function headingProps(level: HeadingLevel): Record<string, unknown> {
 }
 
 export function Heading({ level, children, headingRef }: HeadingProps) {
-  const font = useSerifStyle('semibold');
+  // Web (Sora): h1 is light, the rest regular. Native keeps its semibold face.
+  const webWeight = level === 1 ? 'light' : 'regular';
+  const font = useSerifStyle(Platform.OS === 'web' ? webWeight : 'semibold');
   return (
     <Text ref={headingRef} style={[styles.base, font, { fontSize: sizeByLevel[level] }]} {...headingProps(level)}>
       {children}

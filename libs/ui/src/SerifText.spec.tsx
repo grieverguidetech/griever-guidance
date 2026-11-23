@@ -9,12 +9,12 @@ describe('SerifText and SerifTextInput', () => {
         <SerifTextInput accessibilityLabel="Name" />
       </>,
     );
-    expect(getComputedStyle(screen.getByText('Plain')).fontFamily).toContain('Source Serif 4');
-    expect(getComputedStyle(screen.getByLabelText('Name')).fontFamily).toContain('Source Serif 4');
+    expect(getComputedStyle(screen.getByText('Plain')).fontFamily).toContain('var(--font-v2)');
+    expect(getComputedStyle(screen.getByLabelText('Name')).fontFamily).toContain('var(--font-v2)');
   });
 
-  it('uses the semibold weight when the caller asks for bold', () => {
+  it('uses the medium weight (500) when the caller asks for bold', () => {
     render(<SerifText style={{ fontWeight: 'bold' }}>Strong</SerifText>);
-    expect(getComputedStyle(screen.getByText('Strong')).fontWeight).toBe('600');
+    expect(getComputedStyle(screen.getByText('Strong')).fontWeight).toBe('500');
   });
 });

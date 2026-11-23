@@ -16,9 +16,9 @@ describe('SentNote', () => {
     const lead = getComputedStyle(screen.getByText(LEAD));
     const rest = getComputedStyle(screen.getByText(REST));
     expect(lead.fontStyle).toBe('italic');
-    expect(lead.fontWeight).toBe('600');
+    expect(lead.fontWeight).toBe('500');
     expect(rest.fontStyle).toBe('italic');
-    expect(rest.fontWeight).not.toBe('600');
+    expect(rest.fontWeight).not.toBe('500');
   });
 
   it('has no border and no card background', () => {
