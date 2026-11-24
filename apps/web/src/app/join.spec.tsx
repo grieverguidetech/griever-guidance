@@ -240,7 +240,9 @@ describe('signed in, flags on', () => {
     saveToken();
     useClerk({ userId: 'u1' });
     renderApp(<App />, { path: LINK });
-    expect(await screen.findByText(MEMBER_EMPTY)).toBeInTheDocument();
+    // Home flashes on the way off /join, so the test waits for the settled Overview page.
+    await waitFor(() => expect(window.location.pathname).toBe('/start'));
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await waitFor(() => expect(saved()).toBeNull());
     expect(mocks.acceptInvite).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { name: UNUSABLE })).toBeNull();
