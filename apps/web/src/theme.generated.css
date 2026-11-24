@@ -24,8 +24,6 @@
   --color-v2-field-focus: #006786;
   --color-v2-primary-text: #2a1f12;
   --color-v2-primary-border: #a7774b;
-  --color-v2-secondary-text: #10324d;
-  --color-v2-secondary-border: #4f86ad;
   --color-v2-outline-text: #006786;
   --color-v2-outline-border: #006786;
   --color-v2-card-fill: rgba(255,255,255,0.65);
@@ -48,10 +46,8 @@
   --space-8: 40px;
 
   --v2-primary-bg: linear-gradient(120deg, #f9d697, #f7cd94, #f9d9bd);
-  --v2-secondary-bg: linear-gradient(120deg, #a5cbe3, #a9d6d0, #c6c0eb);
   --v2-nudge-bg: linear-gradient(120deg, #dcebf5, #e3f1ee, #e9e6f8);
   --v2-primary-shadow: 0px 2px 12px rgba(150,90,30,0.12);
-  --v2-secondary-shadow: 0px 1px 9px rgba(20,50,80,0.065);
   --v2-card-shadow: 0px 1px 9px rgba(20,50,80,0.065);
   --v2-nudge-shadow: 0px 3px 6px rgba(15,47,74,0.28), 0px 1px 2px rgba(15,47,74,0.13);
   --v2-nudge-speckle-alpha: 0.28;

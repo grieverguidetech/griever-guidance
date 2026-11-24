@@ -4,6 +4,7 @@ import whoShouldKnowJson from '../../../../../libs/copy/screens/whoShouldKnow.js
 import phonePeopleJson from '../../../../../libs/copy/screens/phonePeople.json';
 import { WhoShouldKnow } from './WhoShouldKnow';
 import type { WhoShouldKnowCopy, WhoShouldKnowProps } from './WhoShouldKnow';
+import { tierOfButton } from '../buttonTier.testkit';
 
 const copy: WhoShouldKnowCopy = {
   heading: 'Who should know?',
@@ -145,6 +146,12 @@ describe('WhoShouldKnow (mobile props, #652)', () => {
     const { onContinue } = setup({ grouped: false, scrollList: true, doneLabel: 'Done' });
     fireEvent.press(screen.getByRole('button', { name: 'Done' }));
     expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws Back as secondary and What you will need as primary', () => {
+    setup({ onWhatYoullNeed: jest.fn() });
+    expect(tierOfButton('Back')).toBe('secondary');
+    expect(tierOfButton("What you'll need")).toBe('primary');
   });
 
   it('with scrollList, Close does what Back did, and What you\'ll need is hidden', () => {

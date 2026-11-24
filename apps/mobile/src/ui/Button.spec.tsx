@@ -51,32 +51,97 @@ describe('Button (mobile)', () => {
     expect(heightOf(screen.getByRole('button', { name: 'Save' }))).toBe(52);
   });
 
-  describe('swirl variants', () => {
-    const recipes = { primary: v2.recipes.button.primary, secondary: v2.recipes.button.secondary };
+  // The secondary tier reads the outline recipe; the tertiary tier reads the tertiary recipe.
+  describe('three tiers', () => {
+    const outline = v2.recipes.button.outline;
+    const tertiary = v2.recipes.button.tertiary;
+    const flatStyle = (node: { props: { style?: unknown } }) =>
+      StyleSheet.flatten(typeof node.props.style === 'function' ? node.props.style({ pressed: false }) : node.props.style);
+
+    it('secondary is an outline: no swirl, no shadow, a thin link edge, link text, radius 8', () => {
+      render(<Button label="Back" variant="secondary" onPress={jest.fn()} />);
+      expect(screen.UNSAFE_queryAllByType(LinearSwirl)).toHaveLength(0);
+      const frame = flatStyle(screen.getByRole('button', { name: 'Back' }));
+      expect(frame).toMatchObject({ borderWidth: 1, borderColor: v2.roles.link, borderRadius: 8 });
+      expect(frame.boxShadow).toBeUndefined();
+      expect(frame.backgroundColor).toBeUndefined();
+      expect(StyleSheet.flatten(screen.getByText('Back').props.style).color).toBe(outline.text.color);
+      expect(outline.text.color).toBe(v2.roles.link);
+      expect(outline.border.color).toBe(v2.roles.link);
+    });
+
+    it('tertiary is underlined link text with no edge, no fill and no shadow', () => {
+      render(<Button label="Skip" variant="tertiary" onPress={jest.fn()} />);
+      expect(screen.UNSAFE_queryAllByType(LinearSwirl)).toHaveLength(0);
+      const label = StyleSheet.flatten(screen.getByText('Skip').props.style);
+      expect(label.color).toBe(tertiary.text.color);
+      expect(label.textDecorationLine).toBe('underline');
+      const frame = flatStyle(screen.getByRole('button', { name: 'Skip' }));
+      expect(frame.borderColor).toBe('transparent');
+      expect(frame.backgroundColor).toBeUndefined();
+      expect(frame.boxShadow).toBeUndefined();
+    });
+
+    it('a pressed secondary or tertiary shows the wash, not a fade', async () => {
+      for (const variant of ['secondary', 'tertiary'] as const) {
+        const { unmount } = render(<Button label="Go" variant={variant} onPress={jest.fn()} />);
+        await act(async () => {
+          fireEvent(screen.getByRole('button', { name: 'Go' }), 'responderGrant', { nativeEvent: { touches: [], changedTouches: [], target: 1 }, currentTarget: { measure: () => undefined }, persist: () => undefined });
+        });
+        const frame = flatStyle(screen.getByRole('button', { name: 'Go' }));
+        expect({ variant, background: frame.backgroundColor, opacity: frame.opacity }).toEqual({
+          variant,
+          background: v2.roles.wash,
+          opacity: undefined,
+        });
+        unmount();
+      }
+    });
+
+    it('an unavailable tertiary has no edge and a muted label', () => {
+      render(<Button label="Skip" variant="tertiary" onPress={jest.fn()} ariaDisabled />);
+      expect(StyleSheet.flatten(screen.getByText('Skip').props.style).color).toBe(v2.roles.muted);
+      expect(flatStyle(screen.getByRole('button', { name: 'Skip' })).borderStyle).toBeUndefined();
+    });
+
+    it('an available tertiary is underlined; an unavailable one is not (muted only)', () => {
+      const { rerender } = render(<Button label="Skip" variant="tertiary" onPress={jest.fn()} />);
+      expect(StyleSheet.flatten(screen.getByText('Skip').props.style).textDecorationLine).toBe('underline');
+      rerender(<Button label="Skip" variant="tertiary" onPress={jest.fn()} ariaDisabled />);
+      expect(StyleSheet.flatten(screen.getByText('Skip').props.style).textDecorationLine).toBeUndefined();
+    });
+
+    it('a secondary toggle that is on shows the wash; off shows none; selected is still set', () => {
+      const { rerender } = render(<Button label="Softer" variant="secondary" pressed onPress={jest.fn()} />);
+      const on = flatStyle(screen.getByRole('button', { name: 'Softer' }));
+      expect(on.backgroundColor).toBe(v2.roles.wash);
+      expect(screen.getByRole('button', { name: 'Softer' }).props.accessibilityState).toMatchObject({ selected: true });
+      rerender(<Button label="Softer" variant="secondary" pressed={false} onPress={jest.fn()} />);
+      const off = flatStyle(screen.getByRole('button', { name: 'Softer' }));
+      expect(off.backgroundColor).toBeUndefined();
+      expect(screen.getByRole('button', { name: 'Softer' }).props.accessibilityState).toMatchObject({ selected: false });
+    });
+  });
+
+  describe('primary and shared behaviour', () => {
+    const recipes = { primary: v2.recipes.button.primary, secondary: v2.recipes.button.outline };
     const flat = (node: { props: { style?: unknown } }) =>
       StyleSheet.flatten(typeof node.props.style === 'function' ? node.props.style({ pressed: false }) : node.props.style);
 
-    it.each(['primary', 'secondary'] as const)('%s renders a LinearSwirl with the recipe stops and the recipe text', (variant) => {
-      const recipe = recipes[variant];
-      render(<Button label="Save" variant={variant} onPress={jest.fn()} />);
+    it('primary renders a LinearSwirl with the recipe stops and the recipe text', () => {
+      const recipe = recipes.primary;
+      render(<Button label="Save" variant="primary" onPress={jest.fn()} />);
       const swirl = screen.UNSAFE_getByType(LinearSwirl);
       expect(swirl.props.stops).toEqual([...recipe.swirl.stops]);
       expect(swirl.props.angle).toBe(recipe.swirl.angle);
       expect(swirl.props.driftMs).toBe(recipe.driftMs);
       const label = StyleSheet.flatten(screen.getByText('Save').props.style);
       expect(label.color).toBe(recipe.text.color);
-      // Native picks the weight by family name: Nunito Sans 600 for primary, Nunito Sans 400 for secondary.
-      expect(label.fontFamily).toBe(variant === 'secondary' ? 'NunitoSans_400Regular' : 'NunitoSans_600SemiBold');
+      // Native picks the weight by family name: Nunito Sans 600.
+      expect(label.fontFamily).toBe('NunitoSans_600SemiBold');
       expect(label.fontWeight).toBeUndefined();
       const frame = flat(screen.getByRole('button', { name: 'Save' }));
       expect(frame).toMatchObject({ borderWidth: recipe.border.width, borderColor: recipe.border.color, borderRadius: 8 });
-    });
-
-    it('primary is medium weight with a 1px border, secondary is regular with 1.5px', () => {
-      expect(recipes.primary.text.weight).toBe(600);
-      expect(recipes.primary.border.width).toBe(1);
-      expect(recipes.secondary.text.weight).toBe(400);
-      expect(recipes.secondary.border.width).toBe(1.5);
     });
 
     it('keeps the label readable by role, and only the decoration is hidden', () => {
@@ -110,7 +175,7 @@ describe('Button (mobile)', () => {
       expect(frame).toMatchObject({
         backgroundColor: v2.roles.page.color,
         borderStyle: 'dashed',
-        borderWidth: 1.5,
+        borderWidth: 1,
         borderColor: recipes.secondary.border.color,
       });
       expect(StyleSheet.flatten(screen.getByText('Save').props.style).color).toBe(recipes.secondary.text.color);
@@ -118,15 +183,14 @@ describe('Button (mobile)', () => {
 
     it('maps the whole recipe shadow list to one exact boxShadow string', () => {
       expect(recipeShadow(recipes.primary)).toBe('0px 2px 12px rgba(150,90,30,0.12)');
-      expect(recipeShadow(recipes.secondary)).toBe('0px 1px 9px rgba(20,50,80,0.065)');
       render(<Button label="Save" onPress={jest.fn()} />);
       expect(flat(screen.getByRole('button', { name: 'Save' })).boxShadow).toBe('0px 2px 12px rgba(150,90,30,0.12)');
     });
 
     it('the swirl clips to the frame radius minus the border, so no fill shows at the corners', () => {
-      render(<Button label="Save" variant="secondary" onPress={jest.fn()} />);
+      render(<Button label="Save" variant="primary" onPress={jest.fn()} />);
       const inner = screen.UNSAFE_getByType(LinearSwirl).props.style;
-      expect(StyleSheet.flatten(inner).borderRadius).toBe(recipes.secondary.radius - recipes.secondary.border.width);
+      expect(StyleSheet.flatten(inner).borderRadius).toBe(recipes.primary.radius - recipes.primary.border.width);
     });
 
     // Pressed dims the whole button. Blend the label and each swirl stop over the page and check 4.5:1.
@@ -145,9 +209,9 @@ describe('Button (mobile)', () => {
       return (hi + 0.05) / (lo + 0.05);
     };
 
-    it.each(['primary', 'secondary'] as const)('%s label stays at 4.5:1 or more while pressed', async (variant) => {
-      const recipe = recipes[variant];
-      render(<Button label="Save" variant={variant} onPress={jest.fn()} />);
+    it('primary label stays at 4.5:1 or more while pressed', async () => {
+      const recipe = recipes.primary;
+      render(<Button label="Save" variant="primary" onPress={jest.fn()} />);
       const node = screen.getByRole('button', { name: 'Save' });
       await act(async () => {
         fireEvent(node, 'responderGrant', { nativeEvent: { touches: [], changedTouches: [], target: 1 }, currentTarget: { measure: () => undefined }, persist: () => undefined });
@@ -216,6 +280,38 @@ describe('Button (mobile)', () => {
       }
     });
 
+    // Secondary (outline) and tertiary sit on the page, both glows and glass cards (the glass fill blended over each).
+    const glassOver = (ground: string) => {
+      const match = /rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/.exec(v2.recipes.card.fill);
+      const [r, g, b, a] = [Number(match?.[1]), Number(match?.[2]), Number(match?.[3]), Number(match?.[4])];
+      return [r, g, b].map((v, k) => v * a + channel(ground, k) * (1 - a));
+    };
+    const hexRgb = (value: string) => [0, 1, 2].map((k) => channel(value, k));
+    const bases = [v2.roles.page.color, v2.roles.page.glows.topRight, v2.roles.page.glows.bottomLeft];
+    const grounds = [
+      ...bases.map((ground) => ({ name: ground, rgb: hexRgb(ground) })),
+      ...bases.map((ground) => ({ name: `glass over ${ground}`, rgb: glassOver(ground) })),
+    ];
+
+    it('secondary outline edge is 3:1 and label 4.5:1 on the page, both glows and glass', () => {
+      for (const ground of grounds) {
+        expect({ ground: ground.name, ok: ratio(hexRgb(recipes.secondary.border.color), ground.rgb) >= 3 }).toEqual({ ground: ground.name, ok: true });
+        expect({ ground: ground.name, ok: ratio(hexRgb(recipes.secondary.text.color), ground.rgb) >= 4.5 }).toEqual({ ground: ground.name, ok: true });
+      }
+    });
+
+    // The pressed wash is an opaque fill, so one ratio covers every ground.
+    it('secondary label stays at 4.5:1 on the pressed wash', () => {
+      expect(ratio(hexRgb(recipes.secondary.text.color), hexRgb(v2.roles.wash))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('tertiary label is 4.5:1 on the page, both glows, glass and the pressed wash', () => {
+      for (const ground of grounds) {
+        expect({ ground: ground.name, ok: ratio(hexRgb(v2.recipes.button.tertiary.text.color), ground.rgb) >= 4.5 }).toEqual({ ground: ground.name, ok: true });
+      }
+      expect(ratio(hexRgb(v2.recipes.button.tertiary.text.color), hexRgb(v2.roles.wash))).toBeGreaterThanOrEqual(4.5);
+    });
+
     it('aria-disabled primary keeps its accessibilityState: not disabled by default, disabled when announceDisabled is set', () => {
       const { rerender } = render(<Button label="Save" onPress={jest.fn()} ariaDisabled />);
       expect(screen.getByRole('button', { name: 'Save' }).props.accessibilityState?.disabled).toBeFalsy();
@@ -246,7 +342,7 @@ describe('Button (mobile)', () => {
       expect(onPress).toHaveBeenCalledTimes(1);
     });
 
-    it.each(['primary', 'secondary'] as const)('%s keeps a touch target of at least 44', (variant) => {
+    it.each(['primary', 'secondary', 'tertiary'] as const)('%s keeps a touch target of at least 44', (variant) => {
       render(<Button label="Save" variant={variant} onPress={jest.fn()} />);
       const frame = flat(screen.getByRole('button', { name: 'Save' }));
       expect(frame.minHeight).toBeGreaterThanOrEqual(44);

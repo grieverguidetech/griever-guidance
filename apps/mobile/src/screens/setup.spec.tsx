@@ -19,6 +19,7 @@ jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
 }));
 
 import { SetupScreen } from './SetupScreen';
+import { tierOfButton } from '../ui/buttonTier.testkit';
 
 const setup = (initial: { personName: string; dateOfPassing: string; birthDate?: string } = { personName: '', dateOfPassing: '' }) => {
   const onContinue = jest.fn();
@@ -297,6 +298,14 @@ const focusedIsChecklistButton = (focus: jest.SpiedFunction<typeof Accessibility
   const button = screen.getByRole('button', { name: "What you'll need" });
   return node?.props?.role === 'button' && typeof node.props.onClick === 'function' && node.props.onClick === button.props.onClick;
 };
+
+describe('SetupScreen button tiers (#1065)', () => {
+  it('draws Back as secondary and What you will need as primary', () => {
+    setup();
+    expect(tierOfButton('Back')).toBe('secondary');
+    expect(tierOfButton("What you'll need")).toBe('primary');
+  });
+});
 
 describe('SetupScreen What you will need (#699)', () => {
   beforeEach(() => {

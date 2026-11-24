@@ -177,13 +177,12 @@ export function SecondaryButton({ label, pending = false, onPress }: ActionProps
 }
 
 /**
- * A text-style action ("Create an account"). TODO: use the `tertiary` Button variant once #341
- * lands; until then the existing `ghost` variant is the closest look.
+ * A text-style action ("Create an account"): a suggestion, so the `tertiary` Button variant.
  */
 export function LinkButton({ label, onPress, pending = false }: ActionProps) {
   return (
     <View style={styles.link}>
-      <Button label={label} onPress={onPress} variant="ghost" busy={pending} ariaDisabled={pending} />
+      <Button label={label} onPress={onPress} variant="tertiary" busy={pending} ariaDisabled={pending} />
     </View>
   );
 }

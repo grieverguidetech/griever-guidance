@@ -6,6 +6,7 @@ import type { MembersView } from '@griever/shared';
 import { membersErrorMessage } from '@griever/hooks';
 import { onLeftFamily } from '../lib/leftFamily';
 import { PeopleHelping } from './PeopleHelping';
+import { tierOfButton } from '../ui/buttonTier.testkit';
 
 const mockGetMembers = jest.fn<(token: string) => Promise<GetMembersResult>>();
 const mockLeave = jest.fn<(token: string) => Promise<LeaveMembershipResult>>();
@@ -93,6 +94,13 @@ describe('PeopleHelping: stop helping (#224)', () => {
     expect(CONFIRM).not.toContain('!');
     await waitFor(() => expect(lastFocusText()).toBe('Stop helping Anna?'));
     expect(mockLeave).not.toHaveBeenCalled();
+  });
+
+  it('draws Keep helping as primary (the safe choice) and Stop helping as secondary', async () => {
+    await renderMember();
+    fireEvent.press(opener());
+    expect(tierOfButton('Keep helping')).toBe('primary');
+    expect(tierOfButton('Stop helping')).toBe('secondary');
   });
 
   it('Keep closes the step, calls nothing and returns focus to the button', async () => {

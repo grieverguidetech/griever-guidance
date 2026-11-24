@@ -53,7 +53,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
       <ScreenHeader>Who you're writing about</ScreenHeader>
       {onWhatYoullNeed ? (
         <View style={styles.headerRow}>
-          <Button label={copy.checklist} variant="header" onPress={onWhatYoullNeed} />
+          <Button label={copy.checklist} variant="primary" onPress={onWhatYoullNeed} />
         </View>
       ) : null}
       {people.length > 0 ? (
@@ -86,14 +86,14 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
         </View>
       ) : null}
       {onAccount ? (
-        // Outline, page showing through: the shared `header` variant (web's top bar look).
+        // Outline, page showing through: the secondary variant (navigation).
         <View style={styles.account} testID="home-account-row">
-          <Button label="Your account" variant="header" onPress={onAccount} />
+          <Button label="Your account" variant="secondary" onPress={onAccount} />
         </View>
       ) : null}
       {onImportContacts ? (
         <View style={onAccount ? styles.importBelow : styles.account} testID="home-import-row">
-          <Button label={IMPORT_LABEL} variant="header" onPress={onImportContacts} buttonRef={importRef} />
+          <Button label={IMPORT_LABEL} variant="secondary" onPress={onImportContacts} buttonRef={importRef} />
         </View>
       ) : null}
     </ScrollView>

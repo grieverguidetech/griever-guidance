@@ -198,7 +198,7 @@ export function ContactsStepScreen({ contacts, onContinue, onBack, startWithImpo
 
   const back = (
     <View style={styles.backRow}>
-      <Button label="Back" variant="header" onPress={leaveStep} />
+      <Button label="Back" variant="secondary" onPress={leaveStep} />
     </View>
   );
 

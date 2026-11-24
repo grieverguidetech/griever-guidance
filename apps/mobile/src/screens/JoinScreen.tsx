@@ -90,7 +90,7 @@ export function JoinScreen({
           <Button label={copy.signIn} variant="secondary" onPress={onSignIn} />
         </>
       ) : (
-        <Button label={copy.continue} variant="secondary" onPress={onContinue} />
+        <Button label={copy.continue} onPress={onContinue} />
       )}
     </ScrollView>
   );
