@@ -265,7 +265,7 @@ additive and optional.
   sessions are unchanged. Clearing an item is not deletion (C9).
 - At load, ids that are not in `CHECKLIST_PHASES` and states other than `done` or `not_applicable`
   are dropped. If nothing is left, the field is removed.
-- Synced from #1078 (#1077), one wire key per item: `check` plus the item id in PascalCase
+- Accepted on the wire from #1078 and sent by clients from #1080 (#1077, expand then contract: `SYNCED_KEYS` leaves them out until #1080), one wire key per item: `check` plus the item id in PascalCase
   (`pronouncement` is `checkPronouncement`, `burial-or-cremation` is `checkBurialOrCremation`), value
   `'done'`, `'not_applicable'` or null (open). 37 keys, listed by `CHECKLIST_FLOW_KEYS` in
   `libs/shared/src/checklistSync.ts`. Item ids must never be renamed: the key comes from the id, so a

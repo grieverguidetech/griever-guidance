@@ -59,10 +59,14 @@ describe('checklist mapping', () => {
     expect(next).toEqual({ custody: 'done', headstone: 'done' });
   });
 
-  it('toFlowDetails and flowDetailsToSessionFields carry the ticks', () => {
-    const details = toFlowDetails({ checklist: { 'guest-book': 'done' } });
-    expect(details.checkGuestBook).toBe('done');
-    expect(details.checkReception).toBeNull();
+  it('toFlowDetails and toSyncedFields do not send any check key yet (T2, #1080, flips this)', () => {
+    const source = { checklist: { 'guest-book': 'done', custody: 'not_applicable' } } as const;
+    for (const out of [toFlowDetails(source), toSyncedFields(source)]) {
+      expect(Object.keys(out).filter((key) => key.startsWith('check'))).toEqual([]);
+    }
+  });
+
+  it('flowDetailsToSessionFields maps the keys back into the checklist', () => {
     const fields = flowDetailsToSessionFields({ checkReception: 'not_applicable' }, {}, {
       'guest-book': 'done',
     });
@@ -71,7 +75,10 @@ describe('checklist mapping', () => {
   });
 
   it('toSyncedFields never carries a checklist object or the Gather ticks', () => {
-    const synced = toSyncedFields({ checklist: { custody: 'done' } }) as unknown as Record<string, unknown>;
+    const synced = toSyncedFields({ checklist: { custody: 'done' } }) as unknown as Record<
+      string,
+      unknown
+    >;
     expect(Object.hasOwn(synced, 'checklist')).toBe(false);
     expect(Object.hasOwn(synced, 'checklistTicks')).toBe(false);
   });

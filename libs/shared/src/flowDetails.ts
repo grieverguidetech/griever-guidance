@@ -4,7 +4,6 @@
 // never appear here. The phase checklist ticks do, as one flat key per item (checklistSync.ts).
 import {
   CHECKLIST_FLOW_KEYS,
-  checklistToFlat,
   isChecklistFlowValue,
   mergeFlatIntoChecklist,
   type ChecklistFlowKey,
@@ -108,32 +107,44 @@ export const FLOW_STATUS_KEYS = [
 
 export type FlowStatusKey = (typeof FLOW_STATUS_KEYS)[number];
 
-export const FLOW_DETAIL_KEYS = [
+/** The detail keys clients send today. */
+export const FLOW_SENT_DETAIL_KEYS = [
   ...FLOW_DETAIL_TEXT_KEYS,
   'burialPrivate',
   ...FLOW_STATUS_KEYS,
-  ...CHECKLIST_FLOW_KEYS,
 ] as const;
+
+/**
+ * Every detail key the parsers, the gateway and the data function ACCEPT. Expand, then contract
+ * (#1077): the 37 checklist keys are accepted here but not sent yet, so a new web build cannot
+ * reach an old gateway or data function with keys it refuses. T2 (#1080) turns sending on by
+ * moving CHECKLIST_FLOW_KEYS into SYNCED_KEYS and `toFlowDetails`.
+ */
+export const FLOW_DETAIL_KEYS = [...FLOW_SENT_DETAIL_KEYS, ...CHECKLIST_FLOW_KEYS] as const;
 
 export type FlowDetailKey = (typeof FLOW_DETAIL_KEYS)[number];
 
-/** Every key that may cross the wire for a person. */
-export const SYNCED_KEYS = [...FLOW_FACT_KEYS, ...FLOW_DETAIL_KEYS] as const;
+/** Every key a client sends or merges for a person. The checklist keys are not in it until T2 (#1080). */
+export const SYNCED_KEYS = [...FLOW_FACT_KEYS, ...FLOW_SENT_DETAIL_KEYS] as const;
 
 export type SyncedKey = (typeof SYNCED_KEYS)[number];
 
 /** Wire status values: null is "Not started". */
 export type FlowStatusValue = SectionStatus | null;
 
-export type FlowDetails = {
+/** What a client sends today: the details without the checklist keys (T2, #1080, adds them). */
+export type SentFlowDetails = {
   [K in FlowDetailTextKey]: string | null;
 } & { burialPrivate: boolean } & {
   [K in FlowStatusKey]: FlowStatusValue;
-} & {
-  [K in ChecklistFlowKey]: ChecklistFlowValue;
 };
 
-export type SyncedFields = FlowFacts & FlowDetails;
+/** The checklist keys are optional until clients send them (T2, #1080 makes them required). */
+export type FlowDetails = SentFlowDetails & {
+  [K in ChecklistFlowKey]?: ChecklistFlowValue;
+};
+
+export type SyncedFields = FlowFacts & SentFlowDetails;
 
 /** Mirrors the server column checks. Longer text is cut on save, never rejected there (see ADR 0001). */
 export const FLOW_DETAIL_MAX_LENGTH: Record<FlowDetailTextKey, number> = {
@@ -330,15 +341,15 @@ function toWireText(key: FlowDetailTextKey, value: string | undefined) {
 }
 
 /** Details for a session: the full, valid set (always passes `parseFlowDetails`). */
-export function toFlowDetails(source: SyncedSource): FlowDetails {
+export function toFlowDetails(source: SyncedSource): SentFlowDetails {
   const out: Record<string, unknown> = {};
   for (const key of FLOW_DETAIL_TEXT_KEYS) {
     out[key] = toWireText(key, source[key]);
   }
   out.burialPrivate = source.burialPrivate === true;
   Object.assign(out, statusMapToFlat(source.sectionStatus));
-  Object.assign(out, checklistToFlat(source.checklist));
-  return out as FlowDetails;
+  // Checklist keys are not emitted yet: T2 (#1080) adds `Object.assign(out, checklistToFlat(source.checklist))`.
+  return out as SentFlowDetails;
 }
 
 /** Every synced field for a session, built from the whitelist (never a spread of the session). */

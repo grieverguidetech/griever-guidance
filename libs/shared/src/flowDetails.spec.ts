@@ -5,6 +5,7 @@ import {
   FLOW_DETAIL_TEXT_KEYS,
   FLOW_FACT_KEYS,
   FLOW_MESSAGE_KEYS,
+  FLOW_SENT_DETAIL_KEYS,
   FLOW_STATUS_KEYS,
   FORBIDDEN_SYNC_KEYS,
   SYNCED_KEYS,
@@ -32,7 +33,10 @@ describe('keys', () => {
     expect(FLOW_STATUS_KEYS).toHaveLength(5);
     expect(CHECKLIST_FLOW_KEYS).toHaveLength(37);
     expect(FLOW_DETAIL_KEYS).toHaveLength(93);
-    expect(SYNCED_KEYS).toEqual([...FLOW_FACT_KEYS, ...FLOW_DETAIL_KEYS]);
+    // Expand, then contract (#1077): accepted but not sent until T2 (#1080).
+    expect(FLOW_SENT_DETAIL_KEYS).toHaveLength(56);
+    expect(SYNCED_KEYS).toEqual([...FLOW_FACT_KEYS, ...FLOW_SENT_DETAIL_KEYS]);
+    expect(SYNCED_KEYS.some((key) => key.startsWith('check'))).toBe(false);
     expect(new Set(SYNCED_KEYS).size).toBe(SYNCED_KEYS.length);
   });
 

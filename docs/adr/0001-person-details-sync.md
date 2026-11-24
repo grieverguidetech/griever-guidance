@@ -102,7 +102,14 @@ refused by name.
 **Payload.** 37 short keys add about 1.7 KB at most. The worst-case payload test in
 `libs/shared/src/flowDetails.spec.ts` now sets every checklist key and is still under 128 KB.
 
-**Deploy order.** Same as #772. The data function refuses unknown keys, so the owner redeploys it
-from the #1078 branch BEFORE the PR merges (`docs/aws-data-function.md`). Merging first breaks sync
-for every person. Clients ignore unknown keys on read, so old phones keep working. The session merge
-in `useSessions` (so a pulled tick reaches the local checklist) is a later ticket of #1077 and ships after this.
+**Deploy order (expand, then contract).** `deploy-gateway` and `deploy-web` run in parallel, and the
+data function is deployed by hand (`docs/aws-data-function.md`). An old gateway or data function
+refuses unknown keys, and the client then drops every pending edit for that person. So the keys
+ship in two steps:
+1. #1078 merges. The shared parser, the gateway and the data function code ACCEPT the 37 keys, but
+   no client sends them (`SYNCED_KEYS` and `toFlowDetails` leave them out).
+2. The owner redeploys the data function from main.
+3. Only then #1080 (T2) merges. It adds the keys to `SYNCED_KEYS` and `toFlowDetails`, and the
+   session merge in `useSessions`, so clients start sending and applying ticks.
+
+Clients ignore unknown keys on read, so old phones keep working throughout.
