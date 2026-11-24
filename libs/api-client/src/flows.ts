@@ -107,7 +107,8 @@ async function call(
 
 /**
  * The people on the wire: `{ flows, removed }` from a server that knows `include=removed`, or a bare array
- * from an older one (no removed ids). A `removed` that is not a list of ids refuses the whole answer.
+ * from an older one (no removed ids). A `removed` that is not a list of ids refuses the whole answer. One bad
+ * id does the same, on purpose: a garbled answer is not trusted, and sync removes nobody from it.
  */
 function readListBody(body: unknown): { list: unknown[]; removed: string[] } | null {
   if (Array.isArray(body)) {

@@ -116,7 +116,7 @@ const sessionRecord = (flowId: string, over: object = {}) => ({
 });
 
 /** One phone or browser: its own storage, the real useSessions and the real useFlowSync. */
-function device(client: FlowSyncClient, opts: { sessions?: object[]; sync?: object } = {}) {
+function device(client: FlowSyncClient, opts: { sessions?: object[]; sync?: object; noMove?: boolean } = {}) {
   const storage = memoryStorage();
   if (opts.sessions) {
     storage.data.set('gg.sessions.v1', JSON.stringify(opts.sessions));
@@ -139,7 +139,8 @@ function device(client: FlowSyncClient, opts: { sessions?: object[]; sync?: obje
           return () => void wakes.delete(fn);
         },
         applyRemoteFlows: sessions.applyRemoteFlows,
-        moveFlowId: sessions.moveFlowId,
+        // `noMove` keeps a session on its old id, as in the moment before React applies a move (#942).
+        moveFlowId: opts.noMove ? () => undefined : sessions.moveFlowId,
         client,
       });
       return sessions;
@@ -150,7 +151,14 @@ function device(client: FlowSyncClient, opts: { sessions?: object[]; sync?: obje
     await act(async () => wakes.forEach((fn) => fn()));
     await advance(10);
   };
-  return { view, storage, wake, sessions: () => view.result.current.sessions };
+  /** The saved sync state for the account, as written to storage. */
+  const saved = () =>
+    JSON.parse(storage.data.get(flowQueueKey(USER)) ?? '{}') as {
+      queue?: Record<string, unknown>;
+      known?: string[];
+      conflicted?: string[];
+    };
+  return { view, storage, wake, saved, sessions: () => view.result.current.sessions };
 }
 
 async function advance(ms: number) {
@@ -248,6 +256,9 @@ describe('a person the server names as removed (#1084)', () => {
     await b.wake(); // the pull names the person; the cycle that follows must not send the edit
     expect(b.sessions()).toEqual([]);
     expect(server.calls.patch).toBe(before.patch);
+    expect(Object.keys(b.saved().queue ?? {})).not.toContain(ids[0]);
+    expect(b.saved().known ?? []).not.toContain(ids[0]);
+    expect(b.saved().conflicted ?? []).not.toContain(ids[0]);
 
     const after = { ...server.calls };
     await b.wake();
@@ -270,6 +281,23 @@ describe('a person the server names as removed (#1084)', () => {
     expect(b.sessions().map((s) => s.personName)).toEqual(['Ben']);
   });
 
+  it('finds a session that still holds the old id when the server names the new id', async () => {
+    const { server, client } = fakeServer();
+    const NEW = '55555555-5555-4555-8555-555555555555';
+    const b = device(client, {
+      sessions: [sessionRecord(OLD)],
+      sync: { queue: {}, known: [NEW], baselines: {}, moved: { [OLD]: NEW } },
+      noMove: true,
+    });
+    server.nameRemoved(NEW);
+    await advance(10);
+    await b.wake();
+
+    expect(b.sessions()).toEqual([]);
+    expect(server.calls.create).toBe(0);
+    expect(server.calls.patch).toBe(0);
+  });
+
   it('keeps a person the same list still has, even if the id is also named', async () => {
     const { server, client } = fakeServer();
     const { b, ids } = await twoDevices(client, ['Anna']);
@@ -277,6 +305,7 @@ describe('a person the server names as removed (#1084)', () => {
     server.nameRemoved(ids[0]);
     await b.wake();
     expect(b.sessions()).toHaveLength(1);
+    expect(b.saved().known).toContain(ids[0]); // sync state kept too
   });
 
   it('keeps everyone when the list is offline, even if a person was deleted', async () => {

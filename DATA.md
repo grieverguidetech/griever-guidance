@@ -779,7 +779,9 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
   The owner's other devices drop the person at their next pull, because the server names the id in
   `removed` (#1084). The client never guesses a delete from absence: an empty or partial list removes
   nobody. The device clears the person's sync state, discards an unsent edit for them and never
-  creates the id again. A failed or offline pull removes nothing. Account deletion (below) still removes everything.
+  creates the id again. A failed or offline pull removes nothing. `removed` names a deleted person
+  only for 90 days (the soft-delete `ttl`): a device offline longer than that keeps the person, and an
+  edit there could create them again. Account deletion (below) still removes everything.
 - **Invite emails (#146, settled 2026-10-21).** An invite carries the email of a third party who
   never agreed to anything, so the `INVITE#` item is deleted after 30 days: 30 days after it expires
   or is revoked, whichever is first, and 30 days after it is accepted. The access rules set the
