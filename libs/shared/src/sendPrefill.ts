@@ -1,6 +1,7 @@
 // Where a moment's first form starts from the details the family planned (and synced from the web).
 // Pure: it reads a person and returns form fields plus an edited message, nothing else. It never
 // touches contacts, drafts or recipients (C1, C3, C4).
+import { FLOW_DETAIL_MAX_LENGTH } from './flowDetails.js';
 import type { SectionFields } from './sections.js';
 import type { SessionDetails, TemplateCategory } from './types.js';
 
@@ -34,6 +35,51 @@ const MESSAGE_KEY: Partial<Record<TemplateCategory, keyof SendPrefillSource>> = 
   announcement: 'announcementMessage',
   aftercare: 'thanksMessage',
 };
+
+/** The planning message a phone edit is saved as (#1077). No entry for obituary: its link message is never saved. */
+type PlannedMessageKey = 'announcementMessage' | 'serviceMessage' | 'thanksMessage';
+const PLANNED_KEY: Partial<Record<TemplateCategory, PlannedMessageKey>> = {
+  announcement: 'announcementMessage',
+  service: 'serviceMessage',
+  aftercare: 'thanksMessage',
+};
+
+export type PlannedMessagePatch = Partial<Record<PlannedMessageKey, string>>;
+
+/**
+ * A hand edit to the message on the phone, as the person's planning message, so the web shows it (#1077).
+ * Only the announcement, service and thank-you, only when the family typed it (not the web's own wording),
+ * and only when it differs from what is saved. The value is the edited message itself (`messageOverride`);
+ * the per-person greeting is never part of it. A blank edit is not saved, so clearing the box never empties the web's wording.
+ */
+export function plannedMessagePatch(
+  category: TemplateCategory | null,
+  flowState: { messageOverride: string | null; messageFromWeb: boolean },
+  session: Partial<Pick<SendPrefillSource, PlannedMessageKey>>,
+): PlannedMessagePatch | null {
+  const key = category ? PLANNED_KEY[category] : undefined;
+  const edited = flowState.messageOverride;
+  if (!key || flowState.messageFromWeb || edited === null || edited.trim() === '') {
+    return null;
+  }
+  const saved = capForServer(key, edited);
+  if (session[key] === saved) {
+    return null;
+  }
+  return { [key]: saved };
+}
+
+// The server cuts text above its cap on a pull, which would shorten the open text; so the saved copy is cut here.
+// A cut never leaves half of a surrogate pair.
+function capForServer(key: PlannedMessageKey, value: string): string {
+  const max = FLOW_DETAIL_MAX_LENGTH[key];
+  if (value.length <= max) {
+    return value;
+  }
+  const cut = value.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+}
 
 const text = (value: string | null | undefined): string => value?.trim() ?? '';
 

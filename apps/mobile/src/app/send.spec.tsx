@@ -387,6 +387,69 @@ describe('picking an announcement', () => {
   });
 });
 
+describe('a hand edit becomes the planning message (#1081)', () => {
+  const stored = async (): Promise<Session> => {
+    const raw = await AsyncStorage.getItem(SESSIONS_KEY);
+    return (JSON.parse(raw ?? '[]') as Session[])[0];
+  };
+  const toReady = async (person: Session = anna) => {
+    jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => undefined);
+    await openAnna(person);
+    await startMoment('Announce the passing');
+    await openPeople();
+    fireEvent.press(await screen.findByText('Dee'));
+    fireEvent.press(screen.getByText(/^Done/));
+    await screen.findByRole('heading', { name: 'Announce the passing' });
+  };
+
+  it('saves the edit as the announcement message, with no greeting, and keeps it after the send', async () => {
+    await toReady();
+    expect(await findMessage('Anna passed away peacefully.')).toBeTruthy();
+    typeMessage('My own words.');
+    await waitFor(async () => expect((await stored()).announcementMessage).toBe('My own words.'));
+    expect(JSON.stringify(await stored())).not.toContain('Dee,');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await afterMessages();
+    fireEvent.press(await screen.findByText('Done'));
+    await screen.findByText('Everyone has been told.');
+    const after = await stored();
+    // The draft's wording is dropped at the send (C2); the planning message stays.
+    expect(after.drafts.announcement?.messageOverride ?? null).toBeNull();
+    expect(after.announcementMessage).toBe('My own words.');
+    // Opening the moment again starts from the saved edit.
+    fireEvent.press(await screen.findByRole('button', { name: /^Announce the passing/ }));
+    expect(await findMessage('My own words.')).toBeTruthy();
+  });
+
+  it('saves an edit that is sent right away', async () => {
+    await toReady();
+    typeMessage('Quick words.');
+    fireEvent.press(screen.getByRole('button', { name: 'Done editing' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Text 1 person' }));
+    fireEvent.press(await screen.findByText('Text Dee'));
+    await waitFor(async () => expect((await stored()).announcementMessage).toBe('Quick words.'));
+  });
+
+  it('does not clear the web wording when the suggested wording is used', async () => {
+    await toReady();
+    typeMessage('My own words.');
+    await waitFor(async () => expect((await stored()).announcementMessage).toBe('My own words.'));
+    fireEvent.press(screen.getByRole('button', { name: 'Use the suggested wording' }));
+    expect(messageNow()).not.toBe('My own words.');
+    await waitFor(() => expect(messageNow()).not.toBe('My own words.'));
+    expect((await stored()).announcementMessage).toBe('My own words.');
+  });
+
+  it('does not save the web wording or an untouched message', async () => {
+    await toReady();
+    expect(await findMessage('Anna passed away peacefully.')).toBeTruthy();
+    expect((await stored()).announcementMessage).toBe('Anna passed away peacefully.');
+  });
+});
+
 describe('Ready to send (announcement)', () => {
   const toReview = async () => {
     await openAnna(annaWithoutEditedWords);
@@ -502,17 +565,13 @@ describe('the end of a send', () => {
     // The announcement is done and the service still needs its date: the bottom button names the service.
     expect(within(screen.getByTestId('hub-action-bar')).getByText('Share the service')).toBeTruthy();
     expect(screen.queryByText("Who you're writing about")).toBeNull();
-    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
-    expect(announce).toHaveBeenCalledWith(
-      "Everyone has been told. We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
-      { queue: true },
-    );
-    expect(screen.getByLabelText(/Everyone has been told\. We don't keep a copy/)).toBeTruthy();
-    // Lead in Nunito Sans 600, rest in Nunito Sans 400 (no italic is loaded), and no border (#365).
+    // The phone no longer says "We don't keep a copy" (#1077).
+    expect(screen.queryByText(/We don't keep a copy/)).toBeNull();
+    expect(announce).toHaveBeenCalledWith('Everyone has been told.', { queue: true });
+    expect(screen.getByLabelText(/Everyone has been told\./)).toBeTruthy();
+    // Lead in Nunito Sans 600, and no border (#365).
     const lead = StyleSheet.flatten(screen.getByText('Everyone has been told.').props.style);
-    const rest = StyleSheet.flatten(screen.getByText(/We don't keep a copy of what was sent/).props.style);
     expect(lead.fontFamily).toBe('NunitoSans_600SemiBold');
-    expect(rest.fontFamily).toBe('NunitoSans_400Regular');
     expect(StyleSheet.flatten(screen.getByLabelText(/Everyone has been told\./).props.style)?.borderWidth ?? 0).toBe(0);
   });
 
@@ -539,7 +598,7 @@ describe('the end of a send', () => {
     expect(await screen.findByText('You told 1 of 2.')).toBeTruthy();
     expect(screen.getByText(/You can text the others from your own Messages app any time\./)).toBeTruthy();
     expect(announce).toHaveBeenCalledWith(
-      "You told 1 of 2. You can text the others from your own Messages app any time. We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.",
+      'You told 1 of 2. You can text the others from your own Messages app any time.',
       { queue: true },
     );
   });
@@ -619,7 +678,7 @@ describe('the end of a send', () => {
     await afterMessages();
     fireEvent.press(await screen.findByText('Done'));
     expect(await screen.findByRole('heading', { name: 'Ready to send' })).toBeTruthy();
-    expect(screen.getByText(/We don't keep a copy of what was sent/)).toBeTruthy();
+    expect(screen.getByText('The obituary has been shared.')).toBeTruthy();
   });
 });
 

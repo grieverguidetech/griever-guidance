@@ -10,7 +10,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMembers, useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
-import { obituaryLink, sendPrefill } from '@griever/shared';
+import { obituaryLink, plannedMessagePatch, sendPrefill } from '@griever/shared';
+import type { PlannedMessagePatch } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
@@ -127,7 +128,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export type FlowProps = { flow: ReturnType<typeof useSendFlow> };
 
-type Details = { personName?: string; dateOfPassing?: string; serviceDate?: string };
+type Details = { personName?: string; dateOfPassing?: string; serviceDate?: string } & PlannedMessagePatch;
 
 type SessionProps = {
   session: Session;
@@ -273,7 +274,7 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
   // The signed-in account's name, for the thank-you's sender field. On-device only (DS-7).
   const accountName = useAccountSenderName();
   const senderTyped = flow.fields['senderName'] ?? '';
-  const { setMessageOverride, setWebMessage, setWebField, templateCategory: category, messageOverride, messageFromWeb, fields, webFields, webMessageSeen } = flow;
+  const { setMessageOverride, setWebMessage, setWebMessageSeen, setWebField, templateCategory: category, messageOverride, messageFromWeb, messageFromPhone, fields, webFields, webMessageSeen } = flow;
   // Fields follow the web until typed on the phone (#958). This runs on every change of the session during the visit,
   // so details that arrive after the form opened fill in. It sets state only when a value differs, so it settles.
   useEffect(() => {
@@ -296,7 +297,8 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       const current = planned.messageOverride;
       if (messageFromWeb && current !== messageOverride) {
         setWebMessage(current);
-      } else if (!messageFromWeb && current === messageOverride) {
+      } else if (!messageFromWeb && !messageFromPhone && current === messageOverride) {
+        // A phone edit saved as the planning message equals the web wording too, but stays a phone edit (#1081).
         setWebMessage(messageOverride);
       }
     }
@@ -357,7 +359,25 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
     ) {
       setWebMessage(planned.messageOverride);
     }
-  }, [inVisit, onForm, selectedTemplate, setMessageOverride, setWebMessage, setWebField, messageOverride, messageFromWeb, category, session, accountName, senderTyped, fields, webFields, webMessageSeen]);
+  }, [inVisit, onForm, selectedTemplate, setMessageOverride, setWebMessage, setWebField, messageOverride, messageFromWeb, messageFromPhone, category, session, accountName, senderTyped, fields, webFields, webMessageSeen]);
+
+  // A hand edit to the message becomes the person's planning message, so the web shows it (#1077). It runs when the
+  // edit itself changes, in the same render, so an edit that is sent right away is saved before the send. Opening a
+  // moment, or a draft that loads its saved edit, is not a new edit; nor is a newer web edit over an old phone edit.
+  const lastEdit = useRef<{ category: TemplateCategory | null; message: string | null }>({ category, message: messageOverride });
+  useEffect(() => {
+    const before = lastEdit.current;
+    lastEdit.current = { category, message: messageOverride };
+    if (before.category !== category || before.message === messageOverride) {
+      return;
+    }
+    const patch = plannedMessagePatch(category, { messageOverride, messageFromWeb: messageFromWeb === true }, session);
+    if (patch) {
+      onDetails(id, patch);
+      // The saved edit is now the web wording the draft has taken, so "Use the suggested wording" is not undone by the prefill.
+      setWebMessageSeen(Object.values(patch)[0] ?? '');
+    }
+  }, [category, messageOverride, messageFromWeb, session, id, onDetails, setWebMessageSeen]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not

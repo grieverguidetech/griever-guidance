@@ -25,7 +25,11 @@ export interface SentNoteText {
   partial: boolean;
 }
 
-/** The calm note shown on Home when the last person has been dealt with. No exclamation points (C7). */
+/**
+ * The calm note shown on Home when the last person has been dealt with. No exclamation points (C7).
+ * The phone no longer says "We don't keep a copy" (#1077): a hand edit to the message is now kept as the
+ * person's planning message. The shared `finishNote.noCopy` copy stays for the web.
+ */
 export function sendNote(category: Category, recipients: RecipientProgress[]): SentNoteText {
   const total = recipients.length;
   const told = recipients.filter((r) => r.status === 'delivered').length;
@@ -35,14 +39,8 @@ export function sendNote(category: Category, recipients: RecipientProgress[]): S
   }
   if (total > 0 && told < total) {
     const lead = fill(finishNote.partial.lead, { told, total });
-    return {
-      lead,
-      rest: `${finishNote.partial.rest} ${finishNote.noCopy}`,
-      spoken: `${lead} ${finishNote.partial.rest} ${finishNote.noCopy}`,
-      category,
-      partial: true,
-    };
+    return { lead, rest: finishNote.partial.rest, spoken: `${lead} ${finishNote.partial.rest}`, category, partial: true };
   }
   const lead = category ? finishNote.allTold[MOMENT_BY_CATEGORY[category]] : finishNote.sentGeneric;
-  return { lead, rest: finishNote.noCopy, spoken: `${lead} ${finishNote.noCopy}`, category, partial: false };
+  return { lead, rest: '', spoken: lead, category, partial: false };
 }

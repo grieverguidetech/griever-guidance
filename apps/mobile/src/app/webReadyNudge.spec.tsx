@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { findMessage, queryMessage, typeMessage } from '../testing/messageBox';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@griever/hooks';
@@ -114,8 +114,47 @@ describe('the web Ready status and the announcement send screen (#949)', () => {
     await open(anna({ sectionStatus: { announcement: 'ready' } }));
     await screen.findByLabelText('Your message');
     typeMessage('My own words.');
+    // The edit is saved as the planning message (#1081); it must still count as a phone edit.
+    await waitFor(async () => expect(((JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as Session[])[0]).announcementMessage).toBe('My own words.'));
     webUnmarks();
     expect(await findMessage('My own words.')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: NUDGE })).toBeNull();
+  });
+
+  it('opening a draft with an older hand edit does not save it over the planning message (#1081)', async () => {
+    const draft = { ...staleDraft, messageOverride: 'Older phone edit.', messageFromWeb: false, messageFromPhone: true };
+    await open(anna({ sectionStatus: { announcement: 'ready' }, drafts: { announcement: draft } }));
+    expect(await findMessage('Older phone edit.')).toBeTruthy();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as Session[];
+    expect(saved[0].announcementMessage).toBe('Anna passed away peacefully.');
+  });
+
+  it('a pull that changes the planning message is not saved back over by the open phone edit (#1081)', async () => {
+    await open(anna({ sectionStatus: { announcement: 'ready' } }));
+    await screen.findByLabelText('Your message');
+    typeMessage('My own words.');
+    await waitFor(async () => expect(((JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as Session[])[0]).announcementMessage).toBe('My own words.'));
+    act(() => {
+      syncOptions?.applyRemoteFlows(
+        {
+          flows: [{
+            id: 'flow-a', ownerId: 'user_me', role: 'owner', updatedAt: '2026-10-02T00:00:00.000Z', updatedBy: null,
+            facts: { personName: 'Anna', dateOfPassing: null, serviceDate: null, obituaryUrl: null, obituaryPublisher: null, serviceReady: false },
+            details: { announcementMessage: 'Newer web wording.' },
+          }],
+        },
+        'user_me',
+      );
+    });
+    await waitFor(async () => expect(((JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as Session[])[0]).announcementMessage).toBe('Newer web wording.'));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as Session[];
+    expect(saved[0].announcementMessage).toBe('Newer web wording.');
+    expect(await findMessage('My own words.')).toBeTruthy();
   });
 });

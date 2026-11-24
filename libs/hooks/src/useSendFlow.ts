@@ -55,6 +55,12 @@ export interface SendFlowState {
    */
   messageFromWeb?: boolean;
   /**
+   * True when `messageOverride` was typed on the phone (#1081). The phone saves that edit as the person's planning
+   * message, so it then equals the web's wording; this flag keeps it a phone edit, so the send screen is never
+   * stranded if the web removes Ready. Cleared by the web wording, a tone change, a field edit or "Use the suggested wording".
+   */
+  messageFromPhone?: boolean;
+  /**
    * Fields whose value came from the web (the prefill), by key, with the value last set from it (#958). A field in
    * this record with that value is not phone content, and the phone updates it when the web changes. Any phone edit
    * of the field drops its key. Mobile only: web never sets it. Absent on drafts saved before it existed.
@@ -98,6 +104,8 @@ export interface SendFlowActions {
   setMessageOverride: (value: string | null) => void;
   /** Sets the message to the web's own wording and marks it so (#949). `null` clears it. */
   setWebMessage: (value: string | null) => void;
+  /** Records the wording the phone has taken as the web's, without touching the message (#1081: a saved phone edit). */
+  setWebMessageSeen: (value: string) => void;
   setGreeting: (value: boolean) => void;
   /** Sets or clears (empty text) the line for one person. Only the thank-you adds it to the message. */
   setRecipientNote: (contactId: string, value: string) => void;
@@ -486,7 +494,7 @@ export function useSendFlow(
 
   const setField = useCallback((key: string, value: string) => {
     setState((s) => {
-      const next: SendFlowState = { ...s, fields: { ...s.fields, [key]: value }, messageOverride: null, messageFromWeb: false };
+      const next: SendFlowState = { ...s, fields: { ...s.fields, [key]: value }, messageOverride: null, messageFromWeb: false, messageFromPhone: false };
       if (s.webFields && key in s.webFields) {
         const { [key]: _typed, ...rest } = s.webFields;
         next.webFields = rest;
@@ -534,15 +542,19 @@ export function useSendFlow(
   }, []);
 
   const setTone = useCallback((tone: MessageTone) => {
-    setState((s) => ({ ...s, tone, messageOverride: null, messageFromWeb: false }));
+    setState((s) => ({ ...s, tone, messageOverride: null, messageFromWeb: false, messageFromPhone: false }));
   }, []);
 
   const setMessageOverride = useCallback((value: string | null) => {
-    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: false }));
+    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: false, messageFromPhone: value !== null }));
+  }, []);
+
+  const setWebMessageSeen = useCallback((value: string) => {
+    setState((s) => (s.webMessageSeen === value ? s : { ...s, webMessageSeen: value }));
   }, []);
 
   const setWebMessage = useCallback((value: string | null) => {
-    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: value !== null, webMessageSeen: value ?? s.webMessageSeen }));
+    setState((s) => ({ ...s, messageOverride: value, messageFromWeb: value !== null, messageFromPhone: false, webMessageSeen: value ?? s.webMessageSeen }));
   }, []);
 
   const setGreeting = useCallback((value: boolean) => {
@@ -654,6 +666,7 @@ export function useSendFlow(
     setTone,
     setMessageOverride,
     setWebMessage,
+    setWebMessageSeen,
     setGreeting,
     startSendJob,
     markActiveSent,

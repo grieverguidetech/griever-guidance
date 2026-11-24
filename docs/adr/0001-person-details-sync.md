@@ -20,7 +20,9 @@ the device that typed them.
    follows the details) and `''` stays `''`. For every other text key a blank value is null.
 5. Merge is last saved wins per field, in server order, with no client timestamps. A field with a
    pending local edit keeps the local value until it is sent (`mergeSyncedFields`).
-6. Never synced: drafts, `messageOverride`, `recipientsNotified`, `selectedContactIds`,
+6. Never synced: drafts, `messageOverride` itself (a phone hand edit to the announcement, service or
+   thank-you message is saved as that person's `announcementMessage`, `serviceMessage` or
+   `thanksMessage`, which do sync; #1077, #1081), `recipientsNotified`, `selectedContactIds`,
    `hearsFirstIds`, any contact data (C3, C4), `senderName`, `momentCompletedAt`,
    `remindersScheduled`, `account.checklistTicks` and the checklist.
 

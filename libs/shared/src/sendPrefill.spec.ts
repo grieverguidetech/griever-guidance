@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sendPrefill } from './sendPrefill.js';
+import { plannedMessagePatch, sendPrefill } from './sendPrefill.js';
 
 const planned = {
   personName: 'Anna Rose',
@@ -67,5 +67,59 @@ describe('sendPrefill message', () => {
 
   it('keeps an empty message as empty', () => {
     expect(sendPrefill({ ...planned, serviceMessage: '' }, 'service').messageOverride).toBe('');
+  });
+});
+
+describe('plannedMessagePatch (#1077)', () => {
+  const edit = { messageOverride: 'My own words.', messageFromWeb: false };
+  const saved = { announcementMessage: 'From the web.', serviceMessage: 'S', thanksMessage: 'T' };
+
+  it('saves a hand edit under the key of its moment', () => {
+    expect(plannedMessagePatch('announcement', edit, saved)).toEqual({ announcementMessage: 'My own words.' });
+    expect(plannedMessagePatch('service', edit, saved)).toEqual({ serviceMessage: 'My own words.' });
+    expect(plannedMessagePatch('aftercare', edit, saved)).toEqual({ thanksMessage: 'My own words.' });
+  });
+
+  it('saves an edit when nothing was planned on the web', () => {
+    expect(plannedMessagePatch('announcement', edit, {})).toEqual({ announcementMessage: 'My own words.' });
+  });
+
+  it('never saves the obituary link message or a missing moment', () => {
+    expect(plannedMessagePatch('obituary', edit, saved)).toBeNull();
+    expect(plannedMessagePatch(null, edit, saved)).toBeNull();
+  });
+
+  it('does not save the web\'s own wording', () => {
+    expect(plannedMessagePatch('announcement', { messageOverride: 'From the web.', messageFromWeb: true }, saved)).toBeNull();
+    expect(plannedMessagePatch('announcement', { messageOverride: 'Other', messageFromWeb: true }, saved)).toBeNull();
+  });
+
+  it('does not save when there is no edit (the suggested wording is back)', () => {
+    expect(plannedMessagePatch('announcement', { messageOverride: null, messageFromWeb: false }, saved)).toBeNull();
+  });
+
+  it('does not save an edit equal to what is saved', () => {
+    expect(plannedMessagePatch('announcement', { messageOverride: 'From the web.', messageFromWeb: false }, saved)).toBeNull();
+  });
+
+  it('does not save a blank edit, so clearing the box never empties the web wording', () => {
+    expect(plannedMessagePatch('service', { messageOverride: '', messageFromWeb: false }, saved)).toBeNull();
+    expect(plannedMessagePatch('service', { messageOverride: '  ', messageFromWeb: false }, saved)).toBeNull();
+  });
+
+  it('cuts the saved copy at the server limit, never in the middle of a surrogate pair', () => {
+    const long = { messageOverride: 'a'.repeat(2500), messageFromWeb: false };
+    expect(plannedMessagePatch('announcement', long, {})).toEqual({ announcementMessage: 'a'.repeat(2000) });
+    const pair = { messageOverride: `${'a'.repeat(1999)}\u{1F54A}`, messageFromWeb: false };
+    expect(plannedMessagePatch('service', pair, {})).toEqual({ serviceMessage: 'a'.repeat(1999) });
+  });
+
+  it('does not save again when the saved copy is already the cut text', () => {
+    const long = { messageOverride: 'a'.repeat(2500), messageFromWeb: false };
+    expect(plannedMessagePatch('aftercare', long, { thanksMessage: 'a'.repeat(2000) })).toBeNull();
+  });
+
+  it('returns only the one planning key', () => {
+    expect(Object.keys(plannedMessagePatch('service', edit, saved) ?? {})).toEqual(['serviceMessage']);
   });
 });
