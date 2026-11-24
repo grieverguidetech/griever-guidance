@@ -35,6 +35,38 @@ const MESSAGE_KEY: Partial<Record<TemplateCategory, keyof SendPrefillSource>> = 
   aftercare: 'thanksMessage',
 };
 
+/** The planning message a phone edit is saved as (#1077). No entry for obituary: its link message is never saved. */
+type PlannedMessageKey = 'announcementMessage' | 'serviceMessage' | 'thanksMessage';
+const PLANNED_KEY: Partial<Record<TemplateCategory, PlannedMessageKey>> = {
+  announcement: 'announcementMessage',
+  service: 'serviceMessage',
+  aftercare: 'thanksMessage',
+};
+
+export type PlannedMessagePatch = Partial<Record<PlannedMessageKey, string>>;
+
+/**
+ * A hand edit to the message on the phone, as the person's planning message, so the web shows it (#1077).
+ * Only the announcement, service and thank-you, only when the family typed it (not the web's own wording),
+ * and only when it differs from what is saved. The value is the edited message itself (`messageOverride`);
+ * the per-person greeting is never part of it. A blank edit is not saved, so clearing the box never empties the web's wording.
+ */
+export function plannedMessagePatch(
+  category: TemplateCategory | null,
+  flowState: { messageOverride: string | null; messageFromWeb: boolean },
+  session: Partial<Pick<SendPrefillSource, PlannedMessageKey>>,
+): PlannedMessagePatch | null {
+  const key = category ? PLANNED_KEY[category] : undefined;
+  const edited = flowState.messageOverride;
+  if (!key || flowState.messageFromWeb || edited === null || edited.trim() === '') {
+    return null;
+  }
+  if (session[key] === edited) {
+    return null;
+  }
+  return { [key]: edited };
+}
+
 const text = (value: string | null | undefined): string => value?.trim() ?? '';
 
 /** Place and address as one line, skipping a missing part. */

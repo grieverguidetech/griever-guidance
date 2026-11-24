@@ -110,12 +110,14 @@ describe('the web Ready status and the announcement send screen (#949)', () => {
     expect(await findMessage('My own words.')).toBeTruthy();
   });
 
-  it('keeps the send screen when the words were edited on the phone, even after Ready is removed', async () => {
+  it('keeps the words edited on the phone as the planning message, even after Ready is removed (#1081)', async () => {
     await open(anna({ sectionStatus: { announcement: 'ready' } }));
     await screen.findByLabelText('Your message');
     typeMessage('My own words.');
     webUnmarks();
-    expect(await findMessage('My own words.')).toBeTruthy();
-    expect(screen.queryByRole('heading', { name: NUDGE })).toBeNull();
+    // The edit is now the web's wording (it was saved as the planning message), so the step follows the Ready status again.
+    expect(await screen.findByRole('heading', { name: NUDGE })).toBeTruthy();
+    const saved = JSON.parse((await AsyncStorage.getItem(SESSIONS_KEY)) ?? '[]') as Session[];
+    expect(saved[0].announcementMessage).toBe('My own words.');
   });
 });

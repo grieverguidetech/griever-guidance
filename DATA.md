@@ -116,6 +116,9 @@ lives under that key.
 2. **`composedMessage` is never stored.** It is derived from L3 + A2/B1/B2 + the flowers toggle on
    every render. The one exception is a user edit (B4: typing in the always-editable message box), which pins the text into
    `screens.B4.values.messageOverride` and stops derivation (never synced in shared sync, §5).
+   On the phone, a hand edit to the announcement, service or thank-you message is also saved as the
+   person's planning message (`announcementMessage`, `serviceMessage`, `thanksMessage`), which syncs
+   (#1077, #1081). `messageOverride` itself, and the per-person greeting, stay on the device.
 3. **`screen.status`** is one of `pending` · `active` · `complete` · `seen` · `skipped`. It is what
    C1's path view and the C2 gate read; it is never inferred by checking whether fields are empty.
 4. **`screen.updatedAt` is per-screen.** This is the load-bearing reason for the screen-keyed shape:
@@ -528,7 +531,7 @@ shared person sync never carries contact ids or edited wording (C2 until it was 
   around: a new device starts fresh (§2). Do not add a "just this once" path that ships a name to
   the server for a preview or a receipt.
 - **Message bodies.** Planning messages (`serviceMessage` and the other section messages the web editor writes) are stored on the device (C2 dropped 2026-10-30); nothing is sent from web. In the send flow, the body is derived, not stored (§2 rule 2). `messageOverride` (edited wording) is the
-  user's own message text. It is kept only in the on-device draft until sent and never syncs (C2, dropped 2026-10-30 for the web editor; still true in the flag-off send flow).
+  user's own message text. It is kept only in the on-device draft until sent and never syncs (C2, dropped 2026-10-30 for the web editor; still true in the flag-off send flow). Since #1081 the phone also saves a hand edit to the announcement, service or thank-you message as the person's planning message, which syncs and stays after the send.
   The removed Convex design would have synced it as `screens.B4.values.messageOverride`, but nothing
   wrote it there.
 - **Send jobs / delivery receipts.** Server-owned already (README B5); they are read down by their
@@ -649,7 +652,7 @@ no email (the email lives in Clerk).
 **What never syncs:**
 
 - send-flow drafts (the four planning messages do sync, see the list above)
-- edited wording (`messageOverride`)
+- `messageOverride` itself. A phone hand edit to the announcement, service or thank-you message is saved as that person's planning message (`announcementMessage`, `serviceMessage`, `thanksMessage`), which syncs and is kept after the send (#1081). The obituary link message is not saved
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)

@@ -5,25 +5,25 @@ const r = (...s: ('delivered' | 'skipped')[]) => s.map((status, i) => ({ contact
 const NO_COPY = "We don't keep a copy of what was sent — it's already where it belongs, in your own Messages app.";
 
 describe('sendNote', () => {
-  it('has one lead per moment when everyone was told, and the privacy line as the rest', () => {
+  it('has one lead per moment when everyone was told, and no "we keep no copy" line (#1077)', () => {
     expect(sendNote('announcement', r('delivered'))).toEqual({
       lead: 'Everyone has been told.',
-      rest: NO_COPY,
-      spoken: `Everyone has been told. ${NO_COPY}`,
+      rest: '',
+      spoken: 'Everyone has been told.',
       category: 'announcement',
       partial: false,
     });
     expect(sendNote('service', r('delivered')).lead).toBe('The service details have been shared.');
     expect(sendNote('obituary', r('delivered')).lead).toBe('The obituary has been shared.');
     expect(sendNote('aftercare', r('delivered')).lead).toBe('Your thank-yous have been sent.');
-    expect(sendNote('obituary', r('delivered')).rest).toBe(NO_COPY);
+    expect(sendNote('obituary', r('delivered')).rest).toBe('');
   });
 
   it('says how many were told when anyone was skipped', () => {
     expect(sendNote('announcement', r('delivered', 'skipped', 'delivered'))).toEqual({
       lead: 'You told 2 of 3.',
-      rest: `You can text the others from your own Messages app any time. ${NO_COPY}`,
-      spoken: `You told 2 of 3. You can text the others from your own Messages app any time. ${NO_COPY}`,
+      rest: 'You can text the others from your own Messages app any time.',
+      spoken: 'You told 2 of 3. You can text the others from your own Messages app any time.',
       category: 'announcement',
       partial: true,
     });
@@ -49,6 +49,14 @@ describe('sendNote', () => {
 
   it('does not say "0 of 0" when there are no recipients', () => {
     expect(sendNote('announcement', []).lead).toBe('Everyone has been told.');
+  });
+
+  it('never says "we keep no copy" on the phone', () => {
+    for (const rs of [r('delivered'), r('delivered', 'skipped'), r('skipped')]) {
+      const n = sendNote('service', rs);
+      expect(n.spoken).not.toContain(NO_COPY);
+      expect(n.rest).not.toContain("We don't keep a copy");
+    }
   });
 
   it('never uses an exclamation point', () => {

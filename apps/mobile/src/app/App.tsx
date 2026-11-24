@@ -10,7 +10,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMembers, useSendFlow, useContacts, getContactsRetentionExpiry, latestInProgressDraft, resumeDraft } from '@griever/hooks';
 import type { Session, SendFlowDraft } from '@griever/hooks';
-import { obituaryLink, sendPrefill } from '@griever/shared';
+import { obituaryLink, plannedMessagePatch, sendPrefill } from '@griever/shared';
+import type { PlannedMessagePatch } from '@griever/shared';
 import type { MomentKey, TemplateCategory } from '@griever/shared';
 import { ContactSelectorScreen } from '../screens/ContactSelectorScreen';
 import { ReadyToSendScreen } from '../screens/ReadyToSendScreen';
@@ -127,7 +128,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export type FlowProps = { flow: ReturnType<typeof useSendFlow> };
 
-type Details = { personName?: string; dateOfPassing?: string; serviceDate?: string };
+type Details = { personName?: string; dateOfPassing?: string; serviceDate?: string } & PlannedMessagePatch;
 
 type SessionProps = {
   session: Session;
@@ -358,6 +359,22 @@ const SendSession = ({ session, contacts, arrived, startCategory, onHub, onShare
       setWebMessage(planned.messageOverride);
     }
   }, [inVisit, onForm, selectedTemplate, setMessageOverride, setWebMessage, setWebField, messageOverride, messageFromWeb, category, session, accountName, senderTyped, fields, webFields, webMessageSeen]);
+
+  // A hand edit to the message becomes the person's planning message, so the web shows it (#1077). It runs when the
+  // edit itself changes, in the same render, so an edit that is sent right away is saved before the send. Opening a
+  // moment, or a draft that loads its saved edit, is not a new edit; nor is a newer web edit over an old phone edit.
+  const lastEdit = useRef<{ category: TemplateCategory | null; message: string | null }>({ category, message: messageOverride });
+  useEffect(() => {
+    const before = lastEdit.current;
+    lastEdit.current = { category, message: messageOverride };
+    if (before.category !== category || before.message === messageOverride) {
+      return;
+    }
+    const patch = plannedMessagePatch(category, { messageOverride, messageFromWeb: messageFromWeb === true }, session);
+    if (patch) {
+      onDetails(id, patch);
+    }
+  }, [category, messageOverride, messageFromWeb, session, id, onDetails]);
 
   // On a moment's first form, Back (on screen and Android's) returns to the hub.
   // The announcement's first form is the people step (its intro is skipped), so Back there must not

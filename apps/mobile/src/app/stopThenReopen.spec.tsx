@@ -13,6 +13,8 @@ import { findMessage, typeMessage } from '../testing/messageBox';
 
 const WEB_SERVICE = 'The service is at noon.';
 const WEB_THANKS = 'Thank you for being there.';
+// What each test types on Ready to send; it is saved as the planning message and starts the reopened moment (#1081).
+const EDITED = 'My own words.';
 
 const base = {
   id: 'a', flowId: 'flow-a', ownerId: null, role: 'owner', personName: 'Anna', dateOfPassing: '', senderName: '', obituaryUrl: '',
@@ -113,7 +115,8 @@ describe('opening a moment again after Stop for now (#1073)', () => {
     await stopForNow();
     expect((await savedDraft('service'))?.step).toBe('sent');
     await pressRow(/Share the service/);
-    await expectReadyToSend(WEB_SERVICE);
+    // The hand edit was saved as the planning message (#1081), so the reopened moment starts from it.
+    await expectReadyToSend(EDITED);
   });
 
   it('b. Share the service after the hand-off to Messages and the return', async () => {
@@ -125,7 +128,7 @@ describe('opening a moment again after Stop for now (#1073)', () => {
     await screen.findByText(/^Sent to Dee\?/);
     await stopForNow();
     await pressRow(/Share the service/);
-    await expectReadyToSend(WEB_SERVICE);
+    await expectReadyToSend(EDITED);
   });
 
   it('c. Share the service with two people, stopping after the first is sent', async () => {
@@ -138,7 +141,7 @@ describe('opening a moment again after Stop for now (#1073)', () => {
     await stopForNow();
     expect(await screen.findByText('You told 1 of 2.')).toBeTruthy();
     await pressRow(/Share the service/);
-    await expectReadyToSend(WEB_SERVICE);
+    await expectReadyToSend(EDITED);
   });
 
   it('d. The announcement, stopped and reopened from the lit card on the hub', async () => {
@@ -148,7 +151,7 @@ describe('opening a moment again after Stop for now (#1073)', () => {
     const cards = screen.getAllByTestId('hub-next-card');
     expect(cards).toHaveLength(1);
     fireEvent.press(cards[0]);
-    await expectReadyToSend('Anna passed away peacefully.');
+    await expectReadyToSend(EDITED);
   });
 
   it('e. Send thank-yous after Stop for now', async () => {
@@ -157,6 +160,6 @@ describe('opening a moment again after Stop for now (#1073)', () => {
     await stopForNow();
     expect((await savedDraft('aftercare'))?.step).toBe('sent');
     await pressRow(/Send thank-yous/);
-    await expectReadyToSend(WEB_THANKS);
+    await expectReadyToSend(EDITED);
   });
 });
