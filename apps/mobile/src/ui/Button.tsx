@@ -12,39 +12,44 @@ import { useSerifStyle } from './typography';
 export type ButtonNode = ComponentRef<typeof Pressable>;
 
 /**
- * `primary` and `secondary` are the v2 swirl buttons (#976): a sunset or soft ocean LinearSwirl fill, radius, border,
- * text and shadow from `v2.recipes.button`. The other variants keep the 2026-10-25 look (decision by Peter): rounded 10px corners, and a tinted outlined "link" button
- * (HomeScreen's What you'll need) as `tinted`, and `tertiary` for quiet actions such as Cancel: an
- * roles.link label with an underline, no fill and no border, and a pale accent wash while pressed.
- * `header` is Back and What you'll need (#362): the page shows through, a thin v2 focus-colour outline,
- * no underline, same as web's top bar. No icons. Palette and serif still follow web.
+ * Three tiers, chosen by what the button does (product owner, 2026-11-23):
+ * - `primary` is an action: the v2 sunset LinearSwirl fill, radius, border, text and shadow from `v2.recipes.button.primary`.
+ * - `secondary` is navigation (Back, Close, What you'll need's neighbours): the `v2.recipes.button.outline` recipe. The page shows
+ *   through, a thin roles.link edge, roles.link text, no swirl and no shadow.
+ * - `tertiary` is a suggestion: the `v2.recipes.button.tertiary` recipe. A roles.link label with an underline, no fill and
+ *   no border, and a pale accent wash while pressed.
+ * No icons. Palette and serif follow web.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'tinted' | 'ghost' | 'tertiary' | 'header';
+export type ButtonVariant = 'primary' | 'secondary' | 'tertiary';
 
-const BUTTON_RADIUS = 10;
-
-/** Primary and secondary are the v2 swirl buttons: a sliding gradient fill, drawn from the recipes. */
-const RECIPES = { primary: v2.recipes.button.primary, secondary: v2.recipes.button.secondary } as const;
+const PRIMARY = v2.recipes.button.primary;
+const OUTLINE = v2.recipes.button.outline;
+const TERTIARY = v2.recipes.button.tertiary;
 const PAGE = v2.roles.page.color;
 
-type Recipe = (typeof RECIPES)[keyof typeof RECIPES];
-
 /** The whole recipe shadow list as one boxShadow string. react-native-web 0.21 warns on the old shadow* props; RN 0.88 reads this natively. */
-export function recipeShadow(recipe: Recipe): string {
+export function recipeShadow(recipe: typeof PRIMARY): string {
   return recipe.shadow.map(({ x, y, blur, color }) => `${x}px ${y}px ${blur}px ${color}`).join(', ');
 }
 
-/** The recipe's border, radius and shadow as one outer style. */
-function recipeFrame(recipe: Recipe) {
+/** The primary recipe's border, radius and shadow as one outer style. */
+function primaryFrame() {
   return {
-    borderWidth: recipe.border.width,
-    borderColor: recipe.border.color,
-    borderRadius: recipe.radius,
-    // Behind the swirl; only a sliver at the edge could show it, so the inner radius is recipe.radius - border.width.
-    backgroundColor: recipe.swirl.stops[0],
-    boxShadow: recipeShadow(recipe),
+    borderWidth: PRIMARY.border.width,
+    borderColor: PRIMARY.border.color,
+    borderRadius: PRIMARY.radius,
+    // Behind the swirl; only a sliver at the edge could show it, so the inner radius is radius - border.width.
+    backgroundColor: PRIMARY.swirl.stops[0],
+    boxShadow: recipeShadow(PRIMARY),
   };
 }
+
+/** The outline recipe's edge and radius: transparent fill, no shadow. */
+const OUTLINE_FRAME = {
+  borderWidth: OUTLINE.border.width,
+  borderColor: OUTLINE.border.color,
+  borderRadius: OUTLINE.radius,
+} as const;
 
 /** Pressed swirl buttons dim to this. At 0.7 the secondary label fell to about 3.6:1; 0.85 stays above 4.5:1 (see Button.spec). */
 const SWIRL_PRESSED_OPACITY = 0.85;
@@ -147,8 +152,8 @@ export function Button({
     extra['aria-haspopup'] = 'dialog';
   }
 
-  // Weight by the typography helper: the regular face for secondary, semibold (Nunito Sans 600) for the rest.
-  const font = useSerifStyle(variant === 'secondary' ? 'regular' : 'semibold');
+  // Weight by the typography helper: semibold (Nunito Sans 600) on every tier.
+  const font = useSerifStyle('semibold');
   // Said once when the work starts. On native, a state change alone is not spoken.
   const working = showBusy;
   useEffect(() => {
@@ -160,29 +165,28 @@ export function Button({
     // Only when the work starts, not when the words change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [working]);
-  const recipe = recipeOf(variant);
-  const swirled = recipe !== undefined && !ariaDisabled;
+  const swirled = variant === 'primary' && !ariaDisabled;
   // An unavailable primary or secondary is quiet (matches web): no swirl, a flat page fill, a dashed recipe border, no shadow.
-  const unavailableOutline = ariaDisabled && recipe !== undefined;
-  // The recipe colour in every state: plain roles.muted was under 4.5:1 on the soft ocean swirl.
-  const labelColor = recipe?.text.color;
+  const unavailableOutline = ariaDisabled && variant !== 'tertiary';
+  // The recipe colour in every state: plain roles.muted would drop under 4.5:1 on the primary fill.
+  const labelColor = LABEL_COLOR[variant];
   const text = (
     <Phrasing>
       <Text
         style={[
           styles.label,
           font,
-          variant === 'primary' ? styles.labelPrimary : styles.labelLink,
+          styles.labelSize,
+          { color: labelColor },
           labelStyle(variant, ariaDisabled),
-          (variant === 'tertiary' || variant === 'ghost') && styles.labelTertiary,
-          labelColor !== undefined && { color: labelColor },
+          variant === 'tertiary' && TERTIARY.underline && !ariaDisabled && styles.labelTertiary,
         ]}
       >
         {working && busyLabel ? busyLabel : label}
       </Text>
     </Phrasing>
   );
-  const spinnerColor = labelColor ?? v2.roles.link;
+  const spinnerColor = labelColor;
   const body = working ? (
     <View style={styles.content}>
       <ActivityIndicator
@@ -204,20 +208,23 @@ export function Button({
       accessibilityState={buttonState(busy, ariaDisabled && announceDisabled, pressed, expanded)}
       onPress={onPress}
       onPressIn={onPressIn}
-      style={({ pressed }) => [
+      style={({ pressed: touching }) => [
         styles.base,
         styles[variant],
-        recipe && recipeFrame(recipe),
+        variant === 'primary' && primaryFrame(),
+        variant === 'secondary' && OUTLINE_FRAME,
         swirled && styles.swirlFrame,
         unavailableOutline && styles.unavailableOutline,
+        // A toggle that is on keeps the pressed wash, so on and off differ (secondary only; matches web).
+        variant === 'secondary' && pressed === true && !ariaDisabled && styles.pressedWash,
         minHeight !== undefined && { minHeight },
         // No press fade while unavailable: opacity would drop the dashed edge under 3:1 (web skips it too).
-        pressed && !ariaDisabled && (variant === 'tertiary' || variant === 'header' ? styles.pressedWash : recipe ? styles.pressedSwirl : styles.pressed),
+        touching && !ariaDisabled && (variant === 'primary' ? styles.pressedSwirl : styles.pressedWash),
       ]}
       {...extra}
     >
       {swirled ? (
-        <LinearSwirl stops={[...recipe.swirl.stops]} angle={recipe.swirl.angle} driftMs={recipe.driftMs} style={[styles.swirl, { borderRadius: recipe.radius - recipe.border.width }]}>
+        <LinearSwirl stops={[...PRIMARY.swirl.stops]} angle={PRIMARY.swirl.angle} driftMs={PRIMARY.driftMs} style={[styles.swirl, { borderRadius: PRIMARY.radius - PRIMARY.border.width }]}>
           {body}
         </LinearSwirl>
       ) : (
@@ -246,16 +253,16 @@ function buttonState(busy: boolean | undefined, ariaDisabled: boolean, pressed: 
   };
 }
 
-function recipeOf(variant: ButtonVariant) {
-  return variant === 'primary' || variant === 'secondary' ? RECIPES[variant] : undefined;
-}
+/** The label colour of each tier, from its recipe. */
+const LABEL_COLOR: Record<ButtonVariant, string> = {
+  primary: PRIMARY.text.color,
+  secondary: OUTLINE.text.color,
+  tertiary: TERTIARY.text.color,
+};
 
+/** An unavailable tertiary has no edge to go quiet with, so its label goes muted; the other tiers keep the recipe colour on a dashed edge. */
 function labelStyle(variant: ButtonVariant, ariaDisabled: boolean) {
-  if (ariaDisabled) {
-    // Primary and secondary take the recipe colour; only the other variants need the muted one.
-    return recipeOf(variant) ? undefined : styles.labelUnavailable;
-  }
-  return variant === 'primary' ? styles.labelOnFill : styles.labelAccent;
+  return ariaDisabled && variant === 'tertiary' ? styles.labelUnavailable : undefined;
 }
 
 const styles = StyleSheet.create({
@@ -267,18 +274,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'transparent',
-    borderRadius: BUTTON_RADIUS,
+    borderRadius: OUTLINE.radius,
   },
-  // Primary and secondary get their fill, border and shadow from the v2 recipes (recipeFrame).
+  // Primary gets its fill, border and shadow from the primary recipe (primaryFrame); secondary its edge from the outline recipe.
   primary: { paddingVertical: 14 },
   secondary: { paddingVertical: 14 },
-  tinted: { borderColor: v2.roles.link, backgroundColor: v2.roles.wash },
-  ghost: {},
   // Text only. The 44px minimum still makes the target; paddingHorizontal keeps the wash off the text edge.
   tertiary: {},
-  // The v2 focus colour holds 3:1 on every ground (v2.spec).
-  header: { borderColor: v2.roles.focus },
-  pressed: { opacity: 0.7 },
   pressedSwirl: { opacity: SWIRL_PRESSED_OPACITY },
   // roles.link on roles.wash is above 4.5:1 (see Button.spec), so the label stays readable while pressed.
   pressedWash: { backgroundColor: v2.roles.wash },
@@ -291,10 +293,7 @@ const styles = StyleSheet.create({
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] },
   label: {
   },
-  labelPrimary: { fontSize: 15 },
-  labelLink: { fontSize: 15 },
-  labelOnFill: { color: PAGE },
+  labelSize: { fontSize: 15 },
   labelTertiary: { textDecorationLine: 'underline' },
-  labelAccent: { color: v2.roles.link },
   labelUnavailable: { color: v2.roles.muted },
 });

@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { Keyboard, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { ShareObituary } from './ShareObituary';
 import type { ShareObituaryCopy, ShareObituaryProps } from './ShareObituary';
+import { tierOfButton } from '../buttonTier.testkit';
 
 const copy: ShareObituaryCopy = {
   heading: 'Has the obituary been published?',
@@ -70,6 +71,14 @@ function setup(over: Partial<ShareObituaryProps> = {}) {
     />,
   );
 }
+
+describe('ShareObituary button tiers (#1065)', () => {
+  it('draws Back as secondary and What you will need as primary', () => {
+    setup();
+    expect(tierOfButton('Back')).toBe('secondary');
+    expect(tierOfButton("What you'll need")).toBe('primary');
+  });
+});
 
 describe('ShareObituary Done after emailing (#726)', () => {
   const editor = { value: 'Anna loved the garden.', onValueChange: jest.fn() };

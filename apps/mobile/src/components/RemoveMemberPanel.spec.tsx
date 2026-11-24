@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import type { GetMembersResult, RemoveMemberResult } from '@griever/api-client';
 import type { MembersView } from '@griever/shared';
 import { PeopleHelping } from './PeopleHelping';
+import { tierOfButton } from '../ui/buttonTier.testkit';
 
 const mockGetMembers = jest.fn<(token: string) => Promise<GetMembersResult>>();
 const mockRemoveMember = jest.fn<(token: string, id: string) => Promise<RemoveMemberResult>>();
@@ -66,6 +67,13 @@ describe('Remove a helper', () => {
     expect(screen.queryByText('Remove Sam Lee')).toBeNull();
     expect(mockRemoveMember).not.toHaveBeenCalled();
     await waitFor(() => expect(lastFocusText()).toBe(CONFIRM_LINE));
+  });
+
+  it('draws Keep as primary (the safe choice) and Remove as secondary', async () => {
+    await renderOwner();
+    fireEvent.press(rowButton('Sam Lee'));
+    expect(tierOfButton('Keep Sam Lee')).toBe('primary');
+    expect(tierOfButton('Remove Sam Lee')).toBe('secondary');
   });
 
   it('Keep closes the step, calls nothing and returns focus to the row button', async () => {

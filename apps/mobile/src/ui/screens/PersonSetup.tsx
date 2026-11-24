@@ -78,8 +78,8 @@ export function PersonSetup({ copy, editing, backName, name, onNameChange, rende
   return (
     <View style={styles.screen}>
       <View style={styles.topBar}>
-        <Button label={copy.back} accessibilityName={backName} variant="header" onPress={onBack} />
-        <Button label={copy.checklist} variant="header" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+        <Button label={copy.back} accessibilityName={backName} variant="secondary" onPress={onBack} />
+        <Button label={copy.checklist} variant="primary" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
       </View>
       <View style={styles.head}>
         <Heading level={1} headingRef={headingRef}>

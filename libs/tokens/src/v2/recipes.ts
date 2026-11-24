@@ -23,15 +23,10 @@ export function buildRecipes(r: Roles, p: Primitives) {
         shadow: [p.shadows.sunset],
         radius: p.radius,
       },
-      secondary: {
-        swirl: r.soft,
-        driftMs: p.motion.driftMs,
-        text: { color: p.colors.secondaryText, weight: p.font.weights.regular, family: p.font.bodyFamily },
-        border: { width: p.border.medium, color: p.colors.secondaryBorder },
-        shadow: [p.shadows.glass],
-        radius: p.radius,
-      },
-      /** The secondary tier (navigation): transparent, a thin link-colour edge, link-colour text. No swirl, shadow or drift. */
+      /**
+       * The secondary tier (navigation): transparent, a thin link-colour edge, link-colour text. No swirl, shadow or drift.
+       * Named `outline` because web's CSS vars (`--color-v2-outline-*`) read it by that name.
+       */
       outline: {
         text: { color: r.link, weight: p.font.weights.medium, family: p.font.bodyFamily },
         border: { width: p.border.thin, color: r.link },

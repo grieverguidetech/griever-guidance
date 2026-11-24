@@ -79,7 +79,7 @@ export function NameSwitcher({ name, others, onPick, onEdit, onAdd }: NameSwitch
         {newestFirst(others).map((person) => (
           <Button key={person.id} label={personLabel(person)} variant="secondary" onPress={() => close(() => onPick(person.id))} />
         ))}
-        {onAdd ? <Button label={copy.addSomeone} variant="tinted" onPress={() => close(onAdd)} /> : null}
+        {onAdd ? <Button label={copy.addSomeone} variant="secondary" onPress={() => close(onAdd)} /> : null}
       </Sheet>
     </>
   );

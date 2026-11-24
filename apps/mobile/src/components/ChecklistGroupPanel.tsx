@@ -89,7 +89,7 @@ export function ChecklistGroupPanel({
   return (
     <View style={styles.panel}>
       <View style={styles.header}>
-        <Button label={checklistCopy.back} variant="header" onPress={onBack} />
+        <Button label={checklistCopy.back} variant="secondary" onPress={onBack} />
         <View style={styles.close}>
           <Button label={copy.close} variant="secondary" onPress={onClose} />
         </View>

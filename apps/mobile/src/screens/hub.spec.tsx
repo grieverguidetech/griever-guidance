@@ -201,10 +201,10 @@ describe('HubScreen', () => {
     expect(screen.queryByRole('button', { name: 'Edit person' })).toBeNull();
   });
 
-  it('draws What you will need as the secondary (soft ocean) swirl button, with the recipe text colour and a 44 pt target', () => {
+  it('draws What you will need as a primary (sunset swirl) button, with the recipe text colour and a 44 pt target', () => {
     setup();
     const flat = StyleSheet.flatten(typeof checklistButton().props.style === 'function' ? checklistButton().props.style({ pressed: false }) : checklistButton().props.style);
-    const recipe = v2.recipes.button.secondary;
+    const recipe = v2.recipes.button.primary;
     expect(flat.borderColor).toBe(recipe.border.color);
     expect(flat.minHeight).toBeGreaterThanOrEqual(44);
     expect(flat.minWidth).toBeGreaterThanOrEqual(44);
@@ -212,10 +212,10 @@ describe('HubScreen', () => {
     expect(StyleSheet.flatten(within(checklistButton()).getByText("What you'll need").props.style).color).toBe(recipe.text.color);
   });
 
-  it('has exactly one primary swirl button, the bottom action bar, so the gold swirl stays for the next step', () => {
+  it('has two primary swirl buttons: What you will need and the bottom action bar (the next step)', () => {
     setup();
     const primary = screen.UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]));
-    expect(primary).toHaveLength(1);
+    expect(primary).toHaveLength(2);
     expect(within(screen.getByTestId('hub-action-bar')).UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]))).toHaveLength(1);
   });
 
@@ -270,14 +270,15 @@ describe('HubScreen', () => {
     expect(onAccount).toHaveBeenCalledTimes(1);
   });
 
-  it('puts the Your account link after the last step, as plain text with no outline', () => {
+  it('puts the Your account link after the last step, as a secondary outline button', () => {
     setup(anna, false, { onAccount: jest.fn() });
     const tree = JSON.stringify(screen.toJSON());
     expect(tree.indexOf('Send thank-yous')).toBeLessThan(tree.indexOf('Your account'));
     const link = screen.getByRole('button', { name: 'Your account' });
     const flat = StyleSheet.flatten(typeof link.props.style === 'function' ? link.props.style({ pressed: false }) : link.props.style);
     expect(flat.backgroundColor).toBeUndefined();
-    expect(flat.borderColor).toBe('transparent');
+    expect(flat.borderColor).toBe(v2.recipes.button.outline.border.color);
+    expect(flat.borderWidth).toBe(v2.recipes.button.outline.border.width);
   });
 
   it('after the checklist sheet closes on iOS, screen-reader focus goes back to What you will need (onDismiss)', () => {

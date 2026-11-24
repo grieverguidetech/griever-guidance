@@ -4,6 +4,7 @@ import { AccessibilityInfo } from 'react-native';
 import { screenCopy } from '@griever/copy';
 import { DeleteAccountPanel } from './DeleteAccountPanel';
 import type { DeleteOutcome } from './DeleteAccountPanel';
+import { tierOfButton } from '../ui/buttonTier.testkit';
 
 // Jest has no native view tree, so findNodeHandle returns null; focus needs a handle. Same replacement as ui/screens/Account.spec.tsx.
 jest.mock('react-native/Libraries/ReactNative/RendererProxy', () => ({
@@ -31,6 +32,13 @@ describe('DeleteAccountPanel', () => {
     expect(screen.queryByText(copy.deleteHint)).toBeNull();
     expect(screen.queryByText(copy.deleteConfirmHeading)).toBeNull();
     expect(screen.queryByRole('button', { name: copy.deleteConfirmAction })).toBeNull();
+  });
+
+  it('draws the cancel as primary (the safe choice) and the delete confirm as secondary', () => {
+    setup();
+    open();
+    expect(tierOfButton(copy.deleteCancel)).toBe('primary');
+    expect(tierOfButton(copy.deleteConfirmAction)).toBe('secondary');
   });
 
   it('deletes nothing when the first button is pressed', () => {

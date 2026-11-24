@@ -290,7 +290,7 @@ export function HubScreen({ session, others, onSwitch, onAddSomeone, onAccount, 
         metaOnAllRows
         headingRef={heading}
         whatYoullNeedRef={checklistButton}
-        footer={onAccount ? <Button label={phoneCopy.account} variant="tertiary" onPress={onAccount} /> : undefined}
+        footer={onAccount ? <Button label={phoneCopy.account} variant="secondary" onPress={onAccount} /> : undefined}
       >
         {note ? (
           <View style={styles.note} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${note.lead} ${note.rest}`}>

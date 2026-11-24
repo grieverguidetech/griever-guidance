@@ -108,9 +108,11 @@ describe('toMarketingCss', () => {
     expect(vars['--gg-primary-bg']).toBe(
       `linear-gradient(${gradients.sunset.angle}deg, ${gradients.sunset.stops.join(', ')})`,
     );
-    expect(vars['--gg-secondary-bg']).toContain(
-      'linear-gradient(120deg, #a5cbe3',
-    );
+    expect(vars['--gg-secondary-bg']).toBeUndefined();
+    expect(vars['--gg-outline-border']).toBe(`1px solid ${v2.roles.link}`);
+    expect(vars['--gg-outline-text']).toBe(v2.roles.link);
+    expect(vars['--gg-wash']).toBe(v2.roles.wash);
+    expect(vars['--gg-outline-radius']).toBeUndefined();
     expect(vars['--gg-primary-text']).toBe(c.primaryText);
     expect(vars['--gg-primary-border']).toBe(`1px solid ${c.primaryBorder}`);
     expect(vars['--gg-primary-shadow']).toBe(
@@ -183,7 +185,8 @@ describe('toWebThemeCss with v2', () => {
     expect(theme['--font-v2-body']).toBe(webFontStack(v2.primitives));
     expect(theme['--font-v2-heading']).toBe(webHeadingFontStack(v2.primitives));
     expect(root['--v2-primary-bg']).toMatch(/^linear-gradient\(120deg, /);
-    expect(root['--v2-secondary-bg']).toMatch(/^linear-gradient\(120deg, /);
+    expect(root['--v2-secondary-bg']).toBeUndefined();
+    expect(root['--v2-secondary-shadow']).toBeUndefined();
     expect(root['--v2-card-shadow']).toBe(
       `0px 1px 9px ${v2.primitives.shadows.glass.color}`,
     );
@@ -284,7 +287,7 @@ describe('toWebThemeCss with v2', () => {
     p.colors.glowSun = '#fedcba';
     p.colors.glowSky = '#abcdef';
     p.colors.error = '#0a0b0c';
-    p.colors.secondaryBorder = '#112233';
+    p.colors.primaryBorder = '#112233';
     p.gradients.sunset.stops = ['#aaaaaa', '#bbbbbb', '#cccccc'];
     p.radius = 3;
     p.motion.settleMs = 3000;
@@ -313,7 +316,8 @@ describe('toWebThemeCss with v2', () => {
     expect(t['--color-v2-glow-sky']).toBe('#abcdef');
     expect(t['--color-v2-error']).toBe('#0a0b0c');
     expect(t['--color-v2-focus']).toBe('#010203'); // the focus role follows the link primitive (#1005)
-    expect(t['--color-v2-secondary-border']).toBe('#112233');
+    expect(t['--color-v2-primary-border']).toBe('#112233');
+    expect(t['--color-v2-secondary-border']).toBeUndefined();
     expect(t['--font-v2-eyebrow']).toMatch(/^'Fixture', /);
     expect(t['--font-v2-body']).toMatch(/^'Fixture', /);
     expect(t['--font-v2-heading']).toMatch(/^'FixtureHead', /);

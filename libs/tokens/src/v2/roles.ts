@@ -34,8 +34,6 @@ export function buildRoles(p: Primitives) {
     success: p.colors.success,
     /** The strong swirl: the primary action. */
     loud: p.gradients.sunset,
-    /** The quiet swirl: secondary actions. */
-    soft: p.gradients.softOcean,
     nudge: p.gradients.pastel,
     doneMark: {
       swirl: [p.colors.ocean, p.colors.sea, p.colors.lavender],
