@@ -107,6 +107,18 @@ describe('plannedMessagePatch (#1077)', () => {
     expect(plannedMessagePatch('service', { messageOverride: '  ', messageFromWeb: false }, saved)).toBeNull();
   });
 
+  it('cuts the saved copy at the server limit, never in the middle of a surrogate pair', () => {
+    const long = { messageOverride: 'a'.repeat(2500), messageFromWeb: false };
+    expect(plannedMessagePatch('announcement', long, {})).toEqual({ announcementMessage: 'a'.repeat(2000) });
+    const pair = { messageOverride: `${'a'.repeat(1999)}\u{1F54A}`, messageFromWeb: false };
+    expect(plannedMessagePatch('service', pair, {})).toEqual({ serviceMessage: 'a'.repeat(1999) });
+  });
+
+  it('does not save again when the saved copy is already the cut text', () => {
+    const long = { messageOverride: 'a'.repeat(2500), messageFromWeb: false };
+    expect(plannedMessagePatch('aftercare', long, { thanksMessage: 'a'.repeat(2000) })).toBeNull();
+  });
+
   it('returns only the one planning key', () => {
     expect(Object.keys(plannedMessagePatch('service', edit, saved) ?? {})).toEqual(['serviceMessage']);
   });

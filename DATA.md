@@ -521,7 +521,7 @@ A failed background flush retries with backoff (1s → 2s → 4s → … capped 
 
 This section covers the original Convex session sync, which was removed (#203).
 The family-sharing design below ("Shared people") overrides it where they differ:
-shared person sync never carries contact ids or edited wording (C2 until it was dropped 2026-10-30, C3).
+shared person sync never carries contact ids or edited wording (except the #1081 planning message) (C2 until it was dropped 2026-10-30, C3).
 
 - **Contacts. Settled: they never leave the device.** Names and mobile numbers of a grieving
   family's circle are the most sensitive data in the app, and they are already on the phone
@@ -652,7 +652,7 @@ no email (the email lives in Clerk).
 **What never syncs:**
 
 - send-flow drafts (the four planning messages do sync, see the list above)
-- `messageOverride` itself. A phone hand edit to the announcement, service or thank-you message is saved as that person's planning message (`announcementMessage`, `serviceMessage`, `thanksMessage`), which syncs and is kept after the send (#1081). The obituary link message is not saved
+- `messageOverride` itself. A phone hand edit to the announcement, service or thank-you message is saved as that person's planning message (`announcementMessage`, `serviceMessage`, `thanksMessage`), which syncs and is kept after the send (#1081). The obituary link message is not saved.
 - recipients, and who was told (who was messaged)
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)

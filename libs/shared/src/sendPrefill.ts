@@ -1,6 +1,7 @@
 // Where a moment's first form starts from the details the family planned (and synced from the web).
 // Pure: it reads a person and returns form fields plus an edited message, nothing else. It never
 // touches contacts, drafts or recipients (C1, C3, C4).
+import { FLOW_DETAIL_MAX_LENGTH } from './flowDetails.js';
 import type { SectionFields } from './sections.js';
 import type { SessionDetails, TemplateCategory } from './types.js';
 
@@ -61,10 +62,23 @@ export function plannedMessagePatch(
   if (!key || flowState.messageFromWeb || edited === null || edited.trim() === '') {
     return null;
   }
-  if (session[key] === edited) {
+  const saved = capForServer(key, edited);
+  if (session[key] === saved) {
     return null;
   }
-  return { [key]: edited };
+  return { [key]: saved };
+}
+
+// The server cuts text above its cap on a pull, which would shorten the open text; so the saved copy is cut here.
+// A cut never leaves half of a surrogate pair.
+function capForServer(key: PlannedMessageKey, value: string): string {
+  const max = FLOW_DETAIL_MAX_LENGTH[key];
+  if (value.length <= max) {
+    return value;
+  }
+  const cut = value.slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
 }
 
 const text = (value: string | null | undefined): string => value?.trim() ?? '';
