@@ -154,6 +154,21 @@ describe('applyRemoteFlows with details (DS-7)', () => {
     expect(s.sectionStatus).toEqual({ person: 'ready', announcement: 'in_progress', obituary: 'in_progress' });
   });
 
+  // Expand, then contract (#1077): check keys are accepted, not merged, until #1080.
+  // Widening the merge before then must fail these two.
+  it('a pulled record with check keys leaves an existing session\'s ticks unchanged', () => {
+    const [s] = apply(
+      [local({ checklist: { custody: 'done' } })],
+      [record({ details: { checkCustody: null, checkEulogy: 'done' } })],
+    );
+    expect(s.checklist).toEqual({ custody: 'done' });
+  });
+
+  it('a new session made from a record with check keys gets those ticks', () => {
+    const [s] = apply([], [record({ details: { checkCustody: null, checkEulogy: 'done' } })]);
+    expect(s.checklist).toEqual({ eulogy: 'done' });
+  });
+
   it('a remote null status removes just that section', () => {
     const [s] = apply(
       [local({ sectionStatus: { person: 'ready', announcement: 'in_progress' } })],

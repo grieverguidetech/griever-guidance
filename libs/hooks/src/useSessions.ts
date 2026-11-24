@@ -597,6 +597,8 @@ function mergeRecordIntoSession(
   for (const key of Object.keys(factPatch)) {
     fromFacts[key] = mappedFacts[key as keyof typeof mappedFacts];
   }
+  // #1080: once the check keys join SYNCED_KEYS, pass `session.checklist` as the third argument
+  // (`currentChecklist`). Without it the checklist is rebuilt from the patch alone and drops local ticks.
   const fromDetails = flowDetailsToSessionFields(detailPatch, session.sectionStatus);
   const updated = { ...session, ...fromFacts, ...fromDetails } as Session;
   const mine = record.ownerId === myUserId;

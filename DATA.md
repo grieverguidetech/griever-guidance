@@ -265,8 +265,13 @@ additive and optional.
   sessions are unchanged. Clearing an item is not deletion (C9).
 - At load, ids that are not in `CHECKLIST_PHASES` and states other than `done` or `not_applicable`
   are dropped. If nothing is left, the field is removed.
-- Local only this round: `toFlowFacts`, `useFlowSync` and the device checklist
-  (`account.checklistTicks`, section 2.1) are unchanged.
+- Accepted on the wire from #1078 and sent by clients from #1080 (#1077, expand then contract: `SYNCED_KEYS` leaves them out until #1080), one wire key per item: `check` plus the item id in PascalCase
+  (`pronouncement` is `checkPronouncement`, `burial-or-cremation` is `checkBurialOrCremation`), value
+  `'done'`, `'not_applicable'` or null (open). 37 keys, listed by `CHECKLIST_FLOW_KEYS` in
+  `libs/shared/src/checklistSync.ts`. Item ids must never be renamed: the key comes from the id, so a
+  rename orphans every stored tick. The object `checklist` itself never crosses the wire (it is in
+  `FORBIDDEN_SYNC_KEYS`). Per item, the last save to reach the server wins. The five Gather ticks
+  (`account.checklistTicks`, section 2.1) stay on the device.
 
 ### 2.1 The screen C3 checklist lives on the account
 
@@ -275,7 +280,7 @@ The ticks persist — silently, as decided — but they belong to the **account*
 **Settled Oct 2026 (#176, product owner): ticks are kept on this device only.** They live in the
 local `account` store as `checklistTicks: string[]` (keys: `will-or-wishes`, `pre-arranged-plans`,
 `ssn-and-id`, `life-insurance`, `military-papers`; never rename one). All items start unticked.
-**Split (2026-10-30, #385, #406):** this rule covers the five "Gather when you can" ticks only. The new phase ticks and "Doesn't apply" marks (WEB-10) are saved on the person and will sync in a later round; they are not synced in round 1. Only the phase checks and the Overview's next item (WEB-12) read them. Still no notifications, nagging, badges or counts. The phase check is not a badge or a count. The phase ticks live on the person, in the local sessions store (`gg.sessions.v1`, field `checklist`, #414).
+**Split (2026-10-30, #385, #406):** this rule covers the five "Gather when you can" ticks only. The phase ticks and "Doesn't apply" marks (WEB-10) are saved on the person and sync as 37 per-item keys (§2.0c, #1077); the five Gather ticks never sync. Only the phase checks and the Overview's next item (WEB-12) read them. Still no notifications, nagging, badges or counts. The phase check is not a badge or a count. The phase ticks live on the person, in the local sessions store (`gg.sessions.v1`, field `checklist`, #414).
 
 These five ticks are per device, not per account: a second phone starts unticked. They are read and written only by the five-item list (checklist screen, Your account), are never sent to the network, and
 are emptied with everything else by "Remove everything from this device". This resolves the design
@@ -649,12 +654,12 @@ no email (the email lives in Clerk).
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
 - the publisher's email typed on Share obituary (`gg.publisherEmail.v1.<id>`, one per person, this phone only, MOB-9)
-- the checklist state (phase ticks and "Doesn't apply" marks, WEB-10) and `account.checklistTicks`: not synced yet (B9); planned later
+- the five Gather ticks (`account.checklistTicks`): device only. The phase ticks and "Doesn't apply" marks (WEB-10) are accepted on the wire from #1078 as 37 per-item keys; sent and synced from #1080 (§2.0c, #1077); the object `checklist` is still refused by name
 - `hearsFirstIds`, `momentCompletedAt`, `remindersScheduled`
 - the parser refuses these by name (`FORBIDDEN_SYNC_KEYS`), so a client that sends one gets an error
 
 This holds for the whole `gg-data` table, not only for flows. No item holds contact data or contact
-ids (C3), send-flow drafts, `messageOverride`, recipients or who was messaged, or checklist state. No `FLOW#`
+ids (C3), send-flow drafts, `messageOverride`, recipients or who was messaged, or the five Gather ticks. No `FLOW#`
 item holds a `FORBIDDEN_SYNC_KEYS` key. Two names on that list are used elsewhere in the table for
 other data: `senderName` on the `PROFILE` item, and `email` (the invitee's address, typed by the
 owner, never a contact's) on `INVITE#` and `MEMBER#`.

@@ -79,3 +79,37 @@ and they are shared only with the owner's members. The product owner accepted th
 (`docs/aws-data-function.md`). The owner redeploys it from the #772 branch BEFORE the PR merges.
 Merging first breaks sync for every new person. Clients ignore unknown keys on read, so old phones
 keep working.
+
+## Addendum, 2026-11-24: phase checklist ticks (#1077, ticket #1078)
+
+The product owner approved this at gate G1 on 2026-11-24. The 37 phase checklist ticks and
+"Doesn't apply" marks (WEB-10) sync under DS-7, so a tick made on the phone shows on the web and the
+other way round. The five "Gather when you can" ticks (`checklistTicks`) stay on the device.
+
+**Keys.** 37 new detail keys, one per item in `CHECKLIST_PHASES`: `check` plus the item id in
+PascalCase (`checkPronouncement`, `checkBurialOrCremation`, `checkViewingClothingPhoto`, and so on).
+The value is `done`, `not_applicable` or null (open). That makes 93 detail keys. The full list is
+`CHECKLIST_FLOW_KEYS` in `libs/shared/src/checklistSync.ts`. Item ids must never be renamed: the key
+is derived from the id, so a rename orphans every stored tick.
+
+**Why one key per item, not one JSON key.** Per-field last-save-wins is the DS-7 rule. With one JSON
+`checklist` key, two devices that tick different items would overwrite each other: the later save
+would drop the other device's tick. With one key per item, each tick merges on its own and last save
+wins per item. It also needs no new parser, because the keys are plain enums like the section
+statuses. The object `checklist` and `checklistTicks` stay in `FORBIDDEN_SYNC_KEYS` and are still
+refused by name.
+
+**Payload.** 37 short keys add about 1.7 KB at most. The worst-case payload test in
+`libs/shared/src/flowDetails.spec.ts` now sets every checklist key and is still under 128 KB.
+
+**Deploy order (expand, then contract).** `deploy-gateway` and `deploy-web` run in parallel, and the
+data function is deployed by hand (`docs/aws-data-function.md`). An old gateway or data function
+refuses unknown keys, and the client then drops every pending edit for that person. So the keys
+ship in two steps:
+1. #1078 merges. The shared parser, the gateway and the data function code ACCEPT the 37 keys, but
+   no client sends them (`SYNCED_KEYS` and `toFlowDetails` leave them out).
+2. The owner redeploys the data function from main.
+3. Only then #1080 (T2) merges. It adds the keys to `SYNCED_KEYS` and `toFlowDetails`, and the
+   session merge in `useSessions`, so clients start sending and applying ticks.
+
+Clients ignore unknown keys on read, so old phones keep working throughout.

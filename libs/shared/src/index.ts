@@ -13,6 +13,7 @@ export * from './account.js';
 export * from './sections.js';
 export * from './serviceEvents.js';
 export * from './checklist.js';
+export * from './checklistSync.js';
 export * from './checklistSections.js';
 export * from './dateChecks.js';
 export * from './flowDetails.js';

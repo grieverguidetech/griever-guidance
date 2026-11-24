@@ -1,9 +1,11 @@
 import {
+  CHECKLIST_FLOW_KEYS,
   FLOW_DETAIL_KEYS,
   FLOW_DETAIL_MAX_LENGTH,
   FLOW_DETAIL_TEXT_KEYS,
   FLOW_FACT_KEYS,
   FLOW_MESSAGE_KEYS,
+  FLOW_SENT_DETAIL_KEYS,
   FLOW_STATUS_KEYS,
   FORBIDDEN_SYNC_KEYS,
   SYNCED_KEYS,
@@ -26,11 +28,15 @@ import {
 } from './index.js';
 
 describe('keys', () => {
-  it('has 50 text keys, burialPrivate and 5 status keys', () => {
+  it('has 50 text keys, burialPrivate, 5 status keys and 37 checklist keys', () => {
     expect(FLOW_DETAIL_TEXT_KEYS).toHaveLength(50);
     expect(FLOW_STATUS_KEYS).toHaveLength(5);
-    expect(FLOW_DETAIL_KEYS).toHaveLength(56);
-    expect(SYNCED_KEYS).toEqual([...FLOW_FACT_KEYS, ...FLOW_DETAIL_KEYS]);
+    expect(CHECKLIST_FLOW_KEYS).toHaveLength(37);
+    expect(FLOW_DETAIL_KEYS).toHaveLength(93);
+    // Expand, then contract (#1077): accepted but not sent until T2 (#1080).
+    expect(FLOW_SENT_DETAIL_KEYS).toHaveLength(56);
+    expect(SYNCED_KEYS).toEqual([...FLOW_FACT_KEYS, ...FLOW_SENT_DETAIL_KEYS]);
+    expect(SYNCED_KEYS.some((key) => key.startsWith('check'))).toBe(false);
     expect(new Set(SYNCED_KEYS).size).toBe(SYNCED_KEYS.length);
   });
 
@@ -389,6 +395,9 @@ describe('payload size', () => {
     expect((full.obituarySurvivorList as string).length).toBe(FLOW_DETAIL_MAX_LENGTH.obituarySurvivorList);
     for (const key of FLOW_STATUS_KEYS) {
       full[key] = 'in_progress';
+    }
+    for (const key of CHECKLIST_FLOW_KEYS) {
+      full[key] = 'not_applicable';
     }
     const split = splitSyncedPatch(full);
     expect(parseFlowFacts(split?.facts)).not.toBeNull();
