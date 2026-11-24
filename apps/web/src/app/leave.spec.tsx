@@ -124,7 +124,7 @@ beforeEach(() => {
   // The server's answers change once the leave is accepted.
   mocks.getProfile.mockImplementation(async () => ({ ok: true, profile: profile(mocks.left ? 'owner' : 'member') }));
   mocks.getMembers.mockImplementation(async () => ({ ok: true, view: mocks.left ? OWNER_VIEW : MEMBER_VIEW }));
-  mocks.listFlows.mockImplementation(async () => ({ ok: true, flows: mocks.left ? [] : [SHARED], dropped: 0 }));
+  mocks.listFlows.mockImplementation(async () => ({ ok: true, flows: mocks.left ? [] : [SHARED], dropped: 0, removed: [] }));
   mocks.leaveMembership.mockImplementation(async () => {
     mocks.left = true;
     return { ok: true };
@@ -203,7 +203,7 @@ describe('stop helping (#223)', () => {
       if (mocks.left) {
         throw new TypeError('Failed to fetch');
       }
-      return { ok: true, flows: [SHARED], dropped: 0 };
+      return { ok: true, flows: [SHARED], dropped: 0, removed: [] };
     });
     await user.click(button);
     await user.click(screen.getByRole('button', { name: 'Stop helping' }));
@@ -237,7 +237,7 @@ describe('stop helping (#223)', () => {
     mocks.listFlows.mockImplementation(async () => {
       throw new TypeError('Failed to fetch');
     });
-    answer({ ok: true, flows: [SHARED], dropped: 0 });
+    answer({ ok: true, flows: [SHARED], dropped: 0, removed: [] });
     // The wake from the leave asks for one more pull.
     await waitFor(() => expect(mocks.listFlows.mock.calls.length).toBe(calls + 2));
     await new Promise((resolve) => setTimeout(resolve, 50));

@@ -176,7 +176,10 @@ additive: an older list loads, and the file keeps its key and shape.
   in 2.0b, through `mergeSyncedFields` in `libs/shared/src/flowDetails.ts`, with the same
   pending-key protection. A field with an unsent local edit keeps the local value. A flow not on
   the device becomes a `role: 'member'` session. A `member` session whose flow is no longer
-  returned is removed (access was lost); an `owner` session is never removed. Drafts,
+  returned is removed (access was lost). An `owner` session is removed only when the server names
+  its flowId in `removed` (#1084, see 7); absence never removes it, so a person never pushed stays.
+  The session goes with its drafts (and their `selectedContactIds`; the contacts are device-wide and
+  stay). A session another account holds (`heldFor`, or another `ownerId`) is not removed. Drafts,
   `draftsUpdatedAt`, contacts, `recipientsNotified`, `momentCompletedAt`, reminders, `senderName`
   and `messageOverride` are never read from or written by it.
 - The role comes from ownership: `record.ownerId` equal to the signed-in user is `owner`, anything
@@ -776,7 +779,12 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
   (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict` for the owner and
   `taken` for anyone else, #942) until DynamoDB
   purges both items after 90 days. A joiner who owns only a deleted person is still refused (C11).
-  The owner's other devices keep the person for now. Account deletion (below) still removes everything.
+  The owner's other devices drop the person at their next pull, because the server names the id in
+  `removed` (#1084). The client never guesses a delete from absence: an empty or partial list removes
+  nobody. The device clears the person's sync state, discards an unsent edit for them and never
+  creates the id again. A failed or offline pull removes nothing. `removed` names a deleted person
+  only for 90 days (the soft-delete `ttl`): a device offline longer than that keeps the person, and an
+  edit there could create them again. Account deletion (below) still removes everything.
 - **Invite emails (#146, settled 2026-10-21).** An invite carries the email of a third party who
   never agreed to anything, so the `INVITE#` item is deleted after 30 days: 30 days after it expires
   or is revoked, whichever is first, and 30 days after it is accepted. The access rules set the

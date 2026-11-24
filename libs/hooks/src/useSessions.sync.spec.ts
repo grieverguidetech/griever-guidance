@@ -331,3 +331,40 @@ describe('moveFlowId (#942)', () => {
     expect(result.current.sessions[1].formerFlowIds).toBeUndefined();
   });
 });
+
+describe('applyRemoteFlows with removed (#1084)', () => {
+  const applyRemoved = (sessions: Partial<Session>[], removed: string[], flows: FlowRecord[] = []) => {
+    const view = renderHook(() => useSessions(mem(sessions)));
+    act(() => view.result.current.applyRemoteFlows({ flows }, ME, {}, removed));
+    return view.result.current.sessions;
+  };
+  const withDraft = {
+    drafts: { announcement: { templateCategory: 'announcement', selectedContactIds: ['c1'] } },
+  } as unknown as Partial<Session>;
+
+  it('removes an owner session the server names removed, with its drafts', () => {
+    expect(applyRemoved([local(withDraft)], [A])).toEqual([]);
+  });
+
+  it('never removes an owner session by absence, or one the server does not name', () => {
+    expect(applyRemoved([local()], [])).toHaveLength(1);
+    expect(applyRemoved([local()], ['99999999-9999-4999-8999-999999999999'])).toHaveLength(1);
+  });
+
+  it('does not touch a member session named in removed', () => {
+    expect(applyRemoved([local({ role: 'member', ownerId: OTHER })], [A], [record({ ownerId: OTHER })])).toHaveLength(1);
+  });
+
+  it("keeps another account's person and one held for another account", () => {
+    expect(applyRemoved([local({ ownerId: OTHER })], [A])).toHaveLength(1);
+    expect(applyRemoved([local({ ownerId: null, heldFor: OTHER })], [A])).toHaveLength(1);
+  });
+
+  it('keeps a person the same pull lists', () => {
+    expect(applyRemoved([local()], [A], [record()])).toHaveLength(1);
+  });
+
+  it('still removes a member session that is no longer returned', () => {
+    expect(applyRemoved([local({ role: 'member', ownerId: OTHER })], [])).toEqual([]);
+  });
+});

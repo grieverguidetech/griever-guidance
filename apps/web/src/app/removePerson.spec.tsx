@@ -247,7 +247,7 @@ describe('Remove a person on Account (#222)', () => {
       updatedAt: '2026-10-12T00:00:00.000Z',
       updatedBy: null,
     });
-    mocks.listFlows.mockResolvedValue({ ok: true, flows: [record(FLOW_A, 'Margaret Hayes'), record(FLOW_B, 'Robert Hayes')], dropped: 0 });
+    mocks.listFlows.mockResolvedValue({ ok: true, flows: [record(FLOW_A, 'Margaret Hayes'), record(FLOW_B, 'Robert Hayes')], dropped: 0, removed: [] });
     const before = mocks.listFlows.mock.calls.length;
     window.dispatchEvent(new Event('focus'));
     await waitFor(() => expect(mocks.listFlows.mock.calls.length).toBeGreaterThan(before));

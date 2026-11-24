@@ -513,6 +513,9 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         if (kept.length !== marks.length) writeRemovedFlows(latest.current.storage, kept);
       }
       markKnown(state, flows, userId);
+      // People the server names as deleted (#1084). Forgotten before the scan below and refused for this run,
+      // so the scan never queues a create for them. Anything the server does not name is left alone.
+      const dropIds = applyRemovals(state, result.removed, flows, latest.current.sessions, userId);
       state.pulled = true;
       try {
         scanSessions(state, latest.current.sessions, userId, new Set((marks ?? []).map((m) => m.id)));
@@ -539,7 +542,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         state.baselines.set(record.id, next as unknown as SyncedFields);
       }
       writeStored(latest.current.storage, state);
-      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
+      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow, dropIds);
       setPulledFor(userId);
       setPullCount((count) => count + 1);
       return 'done';
@@ -767,6 +770,38 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
   }, [active, userId]);
 
   return { lastError, pulled: active && pulledFor === userId, pullNow, pullCount, flushNow };
+}
+
+/**
+ * Handles the ids the server names as removed (#1084), in one place so sync state and sessions agree.
+ * An id counts only if no listed record has it and every session holding it (by its current id, following
+ * `moved`) passes `mayCreate`; an id held by a session this account may not touch is left alone. For each
+ * counted id the person's `known`, queue (an unsent edit goes with the person, so the cycle that follows sends
+ * nothing), baselines and taken-id mark are cleared, and the id is refused so a create is never queued again.
+ * Returns the flowIds of the sessions useSessions must remove.
+ */
+function applyRemovals(
+  state: SyncState,
+  removed: readonly string[],
+  listed: readonly FlowRecord[],
+  sessions: readonly Session[],
+  userId: string,
+): string[] {
+  const listedIds = new Set(listed.map((r) => r.id));
+  const drop: string[] = [];
+  for (const id of removed) {
+    const holders = sessions.filter((s) => flowIdOf(state, s) === id);
+    if (listedIds.has(id) || !holders.every((s) => mayCreate(s, userId))) {
+      continue;
+    }
+    state.known.delete(id);
+    state.queue.delete(id);
+    state.baselines.delete(id);
+    state.conflicted.delete(id);
+    state.refused.add(id);
+    drop.push(...holders.map((s) => s.flowId));
+  }
+  return drop;
 }
 
 function markKnown(state: SyncState, flows: readonly FlowRecord[], userId: string): void {

@@ -39,7 +39,7 @@ function fakeServer() {
     };
   };
   const client: FlowSyncClient = {
-    listFlows: async () => ({ ok: true, flows: [...records.keys()].map(asRecord), dropped: 0 }),
+    listFlows: async () => ({ ok: true, flows: [...records.keys()].map(asRecord), dropped: 0, removed: [] }),
     createFlow: async (_token, id, fields) => {
       writes.push({ method: 'POST', body: { ...fields } });
       const parts = split(fields);
