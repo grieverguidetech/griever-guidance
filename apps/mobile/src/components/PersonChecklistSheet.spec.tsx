@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { screenCopy } from '@griever/copy';
 import { CHECKLIST_PHASES, TIME_PHASE_KEYS } from '@griever/shared';
 import type { ChecklistFields, ChecklistItemState } from '@griever/shared';
+import { onFlowPullRequest } from '../lib/requestFlowPull';
 import { PersonChecklistSheet } from './PersonChecklistSheet';
 
 // Jest has no native view tree, so findNodeHandle returns null. A fake handle lets the test see the focus call.
@@ -118,5 +119,34 @@ describe('PersonChecklistSheet (#696)', () => {
     expect(focus).toHaveBeenCalledTimes(1);
     fireEvent.press(screen.getByRole('button', { name: copy.close }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  describe('asks for a pull when it opens (#1079)', () => {
+    const props = { onClose: jest.fn(), onSetItem: jest.fn(), onOpenGroup: jest.fn() };
+
+    it('requests one pull per opening, not per render', async () => {
+      const onPull = jest.fn();
+      const stop = onFlowPullRequest(onPull);
+      const view = render(<PersonChecklistSheet visible={false} checklist={{}} {...props} />);
+      await act(async () => {});
+      expect(onPull).not.toHaveBeenCalled();
+
+      view.rerender(<PersonChecklistSheet visible checklist={{}} {...props} />);
+      await act(async () => {});
+      expect(onPull).toHaveBeenCalledTimes(1);
+
+      // Re-renders while open, with new ticks, do not ask again.
+      view.rerender(<PersonChecklistSheet visible checklist={tick(['first-weeks'])} {...props} />);
+      view.rerender(<PersonChecklistSheet visible checklist={tick(['first-weeks'])} {...props} />);
+      await act(async () => {});
+      expect(onPull).toHaveBeenCalledTimes(1);
+
+      // Closing and opening again is a new opening.
+      view.rerender(<PersonChecklistSheet visible={false} checklist={{}} {...props} />);
+      view.rerender(<PersonChecklistSheet visible checklist={{}} {...props} />);
+      await act(async () => {});
+      expect(onPull).toHaveBeenCalledTimes(2);
+      stop();
+    });
   });
 });

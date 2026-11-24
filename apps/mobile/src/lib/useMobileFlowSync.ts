@@ -117,7 +117,7 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, stor
 
   // Sync runs, and so a pull can be waited for, only once this account's saved queue has been read.
   const running = allowed && queue !== null && readyQueue === queue;
-  const { pullNow, pullCount } = useFlowSync({
+  const { pullNow, pullCount, flushNow } = useFlowSync({
     sessions,
     userId,
     enabled: running,
@@ -135,6 +135,21 @@ export function useMobileFlowSync({ sessions, applyRemoteFlows, moveFlowId, stor
     }
     return registerManualPull(pullNow);
   }, [running, pullNow]);
+
+  // Leaving the app: send the queue now instead of after the 1 second edit wait. iOS may suspend the app
+  // before the request ends. The queue is saved on the device, so the worst case is that it goes out
+  // the next time the app is in the foreground.
+  useEffect(() => {
+    if (!running) {
+      return;
+    }
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        flushNow();
+      }
+    });
+    return () => subscription.remove();
+  }, [running, flushNow]);
 
   // Any applied pull clears an old "could not load" line.
   useEffect(() => {

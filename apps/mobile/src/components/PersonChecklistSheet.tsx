@@ -15,6 +15,7 @@ import { DoneMark } from '../ui/DoneMark';
 import type { ButtonNode } from '../ui';
 import { ChecklistGroupPanel } from './ChecklistGroupPanel';
 import { MUTED } from './colors';
+import { requestFlowPull } from '../lib/requestFlowPull';
 
 const copy = screenCopy('phoneChecklist');
 const checklistCopy = screenCopy('cmsChecklist');
@@ -56,6 +57,12 @@ export function PersonChecklistSheet({
   useEffect(() => {
     if (!visible) {
       setOpenId(null);
+    }
+  }, [visible]);
+  // Opening the sheet pulls once, so ticks made on the web show up. Keyed to `visible`, not to renders.
+  useEffect(() => {
+    if (visible) {
+      requestFlowPull();
     }
   }, [visible]);
   // After Back, focus returns to the group that was open.
