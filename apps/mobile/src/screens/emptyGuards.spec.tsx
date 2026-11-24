@@ -1,7 +1,9 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { useEffect } from 'react';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
+import { v2 } from '@griever/tokens';
+import { useScreenOptions } from '../app/App';
 import { freshDraft, useSendFlow } from '@griever/hooks';
 import { SendingScreen } from './SendingScreen';
 import { ReadyToSendScreen } from './ReadyToSendScreen';
@@ -36,6 +38,11 @@ describe('screens with nothing to show leave instead of staying blank (#1073)', 
   it('Sending with no send job steps back to Ready to send', async () => {
     render(<SendingWithoutJob />);
     await waitFor(() => expect(screen.getByTestId('step').props.children).toBe('review'));
+  });
+
+  it('the stack paints the page colour behind every screen, so a transparent moment is never white', () => {
+    const { result } = renderHook(() => useScreenOptions());
+    expect(result.current.contentStyle).toEqual({ backgroundColor: v2.roles.page.color });
   });
 
   it('Ready to send with no moment chosen goes to the hub', () => {

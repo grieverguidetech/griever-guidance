@@ -884,7 +884,7 @@ const sharedScreens = (leaveFirst?: () => void) => (
 );
 
 // One calm fade between screens, none with Reduce Motion or a screen reader on. The page colour shows between screens.
-const useScreenOptions = () => {
+export const useScreenOptions = () => {
   const noFade = useNoFade();
   return useMemo(() => ({ headerShown: false, contentStyle: { backgroundColor: v2.roles.page.color }, ...screenTransition(noFade) }), [noFade]);
 };

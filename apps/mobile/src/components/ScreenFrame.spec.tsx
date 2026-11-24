@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { AccessibilityInfo, Animated, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, StyleSheet, Text, View } from 'react-native';
 import { act, render, screen } from '@testing-library/react-native';
 import { v2 } from '@griever/tokens';
 import { FadeIn, ScreenFrame } from './ScreenFrame';
@@ -45,6 +45,56 @@ describe('FadeIn', () => {
     const timing = setup(true, false);
     await show();
     expect(timing).not.toHaveBeenCalled();
+    expect(opacity()).toBe(1);
+  });
+
+  // #1073: a screen must never stay invisible when its fade does not finish.
+  const fakeTiming = (start: (done?: (result: { finished: boolean }) => void) => void) =>
+    jest.spyOn(Animated, 'timing').mockReturnValue({ start } as unknown as Animated.CompositeAnimation);
+
+  it('ends fully shown when the fade is interrupted', async () => {
+    setup(false, false);
+    const reported = jest.fn();
+    fakeTiming((done) => {
+      reported(typeof done);
+      done?.({ finished: false });
+    });
+    await show();
+    expect(reported).toHaveBeenCalledWith('function');
+    expect(opacity()).toBe(1);
+  });
+
+  it('ends fully shown when the fade never reports back, after the safety timer', async () => {
+    jest.useFakeTimers();
+    try {
+      setup(false, false);
+      fakeTiming(() => undefined);
+      await show();
+      expect(opacity()).toBe(0);
+      await act(async () => {
+        jest.advanceTimersByTime(499);
+      });
+      expect(opacity()).toBe(0);
+      await act(async () => {
+        jest.advanceTimersByTime(2);
+      });
+      expect(opacity()).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('ends fully shown when the app comes back to the foreground mid-fade', async () => {
+    setup(false, false);
+    fakeTiming(() => undefined);
+    let listener: (state: string) => void = () => undefined;
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, cb: (state: string) => void) => {
+      listener = cb;
+      return { remove: () => undefined };
+    }) as never);
+    await show();
+    expect(opacity()).toBe(0);
+    await act(async () => listener('active'));
     expect(opacity()).toBe(1);
   });
 
