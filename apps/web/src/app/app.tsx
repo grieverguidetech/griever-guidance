@@ -1673,6 +1673,12 @@ function AppBody({
     go({ ...here, section: 'overview', item: null }, { replace: true });
   }
 
+  /** Done on an item: the Overview takes the item's entry (as for a linked item); the key hook focuses its h1. */
+  function closeCmsItemDone() {
+    itemOpener.current = null;
+    go({ ...here, section: 'overview', item: null }, { replace: true });
+  }
+
   // The focus hook above treats start-up moves as "the initial screen" and leaves focus alone; a landing
   // is a real move to a new screen, so it asks for the h1 itself.
   const focusAfterLanding = useRef(false);
@@ -2162,7 +2168,14 @@ function AppBody({
             <ChecklistItemDetail
               itemId={cmsItem}
               state={active.checklist?.[cmsItem] ?? null}
-              onSetState={(state) => sessions.setChecklistItem(active.id, cmsItem, state)}
+              onSetState={(state) => {
+                const wasDone = active.checklist?.[cmsItem] === 'done';
+                sessions.setChecklistItem(active.id, cmsItem, state);
+                // Marking an item done returns to where it was opened from; un-marking or other states stay put.
+                if (state === 'done' && !wasDone) {
+                  closeCmsItemDone();
+                }
+              }}
               onBack={closeCmsItem}
               // The key hook moves focus to the section's h1.
               onOpenSection={toSection}
