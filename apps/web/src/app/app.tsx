@@ -2171,7 +2171,7 @@ function AppBody({
               onSetState={(state) => {
                 const wasDone = active.checklist?.[cmsItem] === 'done';
                 sessions.setChecklistItem(active.id, cmsItem, state);
-                // Marking an item done returns to where it was opened from; un-marking or other states stay put.
+                // Marking an item done goes to the Overview (#1071); un-marking stays on the item.
                 if (state === 'done' && !wasDone) {
                   closeCmsItemDone();
                 }
