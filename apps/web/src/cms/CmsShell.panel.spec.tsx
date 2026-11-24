@@ -112,6 +112,40 @@ describe('CmsShell checklist panel', () => {
     expect(row.parentElement).toHaveClass('gap-4'); // the main column's rhythm
   });
 
+  it('puts empty live regions in one wrapper so they add no gap, and keeps them rendered (#1069)', () => {
+    render(
+      <CmsShell
+        personName="Margaret Hale"
+        section="service"
+        onSelect={vi.fn()}
+        onPeople={vi.fn()}
+        onAccount={vi.fn()}
+        notice={
+          <>
+            <div role="status" aria-live="polite" data-testid="live-a" />
+            <div role="status" aria-live="polite" data-testid="live-b" />
+            <div aria-hidden="true" data-testid="live-c" />
+          </>
+        }
+      >
+        <h2>Details</h2>
+      </CmsShell>,
+    );
+    const main = screen.getByRole('main');
+    const slot = screen.getByTestId('notice-slot');
+    expect(slot.parentElement).toBe(main);
+    expect(slot).toHaveClass('-mb-4'); // cancels the one gap after the wrapper
+    for (const id of ['live-a', 'live-b', 'live-c']) {
+      const region = screen.getByTestId(id);
+      expect(region.parentElement).toBe(slot); // not a gap-taking child of main
+      expect(region).toBeEmptyDOMElement();
+      expect(region).toBeInTheDocument();
+      expect(region).not.toHaveAttribute('hidden');
+      expect(region.className).not.toContain('hidden');
+    }
+    expect(main).toHaveClass('gap-4');
+  });
+
   it('wraps the section content in a keyed gg-enter div that remounts on section change', () => {
     const props = { personName: 'Margaret Hale', onSelect: vi.fn(), onPeople: vi.fn(), onAccount: vi.fn() };
     const { rerender } = render(

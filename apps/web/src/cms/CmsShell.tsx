@@ -143,7 +143,11 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
           <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
         )}
         {nobody || section === 'people' || section === 'overview' || section === 'account' ? null : <p className="gg-hint">{syncOn ? shellCopy.saveLineSynced : shellCopy.saveLine}</p>}
-        {notice}
+        {/* The notice slots are live regions that are empty most of the time. Each one as its own child of this
+            flex column cost a 16px gap (three of them: 48px). One wrapper is a single child, and -mb-4 cancels its
+            gap after it, so empty slots add nothing and a message (which carries its own mb-4) has 16px above and below.
+            The regions stay rendered: no display:none, no hidden. */}
+        <div data-testid="notice-slot" className="-mb-4">{notice}</div>
         <div key={`${section}:${title ?? ''}`} className="gg-enter flex flex-col gap-4">
           {children}
         </div>
