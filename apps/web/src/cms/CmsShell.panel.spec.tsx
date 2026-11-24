@@ -96,6 +96,56 @@ describe('CmsShell checklist panel', () => {
     expect(aside.className).toContain('lg:shrink-0');
   });
 
+  it('spaces the panel title from its content by the page gap (gap-4 = 16px) (#1069)', () => {
+    render(shell());
+    const aside = screen.getByRole('complementary', { name: "What you'll need" });
+    expect(aside.className).toContain('lg:flex');
+    expect(aside.className).toContain('lg:flex-col');
+    expect(aside.className).toContain('lg:gap-4');
+  });
+
+  it('keeps the phone button from stretching the title row, so the gap below the h1 is the page gap (#1069)', () => {
+    render(shell());
+    const row = screen.getByTestId('title-row');
+    expect(row.className).toContain('gap-y-4');
+    expect(document.querySelector('[data-checklist-opener]')).toHaveClass('-my-2');
+    expect(row.parentElement).toHaveClass('gap-4'); // the main column's rhythm
+  });
+
+  it('puts empty live regions in one wrapper so they add no gap, and keeps them rendered (#1069)', () => {
+    render(
+      <CmsShell
+        personName="Margaret Hale"
+        section="service"
+        onSelect={vi.fn()}
+        onPeople={vi.fn()}
+        onAccount={vi.fn()}
+        notice={
+          <>
+            <div role="status" aria-live="polite" data-testid="live-a" />
+            <div role="status" aria-live="polite" data-testid="live-b" />
+            <div aria-hidden="true" data-testid="live-c" />
+          </>
+        }
+      >
+        <h2>Details</h2>
+      </CmsShell>,
+    );
+    const main = screen.getByRole('main');
+    const slot = screen.getByTestId('notice-slot');
+    expect(slot.parentElement).toBe(main);
+    expect(slot).toHaveClass('-mb-4'); // cancels the one gap after the wrapper
+    for (const id of ['live-a', 'live-b', 'live-c']) {
+      const region = screen.getByTestId(id);
+      expect(region.parentElement).toBe(slot); // not a gap-taking child of main
+      expect(region).toBeEmptyDOMElement();
+      expect(region).toBeInTheDocument();
+      expect(region).not.toHaveAttribute('hidden');
+      expect(region.className).not.toContain('hidden');
+    }
+    expect(main).toHaveClass('gap-4');
+  });
+
   it('wraps the section content in a keyed gg-enter div that remounts on section change', () => {
     const props = { personName: 'Margaret Hale', onSelect: vi.fn(), onPeople: vi.fn(), onAccount: vi.fn() };
     const { rerender } = render(
