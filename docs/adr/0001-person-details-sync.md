@@ -108,10 +108,22 @@ refused by name.
 data function is deployed by hand (`docs/aws-data-function.md`). An old gateway or data function
 refuses unknown keys, and the client then drops every pending edit for that person. So the keys
 ship in two steps:
-1. #1078 merges. The shared parser, the gateway and the data function code ACCEPT the 37 keys, but
-   no client sends them (`SYNCED_KEYS` and `toFlowDetails` leave them out).
+1. #1078 merged. The shared parser, the gateway and the data function code ACCEPT the 37 keys, but
+   no client sent them.
 2. The owner redeploys the data function from main.
 3. Only then #1080 (T2) merges. It adds the keys to `SYNCED_KEYS` and `toFlowDetails`, and the
-   session merge in `useSessions`, so clients start sending and applying ticks.
+   session merge in `useSessions`, so clients send and apply ticks. This is the current state:
+   the 37 keys are sent and synced from #1080.
 
 Clients ignore unknown keys on read, so old phones keep working throughout.
+
+**First pull after the update.** The server returns null for every check key nobody wrote, which
+looks the same as "cleared". A device that ticked items before #1080 has a saved baseline with no
+check keys. `readBaseline` fills them with null (open), so those ticks diff as local edits, are
+queued before the first pull is merged, and a queued key keeps its local value in the merge. The
+ticks are then pushed, not wiped. A flow with no baseline at all (a lost queue record, a person
+the account's record claims, or one in `known`) is fixed the same way: `scanSessions` seeds a
+baseline with every check key open, so its ticks are queued before the pull is merged. A phone that
+upgrades from an old build re-pushes its local set ticks. Those can overwrite newer web changes for
+the same item, because a pending local tick keeps its value (the owner accepted this: losing ticks
+is worse). The tests are in `libs/hooks/src/useFlowSync.devices.spec.ts`.

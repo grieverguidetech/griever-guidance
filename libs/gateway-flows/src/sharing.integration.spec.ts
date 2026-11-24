@@ -218,6 +218,31 @@ describe.runIf(up)('sharing: gateway routes to DynamoDB Local', () => {
       expect(after?.details).toMatchObject({ servicePlace: 'Chapel', serviceType: 'Funeral', burialPrivate: true });
     });
 
+    it('a PATCH with check keys is stored and both the owner and a member read it back (#1080)', async () => {
+      const patched = await sendFlows(ownerToken, 'PATCH', `/flows/${FLOW_ID}`, {
+        checkCustody: 'done',
+        checkEulogy: 'not_applicable',
+      });
+      expect(patched.status).toBe(200);
+      const again = await sendFlows(ownerToken, 'PATCH', `/flows/${FLOW_ID}`, { checkEulogy: null });
+      expect(again.status).toBe(200);
+      for (const token of [ownerToken, joinerToken]) {
+        const view = (await listed(token)).find((f) => f.id === FLOW_ID);
+        expect(view?.details).toMatchObject({
+          checkCustody: 'done',
+          checkEulogy: null,
+          checkPronouncement: null,
+        });
+      }
+    });
+
+    it('answers 400 for an unknown check key or a bad check value', async () => {
+      const unknown = await sendFlows(ownerToken, 'PATCH', `/flows/${FLOW_ID}`, { checkNotAnItem: 'done' });
+      expect(unknown.status).toBe(400);
+      const bad = await sendFlows(ownerToken, 'PATCH', `/flows/${FLOW_ID}`, { checkCustody: 'maybe' });
+      expect(bad.status).toBe(400);
+    });
+
     it('answers 400 for a forbidden key', async () => {
       const res = await sendFlows(ownerToken, 'PATCH', `/flows/${FLOW_ID}`, { drafts: {} });
       expect(res.status).toBe(400);

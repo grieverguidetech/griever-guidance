@@ -4,6 +4,7 @@
 // never appear here. The phase checklist ticks do, as one flat key per item (checklistSync.ts).
 import {
   CHECKLIST_FLOW_KEYS,
+  checklistToFlat,
   isChecklistFlowValue,
   mergeFlatIntoChecklist,
   type ChecklistFlowKey,
@@ -107,7 +108,7 @@ export const FLOW_STATUS_KEYS = [
 
 export type FlowStatusKey = (typeof FLOW_STATUS_KEYS)[number];
 
-/** The detail keys clients send today. */
+/** The text, `burialPrivate` and status detail keys (56). The 37 checklist keys come after them. */
 export const FLOW_SENT_DETAIL_KEYS = [
   ...FLOW_DETAIL_TEXT_KEYS,
   'burialPrivate',
@@ -115,32 +116,35 @@ export const FLOW_SENT_DETAIL_KEYS = [
 ] as const;
 
 /**
- * Every detail key the parsers, the gateway and the data function ACCEPT. Expand, then contract
- * (#1077): the 37 checklist keys are accepted here but not sent yet, so a new web build cannot
- * reach an old gateway or data function with keys it refuses. T2 (#1080) turns sending on by
- * moving CHECKLIST_FLOW_KEYS into SYNCED_KEYS and `toFlowDetails`.
+ * Every detail key the parsers, the gateway and the data function accept, and clients send: the 56
+ * above plus the 37 checklist keys (#1077). Clients send the checklist keys from #1080, after the
+ * data function accepted them (#1078).
  */
 export const FLOW_DETAIL_KEYS = [...FLOW_SENT_DETAIL_KEYS, ...CHECKLIST_FLOW_KEYS] as const;
 
 export type FlowDetailKey = (typeof FLOW_DETAIL_KEYS)[number];
 
-/** Every key a client sends or merges for a person. The checklist keys are not in it until T2 (#1080). */
-export const SYNCED_KEYS = [...FLOW_FACT_KEYS, ...FLOW_SENT_DETAIL_KEYS] as const;
+/** Every key a client sends or merges for a person. */
+export const SYNCED_KEYS = [...FLOW_FACT_KEYS, ...FLOW_DETAIL_KEYS] as const;
 
 export type SyncedKey = (typeof SYNCED_KEYS)[number];
 
 /** Wire status values: null is "Not started". */
 export type FlowStatusValue = SectionStatus | null;
 
-/** What a client sends today: the details without the checklist keys (T2, #1080, adds them). */
-export type SentFlowDetails = {
+type BaseFlowDetails = {
   [K in FlowDetailTextKey]: string | null;
 } & { burialPrivate: boolean } & {
   [K in FlowStatusKey]: FlowStatusValue;
 };
 
-/** The checklist keys are optional until clients send them (T2, #1080 makes them required). */
-export type FlowDetails = SentFlowDetails & {
+/** What a client sends: every detail key, the checklist keys included (null is an open item). */
+export type SentFlowDetails = BaseFlowDetails & {
+  [K in ChecklistFlowKey]: ChecklistFlowValue;
+};
+
+/** What a parser may return: records from before #1078 have no checklist keys, so they are optional. */
+export type FlowDetails = BaseFlowDetails & {
   [K in ChecklistFlowKey]?: ChecklistFlowValue;
 };
 
@@ -348,7 +352,7 @@ export function toFlowDetails(source: SyncedSource): SentFlowDetails {
   }
   out.burialPrivate = source.burialPrivate === true;
   Object.assign(out, statusMapToFlat(source.sectionStatus));
-  // Checklist keys are not emitted yet: T2 (#1080) adds `Object.assign(out, checklistToFlat(source.checklist))`.
+  Object.assign(out, checklistToFlat(source.checklist));
   return out as SentFlowDetails;
 }
 
