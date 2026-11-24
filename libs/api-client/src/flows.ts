@@ -54,7 +54,7 @@ export type FlowsFailureReason =
 
 export type FlowsFailure = { ok: false; reason: FlowsFailureReason };
 export type ListFlowsResult =
-  | { ok: true; flows: FlowRecord[]; dropped: number }
+  | { ok: true; flows: FlowRecord[]; dropped: number; removed: string[] }
   | FlowsFailure;
 export type WriteFlowResult = { ok: true; flow: FlowRecord } | FlowsFailure;
 /** `flow: null` means there was nothing to send. */
@@ -105,19 +105,44 @@ async function call(
   }
 }
 
-/** Every person the signed-in user owns or helps with. Records that fail validation are dropped. */
+/**
+ * The people on the wire: `{ flows, removed }` from a server that knows `include=removed`, or a bare array
+ * from an older one (no removed ids). A `removed` that is not a list of ids refuses the whole answer.
+ */
+function readListBody(body: unknown): { list: unknown[]; removed: string[] } | null {
+  if (Array.isArray(body)) {
+    return { list: body, removed: [] };
+  }
+  if (typeof body !== 'object' || body === null) {
+    return null;
+  }
+  const { flows, removed } = body as { flows?: unknown; removed?: unknown };
+  if (!Array.isArray(flows) || !Array.isArray(removed)) {
+    return null;
+  }
+  if (!removed.every((id): id is string => typeof id === 'string' && isUuid(id))) {
+    return null;
+  }
+  return { list: flows, removed };
+}
+
+/**
+ * Every person the signed-in user owns or helps with. Records that fail validation are dropped.
+ * `removed` is the ids of the user's own people deleted elsewhere (#1084).
+ */
 export async function listFlows(
   accessToken: string,
   signal?: AbortSignal,
 ): Promise<ListFlowsResult> {
-  const result = await call(accessToken, '/flows', { method: 'GET' }, signal);
+  const result = await call(accessToken, '/flows?include=removed', { method: 'GET' }, signal);
   if (!result.ok) return result;
-  if (!Array.isArray(result.body)) return { ok: false, reason: 'failed' };
-  const flows = result.body
+  const read = readListBody(result.body);
+  if (!read) return { ok: false, reason: 'failed' };
+  const flows = read.list
     .map(parseFlowRecord)
     .filter((flow): flow is FlowRecord => flow !== null);
   // `dropped` lets sync tell "the server stopped listing it" from "we couldn't read it".
-  return { ok: true, flows, dropped: result.body.length - flows.length };
+  return { ok: true, flows, dropped: read.list.length - flows.length, removed: read.removed };
 }
 
 async function send(

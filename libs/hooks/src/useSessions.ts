@@ -153,16 +153,20 @@ export interface UseSessionsResult {
    * Applies what the server returned for this account. `pendingByFlow` maps a flowId to the fact
    * fields with an unsent local edit; those keep the local value. A flow not on the device becomes
    * a 'member' session. A 'member' session whose flow is no longer returned is removed (access was
-   * lost). 'owner' sessions are never removed. Drafts, contacts, who was notified, reminders and
-   * edited wording are never touched. With no signed-in user (`myUserId` empty) nothing changes.
-   * When `dropped > 0` some records could not be read, so nothing is removed (they may be among
-   * the missing). A role comes from ownership: `record.ownerId === myUserId`. A session with
+   * lost). An 'owner' session is removed only when its flowId is in `removed`: ids the server names
+   * as deleted for this account (#1084). It goes with its drafts. Absence never removes an owner
+   * session, so a person never pushed stays. A session another account holds is not removed.
+   * Contacts, who was notified, reminders and edited wording of the other sessions are never touched.
+   * With no signed-in user (`myUserId` empty) nothing changes.
+   * When `dropped > 0` some records could not be read, so no 'member' session is removed (they may be
+   * among the missing). A role comes from ownership: `record.ownerId === myUserId`. A session with
    * `ownerId === null` is never turned into a member.
    */
   applyRemoteFlows: (
     result: { flows: readonly FlowRecord[]; dropped?: number },
     myUserId: string,
     pendingByFlow?: Readonly<Record<string, Iterable<SyncedKey>>>,
+    removed?: readonly string[],
   ) => void;
 }
 
@@ -471,6 +475,11 @@ function listHolder(storage: SendFlowStorage | undefined, sessions: readonly Ses
  * deleted; nothing reads it back, because the server lists those people again on the next pull.
  */
 const UNKNOWN_HOLDER = '_unknown';
+
+/** An owner session this account may remove when the server names it removed (#1084). Keep in step with `mayCreate` in useFlowSync. */
+function isOwnedHere(s: Session, userId: string): boolean {
+  return s.role === 'owner' && (s.ownerId === null || s.ownerId === userId) && (!s.heldFor || s.heldFor === userId);
+}
 
 /**
  * Keep in step with `isMine` in useFlowSync: a person hidden here must never be sent for `userId`.
@@ -971,14 +980,16 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
   }, []);
 
   const applyRemoteFlows = useCallback<UseSessionsResult['applyRemoteFlows']>(
-    ({ flows, dropped = 0 }, myUserId, pendingByFlow = {}) => {
+    ({ flows, dropped = 0 }, myUserId, pendingByFlow = {}, removed = []) => {
       if (!myUserId) return;
       const returned = new Map(flows.map((r) => [r.id, r]));
+      const removedIds = new Set(removed);
       setSessions((list) => {
         const known = new Set(list.map((s) => s.flowId));
         const updated = list
-          // Losing access removes a shared person; a person this user owns is never removed here.
+          // Losing access removes a shared person. A person this user owns goes only when the server names it removed.
           .filter((s) => dropped > 0 || s.role !== 'member' || returned.has(s.flowId))
+          .filter((s) => !(removedIds.has(s.flowId) && !returned.has(s.flowId) && isOwnedHere(s, myUserId)))
           .map((s) => {
             const record = returned.get(s.flowId);
             return record ? mergeRecordIntoSession(s, record, pendingByFlow[s.flowId] ?? [], myUserId) : s;

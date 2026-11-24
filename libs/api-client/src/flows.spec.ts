@@ -5,6 +5,7 @@ import { pickFlowDetails as sharedPickFlowDetails, type FlowFacts } from '@griev
 const fetchMock = vi.fn();
 const ACCESS = 'access-token-abc';
 const ID = '123e4567-e89b-12d3-a456-426614174000';
+const OTHER_ID = '223e4567-e89b-12d3-a456-426614174000';
 const OWNER = 'user_2abcDEF123';
 
 const facts: FlowFacts = {
@@ -49,7 +50,7 @@ const calls: Array<
   [string, (signal?: AbortSignal) => Promise<unknown>, string, string, unknown]
 > =
   [
-    ['listFlows', (signal) => listFlows(ACCESS, signal), 'GET', '/flows', [record]],
+    ['listFlows', (signal) => listFlows(ACCESS, signal), 'GET', '/flows?include=removed', { flows: [record], removed: [] }],
     [
       'createFlow',
       (signal) => createFlow(ACCESS, ID, facts, signal),
@@ -123,10 +124,26 @@ describe('listFlows', () => {
       ok: true,
       flows: [record],
       dropped: 1,
+      removed: [],
     });
   });
-  it('fails when the reply is not a list', async () => {
-    fetchMock.mockResolvedValue(json(200, { flows: [] }));
+  it('reads { flows, removed } and keeps the removed ids (#1084)', async () => {
+    fetchMock.mockResolvedValue(json(200, { flows: [record], removed: [OTHER_ID] }));
+    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [record], dropped: 0, removed: [OTHER_ID] });
+  });
+  it('treats a bare array from an older server as no removed ids', async () => {
+    fetchMock.mockResolvedValue(json(200, [record]));
+    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [record], dropped: 0, removed: [] });
+  });
+  it.each([
+    ['no removed list', { flows: [] }],
+    ['removed is not a list', { flows: [], removed: 'x' }],
+    ['a removed id that is not a uuid', { flows: [], removed: ['nope'] }],
+    ['a removed id that is a number', { flows: [], removed: [5] }],
+    ['flows is not a list', { flows: 'x', removed: [] }],
+    ['null', null],
+  ])('fails when the reply has %s', async (_name, body) => {
+    fetchMock.mockResolvedValue(json(200, body));
     expect(await listFlows(ACCESS)).toEqual({ ok: false, reason: 'failed' });
   });
 });
@@ -211,6 +228,7 @@ describe('round 2 behaviour', () => {
       ok: true,
       flows: [record],
       dropped: 2,
+      removed: [],
     });
     fetchMock.mockResolvedValue(json(200, [record]));
     expect(await listFlows(ACCESS)).toMatchObject({ dropped: 0 });
@@ -223,6 +241,7 @@ describe('round 2 behaviour', () => {
       ok: true,
       flows: [record],
       dropped: 0,
+      removed: [],
     });
   });
 
@@ -233,12 +252,13 @@ describe('round 2 behaviour', () => {
       ok: true,
       flows: [{ ...record, details: { serviceTime: '10am', serviceStatus: 'ready' } }],
       dropped: 0,
+      removed: [],
     });
   });
 
   it('listFlows keeps the facts of a record whose details are invalid, and drops only the details', async () => {
     fetchMock.mockResolvedValue(json(200, [{ ...record, details: { serviceStatus: 'done' } }]));
-    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [record], dropped: 0 });
+    expect(await listFlows(ACCESS)).toEqual({ ok: true, flows: [record], dropped: 0, removed: [] });
   });
 
   it('a write reply with invalid details is a success without details, not a failure', async () => {
