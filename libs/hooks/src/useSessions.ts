@@ -153,7 +153,10 @@ export interface UseSessionsResult {
    * Applies what the server returned for this account. `pendingByFlow` maps a flowId to the fact
    * fields with an unsent local edit; those keep the local value. A flow not on the device becomes
    * a 'member' session. A 'member' session whose flow is no longer returned is removed (access was
-   * lost). 'owner' sessions are never removed. Drafts, contacts, who was notified, reminders and
+   * lost). An 'owner' session is removed only when its flowId is in `gone`: ids sync saw on the
+   * server that a clean pull no longer lists (deleted on another device, #1084). It goes with its
+   * drafts and contacts. Without `gone`, an owner session is never removed (a person never pushed
+   * is not on the server and must stay). Otherwise drafts, contacts, who was notified, reminders and
    * edited wording are never touched. With no signed-in user (`myUserId` empty) nothing changes.
    * When `dropped > 0` some records could not be read, so nothing is removed (they may be among
    * the missing). A role comes from ownership: `record.ownerId === myUserId`. A session with
@@ -163,6 +166,7 @@ export interface UseSessionsResult {
     result: { flows: readonly FlowRecord[]; dropped?: number },
     myUserId: string,
     pendingByFlow?: Readonly<Record<string, Iterable<SyncedKey>>>,
+    gone?: readonly string[],
   ) => void;
 }
 
@@ -970,14 +974,16 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
   }, []);
 
   const applyRemoteFlows = useCallback<UseSessionsResult['applyRemoteFlows']>(
-    ({ flows, dropped = 0 }, myUserId, pendingByFlow = {}) => {
+    ({ flows, dropped = 0 }, myUserId, pendingByFlow = {}, gone = []) => {
       if (!myUserId) return;
       const returned = new Map(flows.map((r) => [r.id, r]));
+      const goneIds = new Set(dropped > 0 ? [] : gone);
       setSessions((list) => {
         const known = new Set(list.map((s) => s.flowId));
         const updated = list
-          // Losing access removes a shared person; a person this user owns is never removed here.
+          // Losing access removes a shared person. An owned person goes only when sync says it was deleted elsewhere.
           .filter((s) => dropped > 0 || s.role !== 'member' || returned.has(s.flowId))
+          .filter((s) => !(s.role === 'owner' && goneIds.has(s.flowId) && !returned.has(s.flowId) && (s.ownerId === null || s.ownerId === myUserId)))
           .map((s) => {
             const record = returned.get(s.flowId);
             return record ? mergeRecordIntoSession(s, record, pendingByFlow[s.flowId] ?? [], myUserId) : s;

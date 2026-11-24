@@ -173,7 +173,9 @@ additive: an older list loads, and the file keeps its key and shape.
   in 2.0b, through `mergeSyncedFields` in `libs/shared/src/flowDetails.ts`, with the same
   pending-key protection. A field with an unsent local edit keeps the local value. A flow not on
   the device becomes a `role: 'member'` session. A `member` session whose flow is no longer
-  returned is removed (access was lost); an `owner` session is never removed. Drafts,
+  returned is removed (access was lost). An `owner` session is removed only when a clean pull
+  (`dropped === 0`) omits a flow this device saw on the server (#1084); a person never pushed stays.
+  The session goes with its drafts and contacts. Drafts,
   `draftsUpdatedAt`, contacts, `recipientsNotified`, `momentCompletedAt`, reminders, `senderName`
   and `messageOverride` are never read from or written by it.
 - The role comes from ownership: `record.ownerId` equal to the signed-in user is `owner`, anything
@@ -761,7 +763,7 @@ Accounts use Clerk; the gateway verifies the Clerk token (see REQUIREMENTS.md §
   (`listFlows`, `updateFlow`), and its id stays taken (`createFlow` gets `conflict` for the owner and
   `taken` for anyone else, #942) until DynamoDB
   purges both items after 90 days. A joiner who owns only a deleted person is still refused (C11).
-  The owner's other devices keep the person for now. Account deletion (below) still removes everything.
+  The owner's other devices drop the person at their next clean pull (#1084), with any unsent edit for them. Account deletion (below) still removes everything.
 - **Invite emails (#146, settled 2026-10-21).** An invite carries the email of a third party who
   never agreed to anything, so the `INVITE#` item is deleted after 30 days: 30 days after it expires
   or is revoked, whichever is first, and 30 days after it is accepted. The access rules set the

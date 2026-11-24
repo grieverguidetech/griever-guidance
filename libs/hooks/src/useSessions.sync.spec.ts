@@ -300,3 +300,35 @@ describe('moveFlowId (#942)', () => {
     expect(result.current.sessions[1].formerFlowIds).toBeUndefined();
   });
 });
+
+describe('applyRemoteFlows with gone (#1084)', () => {
+  const applyGone = (sessions: Partial<Session>[], gone: string[], dropped = 0) => {
+    const view = renderHook(() => useSessions(mem(sessions)));
+    act(() => view.result.current.applyRemoteFlows({ flows: [], dropped }, ME, {}, gone));
+    return view.result.current.sessions;
+  };
+  const withDraft = {
+    drafts: { announcement: { templateCategory: 'announcement', selectedContactIds: ['c1'] } },
+  } as unknown as Partial<Session>;
+
+  it('removes an owner session named in gone, with its drafts', () => {
+    expect(applyGone([local(withDraft)], [A])).toEqual([]);
+  });
+
+  it('keeps an owner session whose id is not in gone', () => {
+    expect(applyGone([local(withDraft)], [])).toHaveLength(1);
+    expect(applyGone([local(withDraft)], ['99999999-9999-4999-8999-999999999999'])).toHaveLength(1);
+  });
+
+  it('keeps it when records were dropped', () => {
+    expect(applyGone([local()], [A], 1)).toHaveLength(1);
+  });
+
+  it('does not remove another account\'s person', () => {
+    expect(applyGone([local({ ownerId: OTHER })], [A])).toHaveLength(1);
+  });
+
+  it('still removes a member session that is no longer returned', () => {
+    expect(applyGone([local({ role: 'member', ownerId: OTHER })], [])).toEqual([]);
+  });
+});

@@ -478,6 +478,9 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     const pull = async (accessToken: string): Promise<'done' | 'stale' | 'failed'> => {
       const asked = pullAsks;
       const seq = ++pullSeq;
+      // What this device saw on the server before asking. A person who joins `known` while the request is out
+      // (a create that finished) is not in it, so a list that was read earlier cannot make them look deleted (#1084).
+      const knownBefore = new Set(getState().known);
       const result = await withTimeout((signal) => client().listFlows(accessToken, signal), offline, inFlight);
       if (!alive) return 'failed';
       if (!result.ok) {
@@ -504,6 +507,14 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         if (kept.length !== marks.length) writeRemovedFlows(latest.current.storage, kept);
       }
       markKnown(state, flows, userId);
+      // A clean list that omits a person this device saw on the server: they were deleted elsewhere (#1084).
+      // A queued id is kept: a send in flight stays queued until it answers, and a 404 drops it and pulls again.
+      const gone = result.dropped ? [] : goneFlows(state, knownBefore, result.flows);
+      for (const id of gone) {
+        state.known.delete(id);
+        state.queue.delete(id);
+        state.baselines.delete(id);
+      }
       state.pulled = true;
       try {
         scanSessions(state, latest.current.sessions, userId, new Set((marks ?? []).map((m) => m.id)));
@@ -530,7 +541,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         state.baselines.set(record.id, next as unknown as SyncedFields);
       }
       writeStored(latest.current.storage, state);
-      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow);
+      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow, gone);
       setPulledFor(userId);
       setPullCount((count) => count + 1);
       return 'done';
@@ -758,6 +769,17 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
   }, [active, userId]);
 
   return { lastError, pulled: active && pulledFor === userId, pullNow, pullCount, flushNow };
+}
+
+/**
+ * Ids this device saw on the server (`knownBefore`) that a clean list no longer has. Not counted: a taken id
+ * (`conflicted`, the server's copy is someone else's), an old id after a move, and an id with an unsent edit.
+ */
+function goneFlows(state: SyncState, knownBefore: ReadonlySet<string>, listed: readonly FlowRecord[]): string[] {
+  const listedIds = new Set(listed.map((r) => r.id));
+  return [...knownBefore].filter(
+    (id) => !listedIds.has(id) && !state.conflicted.has(id) && !state.moved.has(id) && !state.queue.has(id),
+  );
 }
 
 function markKnown(state: SyncState, flows: readonly FlowRecord[], userId: string): void {
