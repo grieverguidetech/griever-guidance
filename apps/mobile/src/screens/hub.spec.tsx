@@ -201,21 +201,19 @@ describe('HubScreen', () => {
     expect(screen.queryByRole('button', { name: 'Edit person' })).toBeNull();
   });
 
-  it('draws What you will need as a primary (sunset swirl) button, with the recipe text colour and a 44 pt target', () => {
+  it('draws What you will need as a secondary outline button (#1075), with a 44 pt target and no swirl', () => {
     setup();
     const flat = StyleSheet.flatten(typeof checklistButton().props.style === 'function' ? checklistButton().props.style({ pressed: false }) : checklistButton().props.style);
-    const recipe = v2.recipes.button.primary;
-    expect(flat.borderColor).toBe(recipe.border.color);
+    expect(flat.borderColor).toBe(v2.recipes.button.outline.border.color);
     expect(flat.minHeight).toBeGreaterThanOrEqual(44);
     expect(flat.minWidth).toBeGreaterThanOrEqual(44);
-    expect(within(checklistButton()).UNSAFE_getAllByType(LinearSwirl)).toHaveLength(1);
-    expect(StyleSheet.flatten(within(checklistButton()).getByText("What you'll need").props.style).color).toBe(recipe.text.color);
+    expect(within(checklistButton()).UNSAFE_queryAllByType(LinearSwirl)).toHaveLength(0);
   });
 
-  it('has two primary swirl buttons: What you will need and the bottom action bar (the next step)', () => {
+  it('has one primary swirl button: the bottom action bar (the next step)', () => {
     setup();
     const primary = screen.UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]));
-    expect(primary).toHaveLength(2);
+    expect(primary).toHaveLength(1);
     expect(within(screen.getByTestId('hub-action-bar')).UNSAFE_getAllByType(LinearSwirl).filter((swirl) => JSON.stringify(swirl.props.stops) === JSON.stringify([...v2.recipes.button.primary.swirl.stops]))).toHaveLength(1);
   });
 

@@ -73,10 +73,10 @@ function setup(over: Partial<ShareObituaryProps> = {}) {
 }
 
 describe('ShareObituary button tiers (#1065)', () => {
-  it('draws Back as secondary and What you will need as primary', () => {
+  it('draws Back and What you will need as secondary (#1075)', () => {
     setup();
     expect(tierOfButton('Back')).toBe('secondary');
-    expect(tierOfButton("What you'll need")).toBe('primary');
+    expect(tierOfButton("What you'll need")).toBe('secondary');
   });
 });
 

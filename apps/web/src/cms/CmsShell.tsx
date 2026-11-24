@@ -132,7 +132,7 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
               ref={sheetButton}
               data-checklist-opener=""
               type="button"
-              className="gg-btn gg-btn-primary -my-2 lg:hidden"
+              className="gg-btn gg-btn-secondary -my-2 lg:hidden"
               aria-haspopup="dialog"
               onClick={() => setSheetOpen(true)}
             >

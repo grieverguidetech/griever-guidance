@@ -131,10 +131,10 @@ describe('useFocusHeadingOnChange, before any press', () => {
 describe('top buttons (#176)', () => {
   const css = readFileSync(join(import.meta.dirname, '..', 'styles.css'), 'utf8');
 
-  it('Back is a bordered secondary button and What you will need is the primary action', () => {
+  it('Back is a bordered secondary button and What you will need is also secondary (#1075)', () => {
     render(<TopBar onBack={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Back' })).toHaveClass('gg-btn-secondary');
-    expect(screen.getByRole('button', { name: "What you'll need" })).toHaveClass('gg-btn-primary');
+    expect(screen.getByRole('button', { name: "What you'll need" })).toHaveClass('gg-btn-secondary');
     for (const name of ['Back', "What you'll need"]) {
       const button = screen.getByRole('button', { name });
       expect(button).not.toHaveClass('!px-0'); // padding is kept

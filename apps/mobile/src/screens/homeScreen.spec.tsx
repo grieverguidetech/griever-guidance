@@ -46,11 +46,11 @@ describe('HomeScreen layout (#363)', () => {
     expect(screen.queryByRole('button', { name: 'Your account' })).toBeNull();
   });
 
-  it('draws What you will need as the primary swirl button, not an outline', () => {
+  it('draws What you will need as the secondary outline, not the primary swirl (#1075)', () => {
     render(<HomeScreen {...props} onWhatYoullNeed={jest.fn()} />);
     const button = screen.getByRole('button', { name: "What you'll need" });
-    expect(flat(button).borderColor).toBe(v2.recipes.button.primary.border.color);
-    expect(within(button).UNSAFE_getAllByType(LinearSwirl)).toHaveLength(1);
+    expect(flat(button).borderColor).toBe(HEADER_BORDER);
+    expect(within(button).UNSAFE_queryAllByType(LinearSwirl)).toHaveLength(0);
   });
 
   it('draws "Your account" as the secondary outline with no fill', () => {

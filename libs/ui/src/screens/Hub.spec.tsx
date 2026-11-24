@@ -174,10 +174,10 @@ describe('Hub', () => {
     expect(getComputedStyle(button).backgroundColor).not.toBe('rgb(0, 103, 134)');
   });
 
-  it('Home is secondary and What you will need is primary', () => {
+  it('Home and What you will need are both secondary (#1075)', () => {
     setup();
     expect(screen.getByRole('button', { name: 'Home' })).toHaveAttribute('data-gg-btn', 'secondary');
-    expect(screen.getByRole('button', { name: "What you'll need" })).toHaveAttribute('data-gg-btn', 'primary');
+    expect(screen.getByRole('button', { name: "What you'll need" })).toHaveAttribute('data-gg-btn', 'secondary');
   });
 
   it('keeps a locked step focusable, aria-disabled and explained, and it asks for the paywall', async () => {

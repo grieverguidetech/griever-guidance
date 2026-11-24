@@ -71,11 +71,11 @@ describe('AppHeader layout', () => {
 });
 
 describe('AppHeader checklist button', () => {
-  it('closed: a primary "What you\'ll need" button with aria-expanded false, an up caret, that calls onToggle', async () => {
+  it('closed: a secondary "What you\'ll need" button with aria-expanded false, an up caret, that calls onToggle', async () => {
     const onToggle = vi.fn();
     renderApp(<AppHeader checklist={{ open: false, onToggle, panelId: 'panel-1' }} />);
     const button = within(screen.getByRole('banner')).getByRole('button', { name: "What you'll need" });
-    expect(button).toHaveClass('gg-btn', 'gg-btn-primary');
+    expect(button).toHaveClass('gg-btn', 'gg-btn-secondary');
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveAttribute('aria-controls', 'panel-1');
     expect(button.className).toContain('hidden lg:inline-flex');
