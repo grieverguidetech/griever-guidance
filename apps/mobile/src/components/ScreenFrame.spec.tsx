@@ -64,6 +64,15 @@ describe('FadeIn', () => {
     expect(opacity()).toBe(1);
   });
 
+  it('sets full opacity even when the fade reports finished', async () => {
+    setup(false, false);
+    const setValue = jest.spyOn(Animated.Value.prototype, 'setValue');
+    fakeTiming((done) => done?.({ finished: true }));
+    await show();
+    expect(setValue).toHaveBeenCalledWith(1);
+    expect(opacity()).toBe(1);
+  });
+
   it('ends fully shown when the fade never reports back, after the safety timer', async () => {
     jest.useFakeTimers();
     try {

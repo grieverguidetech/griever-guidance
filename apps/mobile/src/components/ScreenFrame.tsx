@@ -22,7 +22,7 @@ export function ScreenFrame({ children, bottomInset = true }: { children: ReactN
   );
 }
 
-/** Past the fade's own length, a fade that has not reported back is cut short and the screen is shown. */
+/** A fade that has not reported back this long after its own length (500 ms in all) is cut short and the screen is shown. */
 const FADE_SAFETY_MS = 300;
 
 /**
@@ -50,13 +50,8 @@ export function FadeIn({ children }: { children: ReactNode }) {
       done.current = true;
       opacity.setValue(1);
     };
-    Animated.timing(opacity, { toValue: 1, duration: FADE_MS, useNativeDriver: true }).start(({ finished }) => {
-      if (finished) {
-        done.current = true;
-      } else {
-        show();
-      }
-    });
+    // Whatever `finished` says, the value is set: iOS can report a finished fade while a recreated native view still sits at 0.
+    Animated.timing(opacity, { toValue: 1, duration: FADE_MS, useNativeDriver: true }).start(show);
     const timer = setTimeout(() => {
       if (!done.current) {
         show();

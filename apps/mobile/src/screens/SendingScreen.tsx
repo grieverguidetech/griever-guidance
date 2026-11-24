@@ -90,8 +90,11 @@ export function SendingScreen({ flow, contacts }: Props) {
   // No send job means there is nothing to send here. Step back to Ready to send rather than leave a blank screen (#1073).
   const { prevStep } = flow;
   const hasJob = sendJob !== null;
+  // Once only: prevStep is a new function on every render, so a second call before the step changes would step back twice.
+  const leftEmpty = useRef(false);
   useEffect(() => {
-    if (!hasJob) {
+    if (!hasJob && !leftEmpty.current) {
+      leftEmpty.current = true;
       prevStep();
     }
   }, [hasJob, prevStep]);

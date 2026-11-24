@@ -324,7 +324,8 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
 
   it('opens the new checklist sheet only after a tap, not the old Gather-only sheet', () => {
     setup(linked);
-    expect(checklistModal().props.visible).toBe(false);
+    // Closed: no Modal is mounted at all (#1073).
+    expect(screen.queryByTestId('checklist-sheet')).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
     expect(checklistModal().props.visible).toBe(true);
     const sheet = within(screen.getByTestId('checklist-sheet'));
