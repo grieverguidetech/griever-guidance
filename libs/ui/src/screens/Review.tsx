@@ -124,7 +124,7 @@ export function Review({ copy, kind, intro, message, onMessageChange, edited, on
       <View style={styles.topBar}>
         <Button label={copy.back} variant="secondary" onPress={onBack} />
         {onWhatYoullNeed ? (
-          <Button label={copy.checklist} opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button label={copy.checklist} variant="secondary" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
         ) : null}
       </View>
       <View style={styles.head}>

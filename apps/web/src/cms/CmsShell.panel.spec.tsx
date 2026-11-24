@@ -109,6 +109,8 @@ describe('CmsShell checklist panel', () => {
     const row = screen.getByTestId('title-row');
     expect(row.className).toContain('gap-y-4');
     expect(document.querySelector('[data-checklist-opener]')).toHaveClass('-my-2');
+    expect(document.querySelector('[data-checklist-opener]')).toHaveClass('gg-btn-secondary'); // #1075
+    expect(document.querySelector('[data-checklist-opener]')).not.toHaveClass('gg-btn-primary');
     expect(row.parentElement).toHaveClass('gap-4'); // the main column's rhythm
   });
 

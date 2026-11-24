@@ -148,10 +148,10 @@ describe('WhoShouldKnow (mobile props, #652)', () => {
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
-  it('draws Back as secondary and What you will need as primary', () => {
+  it('draws Back and What you will need as secondary (#1075)', () => {
     setup({ onWhatYoullNeed: jest.fn() });
     expect(tierOfButton('Back')).toBe('secondary');
-    expect(tierOfButton("What you'll need")).toBe('primary');
+    expect(tierOfButton("What you'll need")).toBe('secondary');
   });
 
   it('with scrollList, Close does what Back did, and What you\'ll need is hidden', () => {

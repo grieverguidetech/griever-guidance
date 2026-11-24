@@ -53,7 +53,7 @@ export function HomeScreen({ sessions, canCreate, onOpen, onCreate, onWhatYoullN
       <ScreenHeader>Who you're writing about</ScreenHeader>
       {onWhatYoullNeed ? (
         <View style={styles.headerRow}>
-          <Button label={copy.checklist} variant="primary" onPress={onWhatYoullNeed} />
+          <Button label={copy.checklist} variant="secondary" onPress={onWhatYoullNeed} />
         </View>
       ) : null}
       {people.length > 0 ? (

@@ -140,7 +140,7 @@ export function Sending({ copy, intro, progress, current, others, handOff, confi
     <View style={styles.screen}>
       {onWhatYoullNeed ? (
         <View style={styles.topBar}>
-          <Button label={copy.checklist} opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+          <Button label={copy.checklist} variant="secondary" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
         </View>
       ) : null}
       <View style={styles.head}>

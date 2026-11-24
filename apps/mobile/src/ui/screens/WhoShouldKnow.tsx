@@ -254,7 +254,7 @@ export function WhoShouldKnow({
       {onWhatYoullNeed && !scrollList ? (
         <Button
           label={copy.checklist}
-          variant="primary"
+          variant="secondary"
           opensDialog
           onPress={onWhatYoullNeed}
           buttonRef={checklistRef}
