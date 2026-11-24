@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { fill, screenCopy } from '@griever/copy';
 import type { Session } from '@griever/hooks';
 import { v2 } from '@griever/tokens';
@@ -8,6 +9,7 @@ import type { ButtonNode } from '../ui';
 import { personLabel } from './PersonSwitcher';
 
 const copy = screenCopy('phoneSwitcher');
+const CARET_SIZE = 16;
 
 /** Newest first, by when each person was last opened. Never mutates the list it is given. */
 const newestFirst = (people: Session[]) => [...people].sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
@@ -70,9 +72,17 @@ export function NameSwitcher({ name, others, onPick, onEdit, onAdd }: NameSwitch
       >
         <Text style={styles.name}>{name}</Text>
         {/* A small arrow so the name looks tappable. Hidden from screen readers: the hint says what it does. */}
-        <Text style={styles.chevron} accessible={false} importantForAccessibility="no" accessibilityElementsHidden>
-          ⌄
-        </Text>
+        <View
+          testID="name-switcher-caret"
+          style={styles.caret}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        >
+          <Svg width={CARET_SIZE} height={CARET_SIZE} viewBox="0 0 16 16" fill="none">
+            <Path d="M3 6l5 5 5-5" stroke={v2.roles.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </View>
       </Pressable>
       <Sheet testID="switcher-sheet" title={copy.title} closeLabel={copy.close} visible={open} onClose={() => close()} onDismiss={finish}>
         <Button label={copy.editPerson} variant="secondary" onPress={() => close(onEdit)} />
@@ -87,7 +97,8 @@ export function NameSwitcher({ name, others, onPick, onEdit, onAdd }: NameSwitch
 
 const styles = StyleSheet.create({
   name: { fontSize: 28, lineHeight: 34, color: v2.roles.ink, fontWeight: '600', flexShrink: 1 },
-  press: { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  press: { minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   pressed: { backgroundColor: v2.roles.wash },
-  chevron: { fontSize: 22, color: v2.roles.ink },
+  // A plain box the size of the drawing, with no line-height, so alignItems centres it on the name.
+  caret: { width: CARET_SIZE, height: CARET_SIZE, pointerEvents: 'none' },
 });

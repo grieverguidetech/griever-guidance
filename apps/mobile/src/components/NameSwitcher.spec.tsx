@@ -147,7 +147,11 @@ describe('NameSwitcher', () => {
   it('the name button has a hidden arrow and is at least 44 wide', () => {
     render(<NameSwitcher name="Dan" onEdit={jest.fn()} others={[anna]} onPick={jest.fn()} />);
     const button = screen.getByRole('button', { name: 'Writing about Dan' });
-    expect(screen.getByText('⌄', { includeHiddenElements: true }).props.accessibilityElementsHidden).toBe(true);
+    const caret = screen.getByTestId('name-switcher-caret', { includeHiddenElements: true });
+    expect(caret.props.accessibilityElementsHidden).toBe(true);
+    expect(caret.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(caret.props.accessible).toBe(false);
+    expect(screen.queryByText('⌄', { includeHiddenElements: true })).toBeNull();
     const style = typeof button.props.style === 'function' ? button.props.style({ pressed: false }) : button.props.style;
     expect(JSON.stringify(style)).toContain('"minWidth":44');
   });
