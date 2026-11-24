@@ -175,7 +175,7 @@ describe('checklist in the editor (#421)', () => {
     ).toHaveFocus();
   });
 
-  it('after Done on the item, Back focuses the Next button that now names the next item', async () => {
+  it('Done on the item saves it, shows the Overview with the h1 focused, and the Next button names the next item (#1071)', async () => {
     const user = userEvent.setup();
     await openOverview();
     await user.click(
@@ -185,13 +185,26 @@ describe('checklist in the editor (#421)', () => {
     await user.click(
       within(screen.getByRole('main')).getByRole('button', { name: 'Done' }),
     );
-    await user.click(screen.getByRole('button', { name: 'Back' }));
-    await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Overview' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(stored().checklist).toEqual({ pronouncement: 'done' });
     const next = within(screen.getByRole('main')).getByRole('button', {
       name: /On the checklist/,
     });
     expect(next).not.toHaveAccessibleName(NEXT);
-    expect(next).toHaveFocus();
+  });
+
+  it('un-marking Done keeps the item open (#1071)', async () => {
+    const user = userEvent.setup();
+    seed({ pronouncement: 'done' });
+    await openOverview();
+    await user.click(
+      within(screen.getByRole('complementary')).getByRole('button', { name: ITEM }),
+    );
+    await screen.findByRole('heading', { level: 1, name: ITEM });
+    await user.click(within(screen.getByRole('main')).getByRole('button', { name: 'Done' }));
+    expect(stored().checklist).not.toHaveProperty('pronouncement', 'done');
+    expect(screen.getByRole('heading', { level: 1, name: ITEM })).toBeInTheDocument();
   });
 
   it('marks the open item in the panel with aria-current', async () => {
@@ -225,6 +238,7 @@ describe('checklist in the editor (#421)', () => {
       within(screen.getByRole('main')).getByRole('button', { name: 'Done' }),
     );
     expect(stored().checklist).toEqual({ pronouncement: 'done' });
+    await screen.findByRole('heading', { level: 1, name: 'Overview' });
     await user.click(screen.getByRole('link', { name: /^Service/ }));
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Service' }),
