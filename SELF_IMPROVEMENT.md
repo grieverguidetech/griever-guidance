@@ -230,3 +230,13 @@ to read in a minute; it is a staging area, not an archive.
 - **Rule:** tests on DynamoDB Local must keep every ttl, seeded or computed, in the real future (use
   a fixed clock far ahead, such as 2099), or the sweeper deletes items mid-test. Scope raw snapshots
   to the ids the test created.
+
+### 2026-11-23 — a stacked PR merged into a dead branch and missed main (#1066, #1067, #1068)
+- **What happened:** mobile PR #1067 was stacked on the web branch `feat/web-button-tiers`. #1066
+  was squash-merged to `main` and GitHub did not retarget #1067, so #1067 merged into the dead web
+  branch and its commits never reached `main`. They were re-landed as #1068 by cherry-picking.
+- **Why:** a squash merge makes a new commit on `main` and the old branch is left behind, so a PR
+  based on that branch keeps its old base. "Merged" on the PR page did not mean "on `main`".
+- **Rule:** don't stack a PR on another PR's branch when the base will be squash-merged. Branch the
+  second PR from `main`, or wait for the first to merge and rebase. Before reporting a merge done,
+  check the commit is on `origin/main` (`git merge-base --is-ancestor <sha> origin/main`).
