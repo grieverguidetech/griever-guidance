@@ -54,6 +54,11 @@ export interface UseFlowSyncResult {
   pullNow: () => Promise<boolean>;
   /** Counts the pulls applied since sign-in, so a screen can drop a "could not load" line when one works. */
   pullCount: number;
+  /**
+   * Sends the saved queue now, without the 1 second edit wait. For the phone going to the background.
+   * Does nothing when sync is off or nothing is queued. After a 429 it still waits for the backoff.
+   */
+  flushNow: () => void;
 }
 
 export const FLOW_QUEUE_STORAGE_KEY = 'gg.flowQueue.v1';
@@ -392,6 +397,11 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
   // Set by the effect below; runs one pull for the caller and says whether it worked.
   const pullNowRef = useRef<() => Promise<boolean>>(async () => false);
   const pullNow = useCallback(() => pullNowRef.current(), []);
+  const flushNow = useCallback(() => {
+    if ((stateRef.current?.queue.size ?? 0) > 0) {
+      kickRef.current(0);
+    }
+  }, []);
 
   const { enabled, userId, sessions } = options;
   const active = enabled && userId !== '';
@@ -747,7 +757,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
     };
   }, [active, userId]);
 
-  return { lastError, pulled: active && pulledFor === userId, pullNow, pullCount };
+  return { lastError, pulled: active && pulledFor === userId, pullNow, pullCount, flushNow };
 }
 
 function markKnown(state: SyncState, flows: readonly FlowRecord[], userId: string): void {

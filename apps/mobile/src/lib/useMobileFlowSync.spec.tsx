@@ -9,7 +9,8 @@ import { useMobileFlowSync } from './useMobileFlowSync';
 
 const mockPullCount = { value: 0 };
 const mockPullNow = jest.fn(async () => true);
-const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null, pulled: false, pullNow: mockPullNow, pullCount: mockPullCount.value }));
+const mockFlushNow = jest.fn();
+const mockUseFlowSync = jest.fn((_options: unknown) => ({ lastError: null, pulled: false, pullNow: mockPullNow, pullCount: mockPullCount.value, flushNow: mockFlushNow }));
 jest.mock('@griever/hooks', () => ({
   FLOW_QUEUE_STORAGE_KEY: 'gg.flowQueue.v1',
   flowQueueKey: (id: string) => `gg.flowQueue.v1:${id}`,
@@ -153,6 +154,31 @@ describe('useMobileFlowSync', () => {
     expect(onWake).toHaveBeenCalledTimes(1);
     unsubscribe();
     expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the queue at once when the app goes to the background or inactive, and not when it is active (#1079)', async () => {
+    const listeners: Array<(state: string) => void> = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, cb: (state: string) => void) => {
+      listeners.push(cb);
+      return { remove: jest.fn() };
+    }) as never);
+    mockFlushNow.mockClear();
+    await mount({ auth: true, sync: true }, signedIn);
+    const emit = (state: string) => listeners.forEach((cb) => cb(state));
+    emit('active');
+    expect(mockFlushNow).not.toHaveBeenCalled();
+    emit('background');
+    expect(mockFlushNow).toHaveBeenCalledTimes(1);
+    emit('inactive');
+    expect(mockFlushNow).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not listen for leaving the app while sync is off (#1079)', async () => {
+    // The spy from earlier tests is reused, so clear its old calls first.
+    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation((() => ({ remove: jest.fn() })) as never);
+    spy.mockClear();
+    await mount({ auth: true, sync: true }, { ...signedIn, status: 'signed_out', userId: null });
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('stays disabled until this account\'s queue cache has been read', async () => {

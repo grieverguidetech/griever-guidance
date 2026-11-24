@@ -208,6 +208,25 @@ describe('useFlowSync sending', () => {
     expect(sent[0].body).toMatchObject({ id: FLOW, personName: 'Margaret Hayes' });
   });
 
+  it('flushNow sends the queued edit at once, without the edit wait, and does nothing when nothing is queued (#1079)', async () => {
+    const requests = mockFetch(serverWithFlow);
+    const base = session();
+    const { rerender, result } = setup([base]);
+    await advance(10);
+    const before = requests.length;
+    // Nothing queued: no cycle, no request.
+    act(() => result.current.flushNow());
+    await advance(10);
+    expect(requests.length).toBe(before);
+
+    rerender({ sessions: [{ ...base, serviceDate: 'June 3' }] });
+    await advance(10);
+    expect(writes(requests)).toEqual([]);
+    act(() => result.current.flushNow());
+    await advance(10);
+    expect(writes(requests)).toEqual([{ method: 'PATCH', path: `/flows/${FLOW}`, body: { serviceDate: 'June 3' } }]);
+  });
+
   it('sends two quick edits to the same person as one PATCH with both fields', async () => {
     const requests = mockFetch(serverWithFlow);
     const base = session();
