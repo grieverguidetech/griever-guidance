@@ -33,10 +33,10 @@ describe('keys', () => {
     expect(FLOW_STATUS_KEYS).toHaveLength(5);
     expect(CHECKLIST_FLOW_KEYS).toHaveLength(37);
     expect(FLOW_DETAIL_KEYS).toHaveLength(93);
-    // Expand, then contract (#1077): accepted but not sent until T2 (#1080).
+    // Sent from #1080: the 56 text, flag and status keys plus the 37 checklist keys.
     expect(FLOW_SENT_DETAIL_KEYS).toHaveLength(56);
-    expect(SYNCED_KEYS).toEqual([...FLOW_FACT_KEYS, ...FLOW_SENT_DETAIL_KEYS]);
-    expect(SYNCED_KEYS.some((key) => key.startsWith('check'))).toBe(false);
+    expect(SYNCED_KEYS).toEqual([...FLOW_FACT_KEYS, ...FLOW_SENT_DETAIL_KEYS, ...CHECKLIST_FLOW_KEYS]);
+    expect(SYNCED_KEYS.filter((key) => key.startsWith('check'))).toHaveLength(37);
     expect(new Set(SYNCED_KEYS).size).toBe(SYNCED_KEYS.length);
   });
 

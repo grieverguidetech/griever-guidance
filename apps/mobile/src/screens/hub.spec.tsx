@@ -242,7 +242,7 @@ describe('HubScreen', () => {
     fireEvent.press(checklistButton());
     expect(checklistModal().props.visible).toBe(true);
     expect(within(screen.getByTestId('checklist-sheet')).getByRole('heading', { name: "What you'll need" })).toBeTruthy();
-    expect(within(screen.getByTestId('checklist-sheet')).getByText('Your ticks stay on this phone.')).toBeTruthy();
+    expect(within(screen.getByTestId('checklist-sheet')).getByText('Ticks under Gather when you can stay on this phone.')).toBeTruthy();
   });
 
   it('passes the open person\'s checklist to the sheet and saves a tick through onSetItem', () => {

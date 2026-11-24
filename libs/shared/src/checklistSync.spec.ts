@@ -59,10 +59,23 @@ describe('checklist mapping', () => {
     expect(next).toEqual({ custody: 'done', headstone: 'done' });
   });
 
-  it('toFlowDetails and toSyncedFields do not send any check key yet (T2, #1080, flips this)', () => {
+  it('toFlowDetails and toSyncedFields send all 37 check keys, open items as null (#1080)', () => {
     const source = { checklist: { 'guest-book': 'done', custody: 'not_applicable' } } as const;
     for (const out of [toFlowDetails(source), toSyncedFields(source)]) {
-      expect(Object.keys(out).filter((key) => key.startsWith('check'))).toEqual([]);
+      const record = out as unknown as Record<string, unknown>;
+      expect(Object.keys(out).filter((key) => key.startsWith('check')).sort()).toEqual(
+        [...CHECKLIST_FLOW_KEYS].sort(),
+      );
+      expect(record.checkGuestBook).toBe('done');
+      expect(record.checkCustody).toBe('not_applicable');
+      expect(record.checkEulogy).toBeNull();
+    }
+  });
+
+  it('a session with no checklist sends every check key as null', () => {
+    const out = toFlowDetails({}) as unknown as Record<string, unknown>;
+    for (const key of CHECKLIST_FLOW_KEYS) {
+      expect(out[key]).toBeNull();
     }
   });
 

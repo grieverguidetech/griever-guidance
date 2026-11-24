@@ -50,7 +50,7 @@ describe('PersonChecklistSheet (#696)', () => {
     expect(phrases.gatherHeading).toBe('Gather when you can');
   });
 
-  it('says the ticks stay on this phone and shows no counts', async () => {
+  it('says the Gather ticks stay on this phone and shows no counts', async () => {
     await setup(tick(['right-away']));
     expect(screen.getByText(copy.staysOnPhone)).toBeTruthy();
     expect(screen.queryByText(/\d+\s*(of|\/)\s*\d+/)).toBeNull();

@@ -91,6 +91,9 @@ function coalesce(patches: readonly Pending[]): Pending {
 /**
  * A saved baseline. One saved before details synced holds only the facts: its detail keys are
  * filled with the empty values, so details already typed on this device are found as edits.
+ * The same holds for the 37 check keys (#1080): a baseline saved before then has none, so they
+ * read as open, ticks made earlier diff as edits and are queued before the first pull is merged.
+ * Without this the server's null for every unwritten check key would clear those ticks.
  */
 function readBaseline(input: unknown): SyncedFields | null {
   const parsed = parseSyncedPatch(input);

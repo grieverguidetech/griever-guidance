@@ -154,12 +154,28 @@ describe('applyRemoteFlows with details (DS-7)', () => {
     expect(s.sectionStatus).toEqual({ person: 'ready', announcement: 'in_progress', obituary: 'in_progress' });
   });
 
-  // Expand, then contract (#1077): check keys are accepted, not merged, until #1080.
-  // Widening the merge before then must fail these two.
-  it('a pulled record with check keys leaves an existing session\'s ticks unchanged', () => {
+  // Check keys are merged per item since #1080: last save wins, a key that is absent keeps the local tick.
+  it('a pulled record with check keys sets, clears and keeps ticks per item', () => {
+    const [s] = apply(
+      [local({ checklist: { custody: 'done', reception: 'done', 'guest-book': 'done' } })],
+      [record({ details: { checkCustody: null, checkEulogy: 'done', checkReception: 'not_applicable' } })],
+    );
+    expect(s.checklist).toEqual({ eulogy: 'done', reception: 'not_applicable', 'guest-book': 'done' });
+  });
+
+  it('a pending local tick keeps its local value when the record says otherwise', () => {
     const [s] = apply(
       [local({ checklist: { custody: 'done' } })],
       [record({ details: { checkCustody: null, checkEulogy: 'done' } })],
+      { [A]: ['checkCustody'] },
+    );
+    expect(s.checklist).toEqual({ custody: 'done', eulogy: 'done' });
+  });
+
+  it('a record without check keys leaves the ticks unchanged', () => {
+    const [s] = apply(
+      [local({ checklist: { custody: 'done' } })],
+      [record({ details: { personStatus: 'ready' } })],
     );
     expect(s.checklist).toEqual({ custody: 'done' });
   });
