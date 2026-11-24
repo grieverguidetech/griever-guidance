@@ -71,7 +71,16 @@ describe('checklist mapping', () => {
       'guest-book': 'done',
     });
     expect(fields.checklist).toEqual({ 'guest-book': 'done', reception: 'not_applicable' });
-    expect(flowDetailsToSessionFields({ personStatus: 'ready' }).checklist).toBeUndefined();
+    expect(flowDetailsToSessionFields({ personStatus: 'ready' })).not.toHaveProperty('checklist');
+  });
+
+  it('an empty merged checklist is no field, but still clears when spread over a session', () => {
+    const fields = flowDetailsToSessionFields({ checkCustody: null }, {}, { custody: 'done' });
+    expect(fields.checklist).toBeUndefined();
+    expect(fields).toHaveProperty('checklist');
+    expect({ checklist: { custody: 'done' }, ...fields }.checklist).toBeUndefined();
+    const allNull = flowDetailsToSessionFields({ checkCustody: null, checkEulogy: null });
+    expect(allNull.checklist).toBeUndefined();
   });
 
   it('toSyncedFields never carries a checklist object or the Gather ticks', () => {

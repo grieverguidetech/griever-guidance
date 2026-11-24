@@ -363,7 +363,7 @@ export type SessionDetailFields = {
 } & {
   burialPrivate: boolean;
   sectionStatus: StatusMap;
-  checklist: NonNullable<ChecklistFields['checklist']>;
+  checklist: ChecklistFields['checklist'];
 };
 
 /**
@@ -410,7 +410,10 @@ export function flowDetailsToSessionFields(
     out.sectionStatus = next;
   }
   if (CHECKLIST_FLOW_KEYS.some((key) => details[key] !== undefined)) {
-    out.checklist = mergeFlatIntoChecklist(details, currentChecklist);
+    const merged = mergeFlatIntoChecklist(details, currentChecklist);
+    // An empty map is no field (DATA.md §2.0c). Explicit undefined, not a missing key, so that
+    // spreading the result over a session still clears ticks the server cleared.
+    out.checklist = Object.keys(merged).length > 0 ? merged : undefined;
   }
   return out as Partial<SessionDetailFields>;
 }

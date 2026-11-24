@@ -654,7 +654,7 @@ no email (the email lives in Clerk).
 - contact ids (and contact data)
 - sender name (it stays on the sender's own profile)
 - the publisher's email typed on Share obituary (`gg.publisherEmail.v1.<id>`, one per person, this phone only, MOB-9)
-- the five Gather ticks (`account.checklistTicks`): device only. The phase ticks and "Doesn't apply" marks (WEB-10) do sync, as 37 per-item keys (§2.0c, #1077); the object `checklist` is still refused by name
+- the five Gather ticks (`account.checklistTicks`): device only. The phase ticks and "Doesn't apply" marks (WEB-10) are accepted on the wire from #1078 as 37 per-item keys; sent and synced from #1080 (§2.0c, #1077); the object `checklist` is still refused by name
 - `hearsFirstIds`, `momentCompletedAt`, `remindersScheduled`
 - the parser refuses these by name (`FORBIDDEN_SYNC_KEYS`), so a client that sends one gets an error
 
