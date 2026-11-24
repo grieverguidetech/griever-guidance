@@ -329,7 +329,7 @@ describe('ShareObituaryScreen What you will need (#699)', () => {
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
     expect(checklistModal().props.visible).toBe(true);
     const sheet = within(screen.getByTestId('checklist-sheet'));
-    expect(sheet.getByText('Your ticks stay on this phone.')).toBeTruthy();
+    expect(sheet.getByText('Ticks under “Gather when you can” stay on this phone.')).toBeTruthy();
     expect(screen.queryByText('Not today. Just so none of it surprises you.')).toBeNull();
   });
 

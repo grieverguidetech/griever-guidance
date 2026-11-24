@@ -6,7 +6,7 @@ import type {
   PatchFlowResult,
   WriteFlowResult,
 } from '@griever/api-client';
-import { FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields, withServicePair } from '@griever/shared';
+import { checklistToFlat, FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields, withServicePair } from '@griever/shared';
 import type { FlowRecord, SyncedFields, SyncedKey } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
 import { generateFlowId, readRemovedFlows, writeRemovedFlows } from './useSessions.js';
@@ -91,6 +91,9 @@ function coalesce(patches: readonly Pending[]): Pending {
 /**
  * A saved baseline. One saved before details synced holds only the facts: its detail keys are
  * filled with the empty values, so details already typed on this device are found as edits.
+ * The same holds for the 37 check keys (#1080): a baseline saved before then has none, so they
+ * read as open, ticks made earlier diff as edits and are queued before the first pull is merged.
+ * Without this the server's null for every unwritten check key would clear those ticks.
  */
 function readBaseline(input: unknown): SyncedFields | null {
   const parsed = parseSyncedPatch(input);
@@ -334,7 +337,13 @@ function scanSessions(
     const flowId = flowIdOf(state, s);
     seen.add(flowId);
     const facts = toSyncedFields(s);
-    const before = state.baselines.get(flowId);
+    // No baseline for a flow the server may already have (known, or no pull yet): seed one with
+    // every check key open, so local ticks diff as edits and are queued. Without it the pull's
+    // nulls (nobody wrote them) would clear the ticks with no write. A flow the server cannot
+    // know is created whole, as before.
+    const mayExist = state.known.has(flowId) || !state.pulled;
+    const before =
+      state.baselines.get(flowId) ?? (mayExist ? { ...facts, ...checklistToFlat(undefined) } : undefined);
     state.baselines.set(flowId, facts);
     const diff = before ? diffSynced(before, facts) : {};
     if (!before || Object.keys(diff).length > 0) dirty = true;

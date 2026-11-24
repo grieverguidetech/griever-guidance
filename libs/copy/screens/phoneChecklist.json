@@ -1,7 +1,7 @@
 {
   "title": "What you'll need",
   "close": "Close",
-  "staysOnPhone": "Your ticks stay on this phone.",
+  "staysOnPhone": "Ticks under “Gather when you can” stay on this phone.",
   "groupDone": "{group}. Done",
   "groupHint": "Shows the list.",
   "phaseNowDone": "{group} is now done."

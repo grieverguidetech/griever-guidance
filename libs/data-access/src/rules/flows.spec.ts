@@ -489,6 +489,29 @@ describe.runIf(up)('detail keys on DynamoDB Local', () => {
     });
   });
 
+  it('stores check keys from a patch and returns them, null for the ones nobody wrote (#1080)', async () => {
+    const id = randomUUID();
+    await rawPut(encodeFlow(flow(D_OWNER, id)));
+    const result = await updateFlow(
+      doc,
+      table,
+      caller(D_MEMBER),
+      id,
+      { checkCustody: 'done', checkEulogy: 'not_applicable' },
+      clock,
+    );
+    expect(result.ok).toBe(true);
+    // A later patch for another item leaves the first two alone; null clears an item.
+    await updateFlow(doc, table, caller(D_OWNER), id, { checkReception: 'done', checkEulogy: null }, clock);
+    const listed = await listFlows(doc, table, caller(D_OWNER), clock);
+    expect(listed.find((r) => r.id === id)?.details).toMatchObject({
+      checkCustody: 'done',
+      checkEulogy: null,
+      checkReception: 'done',
+      checkPronouncement: null,
+    });
+  });
+
   it('refuses a member create and writes nothing (C11)', async () => {
     const id = randomUUID();
     expect(
