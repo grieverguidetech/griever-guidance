@@ -70,17 +70,50 @@ async function memberOwnerId(
  * The caller's own people, plus the owner's people when the caller is a member.
  * A stranger gets []. A soft-deleted person (deletedAt set) is never returned.
  */
+export function listFlows(
+  doc: DynamoDBDocumentClient,
+  table: string,
+  caller: Caller,
+  clock: Clock,
+): Promise<FlowRecordWithDetails[]>;
+/** With `includeRemoved`, the answer is `{ flows, removed }` (#1088). */
+export function listFlows(
+  doc: DynamoDBDocumentClient,
+  table: string,
+  caller: Caller,
+  clock: Clock,
+  options: { includeRemoved: true },
+): Promise<ListWithRemoved>;
 export async function listFlows(
   doc: DynamoDBDocumentClient,
   table: string,
   caller: Caller,
   clock: Clock,
-): Promise<FlowRecordWithDetails[]> {
-  const own = await queryLive(doc, table, caller.userId, clock, FLOW_PREFIX);
-  const records = own
-    .map(decodeFlow)
-    .filter((flow) => !flow.deletedAt)
-    .map((flow) => toRecord(flow, 'owner'));
+  options?: { includeRemoved: true },
+): Promise<FlowRecordWithDetails[] | ListWithRemoved> {
+  const listed = await listFlowsWithRemoved(doc, table, caller, clock);
+  return options?.includeRemoved ? listed : listed.flows;
+}
+
+export interface ListWithRemoved {
+  flows: FlowRecordWithDetails[];
+  removed: string[];
+}
+
+/**
+ * The same list, plus `removed`: the ids of the caller's OWN people that are soft-deleted and not yet
+ * expired (#1088). It comes from the same owner query, so it costs no extra read. Only the caller's own
+ * partition is read for it: a member or a stranger gets `removed: []`, never another account's ids.
+ */
+export async function listFlowsWithRemoved(
+  doc: DynamoDBDocumentClient,
+  table: string,
+  caller: Caller,
+  clock: Clock,
+): Promise<ListWithRemoved> {
+  const own = (await queryLive(doc, table, caller.userId, clock, FLOW_PREFIX)).map(decodeFlow);
+  const removed = own.filter((flow) => flow.deletedAt).map((flow) => flow.id);
+  const records = own.filter((flow) => !flow.deletedAt).map((flow) => toRecord(flow, 'owner'));
   const ownerId = await memberOwnerId(doc, table, caller.userId, clock);
   if (ownerId) {
     const shared = await queryLive(doc, table, ownerId, clock, FLOW_PREFIX);
@@ -91,7 +124,7 @@ export async function listFlows(
       }
     }
   }
-  return records;
+  return { flows: records, removed };
 }
 
 export type FlowResult<T> =

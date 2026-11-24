@@ -12,9 +12,18 @@ export interface FlowsClientConfig {
   callData?: CallData;
 }
 
+export interface ListWithRemoved {
+  flows: FlowRecord[];
+  removed: string[];
+}
+
 /** Each call resolves to the data function's answer, or null when it could not be reached. */
 export interface FlowsClient {
-  list(userToken: string): Promise<DataResult<FlowRecord[]> | null>;
+  /**
+   * Without `includeRemoved` the answer is the bare array. With it, the answer is `{ flows, removed }`:
+   * `removed` holds the ids of the caller's own deleted people (#1088).
+   */
+  list(userToken: string, includeRemoved?: boolean): Promise<DataResult<FlowRecord[] | ListWithRemoved> | null>;
   /** `fields` is the six facts plus any detail keys, already validated. */
   create(userToken: string, id: string, fields: Record<string, unknown>): Promise<DataResult<FlowRecord> | null>;
   /** `patch` is the changed facts and detail keys, already validated. */
@@ -43,7 +52,8 @@ export function createFlowsClient(config: FlowsClientConfig): FlowsClient {
   }
 
   return {
-    list: (userToken) => run<FlowRecord[]>(userToken, 'listFlows', {}),
+    list: (userToken, includeRemoved = false) =>
+      run<FlowRecord[] | ListWithRemoved>(userToken, 'listFlows', includeRemoved ? { includeRemoved: true } : {}),
     create: (userToken, id, fields) => run<FlowRecord>(userToken, 'createFlow', { id, facts: fields }),
     update: (userToken, id, patch) => run<FlowRecord>(userToken, 'updateFlow', { id, patch }),
     remove: (userToken, id) => run<null>(userToken, 'deleteFlow', { id }),
