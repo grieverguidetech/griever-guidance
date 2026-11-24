@@ -87,7 +87,7 @@ h1 { font-weight: var(--v2-heading-weight); }
    the focus colour on an inactive option, the page colour on the active one (5.97:1 on the link colour). */
 .gg-seg-opt:focus-visible { outline-offset: -4px; }
 .gg-seg-opt-active:focus-visible { outline-color: var(--color-v2-page); }
-/* Anything focused by script (a heading after navigation, a confirm group, a status note) is
+/* Anything focused by script (a confirm group, a status note; headings are the exception below) is
    not a keyboard stop: a quiet left bar instead of the ring, so the keyboard user still sees
    where focus went (WCAG 2.4.7). The bar is the link colour, which is 5.97:1 on the page,
    5.28:1 on the field fill and 5.89:1 on the wash (non-text 3:1, WCAG 1.4.11).
@@ -95,6 +95,13 @@ h1 { font-weight: var(--v2-heading-weight); }
    The transparent outline shows in forced-colors mode, which drops box-shadow.
    Guarded by focusStyles.spec.ts. Never add an inline `outline: 'none'` to these targets. */
 [tabindex='-1']:focus-visible { outline: 2px solid transparent; box-shadow: -4px 0 0 0 var(--color-v2-link); }
+/* Headings are the exception (#1093). Focus still moves to the heading after navigation so screen
+   readers read it, but a heading is not operable, so WCAG 2.4.7 does not require a visible cue and
+   the bar beside the h1 was noise. The CMS h1 comes from libs/ui Heading (react-native-web: an h1 to
+   h6 element with role="heading"), so both the tags and [role='heading'] are listed. Source order
+   matters: this rule must stay after the generic bar above. Guarded by focusStyles.spec.ts. */
+:is(h1, h2, h3, h4, h5, h6, [role='heading'])[tabindex='-1']:focus,
+:is(h1, h2, h3, h4, h5, h6, [role='heading'])[tabindex='-1']:focus-visible { outline: 2px solid transparent; box-shadow: none; }
 /* #757, #803 phone nudge: focused by script when it appears so screen readers read the card, but it
    shows no ring (a heavy ring around the whole card was noise). The transparent outline keeps a
    forced-colors cue. Keep this rule: without it the generic [tabindex='-1'] bar above comes back
