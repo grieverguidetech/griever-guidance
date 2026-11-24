@@ -19,7 +19,7 @@ export type HubMomentKey = 'announce' | 'service' | 'obituary' | 'thanks';
 export interface HubCopy {
   heading: string;
   intro: string;
-  /** The primary (sunset swirl) button on the title row that opens the checklist sheet. */
+  /** The secondary (outline) button on the title row that opens the checklist sheet. */
   whatYoullNeed: string;
   /** Native hint read after the button's name. */
   whatYoullNeedHint: string;
@@ -93,7 +93,7 @@ export function Hub(props: HubProps) {
       <View testID="hub-top-bar" style={styles.topBar}>
         {props.name}
         <View testID="hub-checklist-slot" style={styles.checklist}>
-          <Button label={copy.whatYoullNeed} hint={copy.whatYoullNeedHint} variant="primary" opensDialog onPress={props.onWhatYoullNeed} buttonRef={props.whatYoullNeedRef} />
+          <Button label={copy.whatYoullNeed} hint={copy.whatYoullNeedHint} variant="secondary" opensDialog onPress={props.onWhatYoullNeed} buttonRef={props.whatYoullNeedRef} />
         </View>
       </View>
       <View style={styles.head}>

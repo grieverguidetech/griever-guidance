@@ -215,7 +215,7 @@ export function ShareObituary({ copy, eyebrow, eyebrowTone, link, onLinkChange, 
     <View style={styles.screen}>
       <View style={styles.topBar}>
         <Button label={copy.back} variant="secondary" onPress={onBack} />
-        <Button label={copy.checklist} variant="primary" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
+        <Button label={copy.checklist} variant="secondary" opensDialog onPress={onWhatYoullNeed} buttonRef={checklistRef} />
       </View>
       <View style={styles.head}>
         <Eyebrow tone={eyebrowTone}>{eyebrow}</Eyebrow>
