@@ -154,8 +154,8 @@ export interface UseSessionsResult {
    * fields with an unsent local edit; those keep the local value. A flow not on the device becomes
    * a 'member' session. A 'member' session whose flow is no longer returned is removed (access was
    * lost). An 'owner' session is removed only when its flowId is in `gone`: ids sync saw on the
-   * server that a clean pull no longer lists (deleted on another device, #1084). It goes with its
-   * drafts and contacts. Without `gone`, an owner session is never removed (a person never pushed
+   * server that two clean pulls in a row no longer listed (deleted on another device, #1084). It goes with its
+   * drafts and their chosen contacts. Without `gone`, an owner session is never removed (a person never pushed
    * is not on the server and must stay). Otherwise drafts, contacts, who was notified, reminders and
    * edited wording are never touched. With no signed-in user (`myUserId` empty) nothing changes.
    * When `dropped > 0` some records could not be read, so nothing is removed (they may be among
@@ -475,6 +475,11 @@ function listHolder(storage: SendFlowStorage | undefined, sessions: readonly Ses
  * deleted; nothing reads it back, because the server lists those people again on the next pull.
  */
 const UNKNOWN_HOLDER = '_unknown';
+
+/** An owner session this account may remove on a remote delete (#1084). Keep in step with `mayCreate` in useFlowSync. */
+function isOwnedHere(s: Session, userId: string): boolean {
+  return s.role === 'owner' && (s.ownerId === null || s.ownerId === userId) && (!s.heldFor || s.heldFor === userId);
+}
 
 /**
  * Keep in step with `isMine` in useFlowSync: a person hidden here must never be sent for `userId`.
@@ -983,7 +988,7 @@ export function useSessions(storage?: SendFlowStorage, userId?: string | null): 
         const updated = list
           // Losing access removes a shared person. An owned person goes only when sync says it was deleted elsewhere.
           .filter((s) => dropped > 0 || s.role !== 'member' || returned.has(s.flowId))
-          .filter((s) => !(s.role === 'owner' && goneIds.has(s.flowId) && !returned.has(s.flowId) && (s.ownerId === null || s.ownerId === myUserId)))
+          .filter((s) => !(goneIds.has(s.flowId) && !returned.has(s.flowId) && isOwnedHere(s, myUserId)))
           .map((s) => {
             const record = returned.get(s.flowId);
             return record ? mergeRecordIntoSession(s, record, pendingByFlow[s.flowId] ?? [], myUserId) : s;

@@ -328,6 +328,10 @@ describe('applyRemoteFlows with gone (#1084)', () => {
     expect(applyGone([local({ ownerId: OTHER })], [A])).toHaveLength(1);
   });
 
+  it('keeps a person held for another account', () => {
+    expect(applyGone([local({ ownerId: null, heldFor: OTHER })], [A])).toHaveLength(1);
+  });
+
   it('still removes a member session that is no longer returned', () => {
     expect(applyGone([local({ role: 'member', ownerId: OTHER })], [])).toEqual([]);
   });

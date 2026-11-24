@@ -116,6 +116,8 @@ interface Stored {
   moved?: Record<string, string>;
   /** Ids made by a re-mint. One of these is never re-minted again (#942). */
   reminted?: string[];
+  /** Known ids the last clean pull did not list. A second clean pull that omits one too means it was deleted elsewhere (#1084). */
+  missing?: string[];
 }
 
 interface SyncState {
@@ -142,6 +144,8 @@ interface SyncState {
   moved: Map<string, string>;
   /** Ids a re-mint made. Never re-minted again, so a run of `taken` answers cannot loop. Saved. */
   reminted: Set<string>;
+  /** See `Stored.missing`. Saved. */
+  missing: Set<string>;
   /** Old ids this run has already asked useSessions to move. Not saved: a restart asks again. */
   moveAsked: Set<string>;
 }
@@ -157,6 +161,7 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
     conflicted: new Set(),
     moved: new Map(),
     reminted: new Set(),
+    missing: new Set(),
     moveAsked: new Set(),
   };
   if (!storage) return state;
@@ -189,6 +194,11 @@ function readStored(storage: SendFlowStorage | undefined, userId: string): SyncS
         state.reminted.add(id);
       }
     }
+    for (const id of parsed.missing ?? []) {
+      if (typeof id === 'string' && isUuid(id)) {
+        state.missing.add(id);
+      }
+    }
   } catch {
     // unreadable storage: start empty
   }
@@ -205,6 +215,7 @@ function writeStored(storage: SendFlowStorage | undefined, state: SyncState): vo
       conflicted: [...state.conflicted],
       moved: Object.fromEntries(state.moved),
       reminted: [...state.reminted],
+      missing: [...state.missing],
     };
     storage.setItem(flowQueueKey(state.userId), JSON.stringify(stored));
   } catch {
@@ -487,6 +498,11 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         fail(result.reason);
         return 'failed';
       }
+      // The account changed while the request was out: this list is not for the signed-in account.
+      // (`alive` already covers this, since the effect restarts on a new userId; this is a second guard.)
+      if (latest.current.userId !== userId) {
+        return 'stale';
+      }
       if (asked !== pullAsks) {
         return 'stale';
       }
@@ -507,13 +523,13 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         if (kept.length !== marks.length) writeRemovedFlows(latest.current.storage, kept);
       }
       markKnown(state, flows, userId);
-      // A clean list that omits a person this device saw on the server: they were deleted elsewhere (#1084).
-      // A queued id is kept: a send in flight stays queued until it answers, and a 404 drops it and pulls again.
-      const gone = result.dropped ? [] : goneFlows(state, knownBefore, result.flows);
-      for (const id of gone) {
+      // A person deleted on another device (#1084). Forgotten before the scan below, and refused for this run, so
+      // the scan does not see a person the server lacks and queue a create for them.
+      const { forget, drop } = planRemoteDeletes(state, knownBefore, result, latest.current.sessions, userId);
+      for (const id of forget) {
         state.known.delete(id);
-        state.queue.delete(id);
         state.baselines.delete(id);
+        state.refused.add(id);
       }
       state.pulled = true;
       try {
@@ -541,7 +557,7 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
         state.baselines.set(record.id, next as unknown as SyncedFields);
       }
       writeStored(latest.current.storage, state);
-      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow, gone);
+      latest.current.applyRemoteFlows({ flows, dropped: result.dropped }, userId, pendingByFlow, drop);
       setPulledFor(userId);
       setPullCount((count) => count + 1);
       return 'done';
@@ -772,14 +788,47 @@ export function useFlowSync(options: UseFlowSyncOptions): UseFlowSyncResult {
 }
 
 /**
- * Ids this device saw on the server (`knownBefore`) that a clean list no longer has. Not counted: a taken id
- * (`conflicted`, the server's copy is someone else's), an old id after a move, and an id with an unsent edit.
+ * Decides which people were deleted on another device (#1084). `forget` are the ids to clean from sync state;
+ * `drop` are the flowIds of the sessions useSessions must remove. One decision, so the two cannot disagree.
+ *
+ * An id this device saw on the server (`knownBefore`) is missing when a clean list omits it. It is gone only
+ * when two clean pulls in a row omit it, so one odd answer removes nothing. Never counted: a taken id
+ * (`conflicted`), an old id after a move, and an id with an unsent edit (a send in flight stays queued). A list
+ * with none of this account's people answers like a stranger's, so it never removes two or more people.
+ * An id whose session is not removable here (see `mayCreate`) is left alone.
  */
-function goneFlows(state: SyncState, knownBefore: ReadonlySet<string>, listed: readonly FlowRecord[]): string[] {
-  const listedIds = new Set(listed.map((r) => r.id));
-  return [...knownBefore].filter(
-    (id) => !listedIds.has(id) && !state.conflicted.has(id) && !state.moved.has(id) && !state.queue.has(id),
+function planRemoteDeletes(
+  state: SyncState,
+  knownBefore: ReadonlySet<string>,
+  result: { flows: readonly FlowRecord[]; dropped: number },
+  sessions: readonly Session[],
+  userId: string,
+): { forget: string[]; drop: string[] } {
+  if (result.dropped > 0) {
+    state.missing.clear();
+    return { forget: [], drop: [] };
+  }
+  const listed = new Set(result.flows.map((r) => r.id));
+  const omitted = [...knownBefore].filter(
+    (id) => !listed.has(id) && !state.conflicted.has(id) && !state.moved.has(id) && !state.queue.has(id),
   );
+  let gone = omitted.filter((id) => state.missing.has(id));
+  const strangerList = !result.flows.some((r) => r.ownerId === userId);
+  const blocked = strangerList && gone.length >= 2;
+  if (blocked) {
+    gone = [];
+  }
+  state.missing = new Set(blocked ? [] : omitted.filter((id) => !gone.includes(id)));
+  const holders = new Map<string, Session[]>();
+  for (const s of sessions) {
+    const id = flowIdOf(state, s);
+    if (gone.includes(id)) {
+      holders.set(id, [...(holders.get(id) ?? []), s]);
+    }
+  }
+  const forget = gone.filter((id) => (holders.get(id) ?? []).every((s) => mayCreate(s, userId)));
+  const drop = forget.flatMap((id) => (holders.get(id) ?? []).map((s) => s.flowId));
+  return { forget, drop };
 }
 
 function markKnown(state: SyncState, flows: readonly FlowRecord[], userId: string): void {
