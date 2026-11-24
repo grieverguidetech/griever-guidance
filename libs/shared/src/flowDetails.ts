@@ -1,7 +1,16 @@
 // The detail fields of a person that sync between devices, next to the six facts in flowFacts.ts.
 // Same rules: a whitelist, caps that mirror the server, and nothing built by spreading a session
-// (C2, C3, C8). Drafts, edited wording, recipients, contact data, senderName, checklist ticks and
-// reminders never appear here.
+// (C2, C3, C8). Drafts, recipients, contact data, senderName, the five Gather ticks and reminders
+// never appear here. The phase checklist ticks do, as one flat key per item (checklistSync.ts).
+import {
+  CHECKLIST_FLOW_KEYS,
+  checklistToFlat,
+  isChecklistFlowValue,
+  mergeFlatIntoChecklist,
+  type ChecklistFlowKey,
+  type ChecklistFlowValue,
+} from './checklistSync.js';
+import type { ChecklistFields } from './checklist.js';
 import {
   FLOW_FACT_KEYS,
   hasForbiddenSyncKey,
@@ -103,6 +112,7 @@ export const FLOW_DETAIL_KEYS = [
   ...FLOW_DETAIL_TEXT_KEYS,
   'burialPrivate',
   ...FLOW_STATUS_KEYS,
+  ...CHECKLIST_FLOW_KEYS,
 ] as const;
 
 export type FlowDetailKey = (typeof FLOW_DETAIL_KEYS)[number];
@@ -119,6 +129,8 @@ export type FlowDetails = {
   [K in FlowDetailTextKey]: string | null;
 } & { burialPrivate: boolean } & {
   [K in FlowStatusKey]: FlowStatusValue;
+} & {
+  [K in ChecklistFlowKey]: ChecklistFlowValue;
 };
 
 export type SyncedFields = FlowFacts & FlowDetails;
@@ -221,7 +233,11 @@ export function flatToStatusMap(
 export type SyncedSource = Partial<
   FlowFacts & {
     [K in FlowDetailTextKey]: string | undefined;
-  } & { burialPrivate: boolean; sectionStatus: StatusMap }
+  } & {
+    burialPrivate: boolean;
+    sectionStatus: StatusMap;
+    checklist: ChecklistFields['checklist'];
+  }
 >;
 
 const isMessageKey = (key: FlowDetailTextKey): key is FlowMessageKey =>
@@ -321,6 +337,7 @@ export function toFlowDetails(source: SyncedSource): FlowDetails {
   }
   out.burialPrivate = source.burialPrivate === true;
   Object.assign(out, statusMapToFlat(source.sectionStatus));
+  Object.assign(out, checklistToFlat(source.checklist));
   return out as FlowDetails;
 }
 
@@ -332,15 +349,21 @@ export function toSyncedFields(source: SyncedSource): SyncedFields {
 /** Session-shaped fields from the wire. Message null becomes undefined; other null becomes ''. */
 export type SessionDetailFields = {
   [K in FlowDetailTextKey]?: string;
-} & { burialPrivate: boolean; sectionStatus: StatusMap };
+} & {
+  burialPrivate: boolean;
+  sectionStatus: StatusMap;
+  checklist: NonNullable<ChecklistFields['checklist']>;
+};
 
 /**
  * Details only (not the six facts; use `flowFactsToSessionFields` for those). Status keys present
- * in `details` are merged into `currentStatus`, so a partial reply never wipes the other statuses.
+ * in `details` are merged into `currentStatus`, and checklist keys into `currentChecklist`, so a
+ * partial reply never wipes the other statuses or ticks.
  */
 export function flowDetailsToSessionFields(
   details: Partial<FlowDetails>,
   currentStatus: StatusMap = {},
+  currentChecklist: ChecklistFields['checklist'] = {},
 ): Partial<SessionDetailFields> {
   const out: Record<string, unknown> = {};
   for (const key of FLOW_DETAIL_TEXT_KEYS) {
@@ -375,6 +398,9 @@ export function flowDetailsToSessionFields(
     }
     out.sectionStatus = next;
   }
+  if (CHECKLIST_FLOW_KEYS.some((key) => details[key] !== undefined)) {
+    out.checklist = mergeFlatIntoChecklist(details, currentChecklist);
+  }
   return out as Partial<SessionDetailFields>;
 }
 
@@ -387,6 +413,9 @@ function validDetail(key: FlowDetailKey, value: unknown): boolean {
   }
   if ((FLOW_STATUS_KEYS as readonly string[]).includes(key)) {
     return isStatusValue(value);
+  }
+  if ((CHECKLIST_FLOW_KEYS as readonly string[]).includes(key)) {
+    return isChecklistFlowValue(value);
   }
   if (value === null) {
     return true;

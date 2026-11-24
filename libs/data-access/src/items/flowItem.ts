@@ -1,4 +1,5 @@
 import {
+  CHECKLIST_FLOW_KEYS,
   FLOW_DETAIL_KEYS,
   FLOW_DETAIL_TEXT_KEYS,
   FLOW_STATUS_KEYS,
@@ -29,7 +30,7 @@ export interface FlowItem {
 /** A person with no detail yet: every text and status null, burialPrivate false. */
 export function emptyDetails(): FlowDetails {
   const out: Record<string, unknown> = { burialPrivate: false };
-  for (const key of [...FLOW_DETAIL_TEXT_KEYS, ...FLOW_STATUS_KEYS]) {
+  for (const key of [...FLOW_DETAIL_TEXT_KEYS, ...FLOW_STATUS_KEYS, ...CHECKLIST_FLOW_KEYS]) {
     out[key] = null;
   }
   return out as FlowDetails;

@@ -79,3 +79,30 @@ and they are shared only with the owner's members. The product owner accepted th
 (`docs/aws-data-function.md`). The owner redeploys it from the #772 branch BEFORE the PR merges.
 Merging first breaks sync for every new person. Clients ignore unknown keys on read, so old phones
 keep working.
+
+## Addendum, 2026-11-24: phase checklist ticks (#1077, ticket #1078)
+
+The product owner approved this at gate G1 on 2026-11-24. The 37 phase checklist ticks and
+"Doesn't apply" marks (WEB-10) sync under DS-7, so a tick made on the phone shows on the web and the
+other way round. The five "Gather when you can" ticks (`checklistTicks`) stay on the device.
+
+**Keys.** 37 new detail keys, one per item in `CHECKLIST_PHASES`: `check` plus the item id in
+PascalCase (`checkPronouncement`, `checkBurialOrCremation`, `checkViewingClothingPhoto`, and so on).
+The value is `done`, `not_applicable` or null (open). That makes 93 detail keys. The full list is
+`CHECKLIST_FLOW_KEYS` in `libs/shared/src/checklistSync.ts`. Item ids must never be renamed: the key
+is derived from the id, so a rename orphans every stored tick.
+
+**Why one key per item, not one JSON key.** Per-field last-save-wins is the DS-7 rule. With one JSON
+`checklist` key, two devices that tick different items would overwrite each other: the later save
+would drop the other device's tick. With one key per item, each tick merges on its own and last save
+wins per item. It also needs no new parser, because the keys are plain enums like the section
+statuses. The object `checklist` and `checklistTicks` stay in `FORBIDDEN_SYNC_KEYS` and are still
+refused by name.
+
+**Payload.** 37 short keys add about 1.7 KB at most. The worst-case payload test in
+`libs/shared/src/flowDetails.spec.ts` now sets every checklist key and is still under 128 KB.
+
+**Deploy order.** Same as #772. The data function refuses unknown keys, so the owner redeploys it
+from the #1078 branch BEFORE the PR merges (`docs/aws-data-function.md`). Merging first breaks sync
+for every person. Clients ignore unknown keys on read, so old phones keep working. The session merge
+in `useSessions` (so a pulled tick reaches the local checklist) is a later ticket of #1077 and ships after this.

@@ -88,6 +88,44 @@ const DETAIL_KEY_NAMES = [
   'serviceStatus',
   'obituaryStatus',
   'thanksStatus',
+  // One key per phase checklist item (#1077). Spelled out so a renamed item id fails here.
+  'checkPronouncement',
+  'checkCustody',
+  'checkFindWishes',
+  'checkTellCloseFamily',
+  'checkDependentsCare',
+  'checkSecureHome',
+  'checkBurialOrCremation',
+  'checkCasketOrUrn',
+  'checkSetService',
+  'checkOfficiant',
+  'checkDeathCertificates',
+  'checkPallbearers',
+  'checkViewingClothingPhoto',
+  'checkConfirmServiceDetails',
+  'checkWriteObituary',
+  'checkSubmitObituary',
+  'checkShareObituary',
+  'checkFlowersProgramsMusic',
+  'checkGuestBook',
+  'checkReception',
+  'checkEulogy',
+  'checkFamilyTransport',
+  'checkNotifyCommunity',
+  'checkNotifySsa',
+  'checkNotifyBanks',
+  'checkLifeInsuranceClaims',
+  'checkPensionRetirement',
+  'checkUtilitiesHousing',
+  'checkCancelSubscriptions',
+  'checkForwardMail',
+  'checkThankYouNotes',
+  'checkWillAndProbate',
+  'checkRetitleProperty',
+  'checkOnlineAccounts',
+  'checkFinalTaxReturn',
+  'checkHeadstone',
+  'checkFollowUpClaims',
 ];
 
 // A value each key accepts: the pronoun and the two lists have their own rules.
@@ -102,8 +140,8 @@ function detailTestValue(key: string): string {
 }
 
 describe('flow codec', () => {
-  it('has the 56 detail keys', () => {
-    expect(DETAIL_KEY_NAMES).toHaveLength(56);
+  it('has the 93 detail keys (56 plus 37 checklist keys)', () => {
+    expect(DETAIL_KEY_NAMES).toHaveLength(93);
     expect([...FLOW_DETAIL_KEYS].sort()).toEqual([...DETAIL_KEY_NAMES].sort());
   });
 
@@ -188,7 +226,9 @@ describe('flow codec', () => {
           ? true
           : key.endsWith('Status')
             ? 'ready'
-            : detailTestValue(key);
+            : key.startsWith('check')
+              ? 'not_applicable'
+              : detailTestValue(key);
       const item = { ...flow, details: { ...emptyDetails(), [key]: value } };
       const encoded = encodeFlow(item);
       expect(encoded[key]).toBe(value);
