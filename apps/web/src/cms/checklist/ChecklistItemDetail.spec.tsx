@@ -9,6 +9,13 @@ const copy = screenCopy('cmsChecklist');
 const noop = () => undefined;
 
 describe('ChecklistItemDetail', () => {
+  it('centres the Back icon on its label with a wider gap and the same width (#1069)', () => {
+    render(<ChecklistItemDetail itemId="pronouncement" state={null} onSetState={noop} onBack={noop} />);
+    const back = screen.getByRole('button', { name: copy.back });
+    expect(back).toHaveClass('gap-[var(--space-2)]', 'px-4');
+    expect(back.querySelector('svg')).toHaveClass('block', 'shrink-0');
+  });
+
   it('renders every part as an h2 and no h1', () => {
     const detail = checklistDetail('pronouncement');
     render(<ChecklistItemDetail itemId="pronouncement" state={null} onSetState={noop} onBack={noop} />);

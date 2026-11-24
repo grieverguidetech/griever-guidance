@@ -24,8 +24,9 @@ export function Tooltip({ text, children }: { text: string; children: (id: strin
 /** "Back" button: a visible border, at least 44 by 44, with the shared focus ring (#176). */
 export function BackButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="gg-btn gg-btn-secondary self-start">
-      <ArrowLeft size={16} weight="regular" aria-hidden="true" />
+    // Gap 6px to 10px (--space-2) and side padding 18px to 16px (px-4): 2 x 18 + 6 = 2 x 16 + 10, so the button keeps its width.
+    <button type="button" onClick={onClick} className="gg-btn gg-btn-secondary self-start gap-[var(--space-2)] px-4">
+      <ArrowLeft size={16} weight="regular" aria-hidden="true" className="block shrink-0" />
       Back
     </button>
   );

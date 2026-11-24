@@ -96,6 +96,22 @@ describe('CmsShell checklist panel', () => {
     expect(aside.className).toContain('lg:shrink-0');
   });
 
+  it('spaces the panel title from its content by the page gap (gap-4 = 16px) (#1069)', () => {
+    render(shell());
+    const aside = screen.getByRole('complementary', { name: "What you'll need" });
+    expect(aside.className).toContain('lg:flex');
+    expect(aside.className).toContain('lg:flex-col');
+    expect(aside.className).toContain('lg:gap-4');
+  });
+
+  it('keeps the phone button from stretching the title row, so the gap below the h1 is the page gap (#1069)', () => {
+    render(shell());
+    const row = screen.getByTestId('title-row');
+    expect(row.className).toContain('gap-y-4');
+    expect(document.querySelector('[data-checklist-opener]')).toHaveClass('-my-2');
+    expect(row.parentElement).toHaveClass('gap-4'); // the main column's rhythm
+  });
+
   it('wraps the section content in a keyed gg-enter div that remounts on section change', () => {
     const props = { personName: 'Margaret Hale', onSelect: vi.fn(), onPeople: vi.fn(), onAccount: vi.fn() };
     const { rerender } = render(

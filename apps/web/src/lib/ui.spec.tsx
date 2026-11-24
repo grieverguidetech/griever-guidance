@@ -141,6 +141,16 @@ describe('top buttons (#176)', () => {
     }
   });
 
+  it('Back centres its icon on the label with a 10px gap and keeps its width (#1069)', () => {
+    render(<TopBar onBack={vi.fn()} />);
+    const button = screen.getByRole('button', { name: 'Back' });
+    expect(button).toHaveClass('gap-[var(--space-2)]', 'px-4');
+    const icon = button.querySelector('svg');
+    expect(icon).toHaveClass('block', 'shrink-0');
+    // The base button is inline-flex with items-center and min-height 44px; the width is 2 x 18 + 6 before and 2 x 16 + 10 now.
+    expect(css).toMatch(/\.gg-btn,\s*\[data-gg-btn\]\s*{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*gap:\s*6px;[^}]*min-height:\s*44px;[^}]*padding:\s*var\(--space-2\) calc\(var\(--space-3\) \* 1\.2\)/);
+  });
+
   it('tertiary buttons are underlined, with link-colour text at rest and hover and heading-colour text when active', () => {
     expect(css).toMatch(/\.gg-btn-tertiary,\s*\[data-gg-btn='tertiary'\]\s*{[^}]*text-decoration:\s*underline/);
     expect(css).toMatch(/\.gg-btn-tertiary,\s*\[data-gg-btn='tertiary'\]\s*{[^}]*color:\s*var\(--color-v2-link\)/);

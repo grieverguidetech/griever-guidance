@@ -43,8 +43,9 @@ export function ChecklistItemDetail({ itemId, state, onSetState, onBack, onOpenS
     <div className="flex flex-col gap-4">
       {/* Back left, Done right; they wrap onto two lines at 320px rather than overflow. */}
       <div data-testid="item-actions" className="flex flex-wrap items-center justify-between gap-2">
-        <button type="button" className="gg-btn gg-btn-secondary" onClick={onBack}>
-          <CaretLeft aria-hidden="true" />
+        {/* Gap 6px to 10px (--space-2), side padding 18px to 16px (px-4): same width as before. */}
+        <button type="button" className="gg-btn gg-btn-secondary gap-[var(--space-2)] px-4" onClick={onBack}>
+          <CaretLeft aria-hidden="true" className="block shrink-0" />
           {copy.back}
         </button>
         {readOnly ? null : <ItemStateToggles groupLabel={copy.items[itemId]} state={state} onChange={onSetState} />}

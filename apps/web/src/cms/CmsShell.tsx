@@ -125,13 +125,14 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
       <SideNav personName={personName} section={section} onSelect={select} statuses={statuses} noCurrent={noCurrent} hrefFor={hrefFor} />
       <main className="flex flex-col gap-4 min-w-0 flex-1">
         {aside ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div data-testid="title-row" className="flex flex-wrap items-center justify-between gap-x-2 gap-y-4">
+            {/* The 44px button is pulled in by 8px top and bottom (-my-2) so it does not stretch the row: the gap below the h1 stays the page's gap-4. */}
             <Heading level={1} headingRef={setHeading}>{title ?? navTitle(section)}</Heading>
             <button
               ref={sheetButton}
               data-checklist-opener=""
               type="button"
-              className="gg-btn gg-btn-primary lg:hidden"
+              className="gg-btn gg-btn-primary -my-2 lg:hidden"
               aria-haspopup="dialog"
               onClick={() => setSheetOpen(true)}
             >
@@ -153,7 +154,7 @@ export function CmsShell({ personName, section, onSelect, onPeople, onAccount, n
         <aside
           id={panelId}
           aria-labelledby={asideTitleId}
-          className="hidden lg:sticky lg:top-4 lg:block lg:w-96 lg:shrink-0 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto"
+          className="hidden lg:sticky lg:top-4 lg:flex lg:flex-col lg:gap-4 lg:w-96 lg:shrink-0 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto"
         >
           <h2 id={asideTitleId} className="text-lg font-semibold">{copy.panelTitle}</h2>
           {renderAside(false)}
