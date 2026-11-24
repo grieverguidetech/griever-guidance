@@ -21,7 +21,7 @@ import {
   type DataResult,
   type FlowRecord,
 } from '@griever/shared';
-import { createFlowsClient } from './flowsClient.js';
+import { createFlowsClient, type ListWithRemoved } from './flowsClient.js';
 
 type Env = { Variables: ClerkAuthVariables };
 
@@ -119,7 +119,7 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
 
   const respond = (
     c: Context<Env>,
-    result: DataResult<FlowRecord | FlowRecord[]> | null,
+    result: DataResult<FlowRecord | FlowRecord[] | ListWithRemoved> | null,
     okStatus: 200 | 201,
     forbiddenCopy = FLOWS_FORBIDDEN,
   ) => {
@@ -133,7 +133,10 @@ export function createFlowsRouter(config: FlowsRouterConfig) {
     return c.json(result.data, okStatus);
   };
 
-  router.get('/flows', async (c) => respond(c, await client.list(c.get('accessToken')), 200));
+  // `?include=removed` adds the caller's own deleted ids (#1088). Any other value is ignored: the bare array.
+  router.get('/flows', async (c) =>
+    respond(c, await client.list(c.get('accessToken'), c.req.query('include') === 'removed'), 200),
+  );
 
   router.post('/flows', async (c) => {
     const body = await readJsonObject(c.req.raw);

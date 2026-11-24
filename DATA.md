@@ -710,6 +710,13 @@ Rules:
   pull with unreadable records (`dropped > 0`) removes nothing. Nothing is shown to the user (C5, dropped 2026-10-30; the sync still stays quiet).
   Nothing is sent until the first pull has worked (a failed pull holds back every send, not only
   creates), so a person the server already has is not created again.
+  `GET /flows?include=removed` (#1088) answers `{ flows, removed }`. `removed` holds the ids of the
+  caller's OWN people that are soft-deleted and whose 90-day `ttl` has not passed. It is read from the
+  same owner query as `flows` (no extra read). A member and a stranger always get `removed: []`; another
+  account's ids are never listed. Without the parameter, or with any other value, the body is the bare
+  array as before, so installed builds keep working. The gateway sends the data function
+  `listFlows` with `{ includeRemoved: true }`; an older data function refuses that arg, so redeploy the
+  data function before a client asks for it.
 - **Invites** (`rules/invites.ts`) last 7 days. An owner can create at most 10 in any 24 hours and
   have at most 20 open at once. Only an owner with a verified email can invite.
 - **Joining** (`rules/acceptInvite.ts`). An invite works once, only for the invited email with

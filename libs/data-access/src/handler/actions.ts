@@ -99,6 +99,10 @@ const PREPARE: Record<DataAction, Prepare> = {
     return async (c) => toResult(await c.rules.putProfile(c.doc, c.table, c.caller, fields, c.clock));
   },
   listFlows: (args) => {
+    // `{}` keeps the bare array. `{ includeRemoved: true }` adds the caller's own deleted ids (#1088).
+    if (hasExactKeys(args, ['includeRemoved']) && args['includeRemoved'] === true) {
+      return async (c) => ({ ok: true, data: await c.rules.listFlows(c.doc, c.table, c.caller, c.clock, { includeRemoved: true }) });
+    }
     if (!hasExactKeys(args, [])) {
       return null;
     }

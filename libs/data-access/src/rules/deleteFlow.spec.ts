@@ -9,7 +9,7 @@ import { getLive } from '../read.js';
 import { createTables, doc, dropTables, rawPut, table, up } from '../testing/localTable.js';
 import { acceptInvite } from './acceptInvite.js';
 import { deleteUser } from './deleteUser.js';
-import { createFlow, deleteFlow, listFlows, updateFlow } from './flows.js';
+import { createFlow, deleteFlow, listFlows, listFlowsWithRemoved, updateFlow } from './flows.js';
 
 // Far in the real future on purpose: every ttl these tests seed or compute (clock +/- seconds, +90 days)
 // must stay in the real future, or DynamoDB Local's TTL sweeper deletes the item mid-test.
@@ -247,5 +247,44 @@ describe.runIf(up)('deleteFlow on DynamoDB Local', () => {
       expect(await getLive(doc, table, flowGuardKey(id), later)).toBeUndefined();
       expect(await listFlows(doc, table, caller(owner), later)).toEqual([]);
     });
+  });
+});
+
+describe.runIf(up)('listFlowsWithRemoved on DynamoDB Local (#1088)', () => {
+  beforeAll(createTables);
+  afterAll(dropTables);
+
+  it("lists the owner's own deleted ids in removed, and keeps them out of flows", async () => {
+    const { owner, id } = await seedOwnerWithPerson();
+    const keptId = randomUUID();
+    await rawPut(encodeFlow(flowItem(owner, keptId)));
+    await deleteFlow(doc, table, caller(owner), id, clock);
+    const listed = await listFlowsWithRemoved(doc, table, caller(owner), clock);
+    expect(listed.removed).toEqual([id]);
+    expect(listed.flows.map((r) => r.id)).toEqual([keptId]);
+  });
+
+  it('gives a member the list as today and no removed ids', async () => {
+    const { owner, id } = await seedOwnerWithPerson();
+    const member = await seedMemberOf(owner);
+    await deleteFlow(doc, table, caller(owner), id, clock);
+    expect(await listFlowsWithRemoved(doc, table, caller(member), clock)).toEqual({ flows: [], removed: [] });
+  });
+
+  it("never shows another account's removed ids to a stranger", async () => {
+    const { owner, id } = await seedOwnerWithPerson();
+    await deleteFlow(doc, table, caller(owner), id, clock);
+    expect(await listFlowsWithRemoved(doc, table, caller(uid('stranger')), clock)).toEqual({ flows: [], removed: [] });
+  });
+
+  it('does not return a deleted person whose ttl has passed', async () => {
+    const { owner } = await seedOwnerWithPerson({ deletedAt: at(-HOUR), ttl: NOW_SECONDS - 10 });
+    expect((await listFlowsWithRemoved(doc, table, caller(owner), clock)).removed).toEqual([]);
+  });
+
+  it('listFlows still answers the array without the deleted person', async () => {
+    const { owner, id } = await seedOwnerWithPerson();
+    await deleteFlow(doc, table, caller(owner), id, clock);
+    expect(await listFlows(doc, table, caller(owner), clock)).toEqual([]);
   });
 });

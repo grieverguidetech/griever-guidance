@@ -116,10 +116,30 @@ describe('args validation (C8)', () => {
     ['removeMember id is empty', 'removeMember', { memberId: '' }],
     ['removeMember id is too long', 'removeMember', { memberId: 'u'.repeat(65) }],
     ['leaveFamily has a memberId key', 'leaveFamily', { memberId: 'user_b' }],
+    ['listFlows includeRemoved is false', 'listFlows', { includeRemoved: false }],
+    ['listFlows includeRemoved is a string', 'listFlows', { includeRemoved: 'true' }],
+    ['listFlows includeRemoved with another key', 'listFlows', { includeRemoved: true, ownerId: 'user_x' }],
     ['acceptInvite hash is not hex', 'acceptInvite', { tokenHash: 'z'.repeat(64) }],
     ['acceptInvite hash is a number', 'acceptInvite', { tokenHash: 1 }],
   ] as const)('refuses: %s', (_name, action, args) => {
     expect(prepareAction(action, args)).toBeNull();
+  });
+});
+
+describe('listFlows (#1088)', () => {
+  it('with no args calls listFlows and answers a bare array', async () => {
+    const rules = stubRules();
+    const c = context(rules);
+    const result = await prepareAction('listFlows', {})!(c);
+    expect(rules.listFlows).toHaveBeenCalledWith(c.doc, 'gg-test', caller, c.clock);
+    expect(result).toEqual({ ok: true, data: [] });
+  });
+
+  it('with includeRemoved: true asks the rule for the removed ids too', async () => {
+    const rules = stubRules();
+    const c = context(rules);
+    await prepareAction('listFlows', { includeRemoved: true })!(c);
+    expect(rules.listFlows).toHaveBeenCalledWith(c.doc, 'gg-test', caller, c.clock, { includeRemoved: true });
   });
 });
 

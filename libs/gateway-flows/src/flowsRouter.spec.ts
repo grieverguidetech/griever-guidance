@@ -112,6 +112,22 @@ describe('flows router (real callData, fetch stubbed)', () => {
       expect(dataCalls[0]!.body).toEqual({ action: 'listFlows', args: {} });
       expect(dataCalls[0]!.headers['x-gg-user-token']).toBe(token);
     });
+
+    it('passes ?include=removed through and returns flows and removed (#1088)', async () => {
+      const removed = ['55555555-5555-4555-8555-555555555555'];
+      dataAnswer = () => ok({ flows: [RECORD], removed });
+      const res = await send('GET', '/flows?include=removed');
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ flows: [RECORD], removed });
+      expect(dataCalls[0]!.body).toEqual({ action: 'listFlows', args: { includeRemoved: true } });
+    });
+
+    it('ignores any other include value: the bare array and empty args', async () => {
+      dataAnswer = () => ok([RECORD]);
+      const res = await send('GET', '/flows?include=everything');
+      expect(await res.json()).toEqual([RECORD]);
+      expect(dataCalls[0]!.body).toEqual({ action: 'listFlows', args: {} });
+    });
   });
 
   describe('POST /flows', () => {
