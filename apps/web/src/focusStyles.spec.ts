@@ -111,6 +111,19 @@ describe('visible focus (#162)', () => {
     }
   });
 
+  it('a heading focused by script shows no bar, and the generic bar still exists (#1093)', () => {
+    const heading = rule(
+      ":is(h1, h2, h3, h4, h5, h6, [role='heading'])[tabindex='-1']:focus,\n:is(h1, h2, h3, h4, h5, h6, [role='heading'])[tabindex='-1']:focus-visible",
+    );
+    expect(heading).toMatch(/box-shadow:\s*none/);
+    expect(heading).toMatch(/outline:\s*2px solid transparent/);
+    expect(rule("[tabindex='-1']:focus-visible")).toMatch(/box-shadow:\s*-4px 0 0 0 var\(--color-v2-link\)/);
+    // Source order decides: the heading rule must come after the generic bar.
+    expect(CSS.indexOf(":is(h1, h2, h3, h4, h5, h6, [role='heading'])")).toBeGreaterThan(
+      CSS.indexOf("[tabindex='-1']:focus-visible {"),
+    );
+  });
+
   it('the phone nudge takes focus with no visible ring and keeps the nudge shadow (#803, #1003)', () => {
     const declarations = rule('.gg-phone-nudge:focus,\n.gg-phone-nudge:focus-visible');
     expect(declarations).toMatch(/outline:\s*2px solid transparent/);
