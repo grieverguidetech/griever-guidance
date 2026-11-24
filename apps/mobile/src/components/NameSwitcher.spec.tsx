@@ -41,8 +41,10 @@ describe('NameSwitcher', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Edit person' }));
     expect(sheet().props.visible).toBe(false);
     expect(onEdit).not.toHaveBeenCalled();
-    act(() => sheet().props.onDismiss());
-    act(() => sheet().props.onDismiss());
+    // The Modal goes once iOS has dismissed it, so a late second dismiss uses the handler kept from before.
+    const dismiss = sheet().props.onDismiss;
+    act(() => dismiss());
+    act(() => dismiss());
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
 
@@ -97,11 +99,12 @@ describe('NameSwitcher', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Anna' }));
     expect(sheet().props.visible).toBe(false);
     expect(onPick).not.toHaveBeenCalled();
-    act(() => sheet().props.onDismiss());
+    const dismiss = sheet().props.onDismiss;
+    act(() => dismiss());
     expect(onPick).toHaveBeenCalledTimes(1);
     expect(onPick).toHaveBeenCalledWith('a');
-    // A later dismiss does not run it again.
-    act(() => sheet().props.onDismiss());
+    // A later dismiss does not run it again. The Modal is gone by now, so the handler kept from before is used.
+    act(() => dismiss());
     expect(onPick).toHaveBeenCalledTimes(1);
   });
 

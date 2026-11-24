@@ -317,7 +317,8 @@ describe('SetupScreen What you will need (#699)', () => {
 
   it('opens the same checklist sheet as the person screen, only after a tap', () => {
     setup();
-    expect(sheet().props.visible).toBe(false);
+    // Closed: no Modal is mounted at all (#1073).
+    expect(screen.UNSAFE_queryAllByType(Modal).find((m) => m.props.testID === 'checklist-sheet')).toBeUndefined();
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
     expect(sheet().props.visible).toBe(true);
     expect(within(screen.getByTestId('checklist-sheet')).getByText('Your ticks stay on this phone.')).toBeTruthy();

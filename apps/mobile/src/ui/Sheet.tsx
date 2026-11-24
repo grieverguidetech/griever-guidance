@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { spacing, v2 } from '@griever/tokens';
 import { Button } from './Button';
 import { Heading } from './Heading';
@@ -58,6 +58,18 @@ export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClo
       AccessibilityInfo.setAccessibilityFocus(handle);
     }
   };
+  // The Modal is mounted only while the sheet is open or sliding out. A Modal that stays mounted while its screen is
+  // swapped out from under it can leave a stuck iOS window that blocks touches (#691, #1073). iOS says when the
+  // slide-out is over (onDismiss); Android has no such callback and needs no wait.
+  const [closing, setClosing] = useState(false);
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
+    setClosing(!visible && Platform.OS === 'ios');
+  }
+  if (!visible && !closing) {
+    return null;
+  }
   return (
     <Modal
       testID={testID}
@@ -69,7 +81,10 @@ export function Sheet({ title, closeLabel, visible = true, onClose, onRequestClo
         focusHeading();
         onShow?.();
       }}
-      onDismiss={onDismiss}
+      onDismiss={() => {
+        setClosing(false);
+        onDismiss?.();
+      }}
     >
       <View style={styles.backdrop}>
         {/* A tap on the dimmed area closes the sheet. Screen readers use the Close button. */}

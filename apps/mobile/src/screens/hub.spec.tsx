@@ -239,7 +239,8 @@ describe('HubScreen', () => {
 
   it('opens the checklist sheet only after a tap on What you will need', () => {
     setup();
-    expect(checklistModal().props.visible).toBe(false);
+    // Closed: no Modal is mounted at all (#1073).
+    expect(screen.queryByTestId('checklist-sheet')).toBeNull();
     fireEvent.press(checklistButton());
     expect(checklistModal().props.visible).toBe(true);
     expect(within(screen.getByTestId('checklist-sheet')).getByRole('heading', { name: "What you'll need" })).toBeTruthy();
@@ -353,7 +354,8 @@ describe('HubScreen', () => {
       fireEvent.press(checklistButton());
       focus.mockClear();
       act(() => checklistModal().props.onRequestClose());
-      expect(checklistModal().props.visible).toBe(false);
+      // On Android there is no slide-out to wait for: the Modal is gone at once.
+      expect(screen.queryByTestId('checklist-sheet')).toBeNull();
       act(() => {
         jest.runAllTimers();
       });

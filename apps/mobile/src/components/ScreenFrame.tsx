@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { Animated, View } from 'react-native';
+import { Animated, AppState, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { v2 } from '@griever/tokens';
 import { PageGlow } from '../ui/PageGlow';
@@ -22,6 +22,9 @@ export function ScreenFrame({ children, bottomInset = true }: { children: ReactN
   );
 }
 
+/** A fade that has not reported back this long after its own length (500 ms in all) is cut short and the screen is shown. */
+const FADE_SAFETY_MS = 300;
+
 /**
  * Fades a screen in when it first shows (the top-level screens are swapped in place, not pushed on
  * a stack). Shows at once, with no animation, when Reduce Motion or a screen reader is on. Opacity only; nothing moves (C7). It paints the page colour only; ScreenFrame draws the glow.
@@ -30,8 +33,10 @@ export function FadeIn({ children }: { children: ReactNode }) {
   const reduce = useNoFade();
   const opacity = useRef(new Animated.Value(reduce ? 1 : 0)).current;
   const played = useRef(false);
+  const done = useRef(false);
   useEffect(() => {
     if (reduce) {
+      done.current = true;
       opacity.setValue(1);
       return;
     }
@@ -39,7 +44,29 @@ export function FadeIn({ children }: { children: ReactNode }) {
       return;
     }
     played.current = true;
-    Animated.timing(opacity, { toValue: 1, duration: FADE_MS, useNativeDriver: true }).start();
+    // The screen must never stay invisible (#1073): an interrupted fade, or one that never reports back
+    // (the native screen was detached), still ends fully shown.
+    const show = () => {
+      done.current = true;
+      opacity.setValue(1);
+    };
+    // Whatever `finished` says, the value is set: iOS can report a finished fade while a recreated native view still sits at 0.
+    Animated.timing(opacity, { toValue: 1, duration: FADE_MS, useNativeDriver: true }).start(show);
+    const timer = setTimeout(() => {
+      if (!done.current) {
+        show();
+      }
+    }, FADE_MS + FADE_SAFETY_MS);
+    // Coming back from another app (the Messages hand-off) with the fade unfinished shows the screen at once.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && !done.current) {
+        show();
+      }
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
   }, [reduce, opacity]);
   return (
     <Animated.View style={{ flex: 1, backgroundColor: v2.roles.page.color, opacity }}>

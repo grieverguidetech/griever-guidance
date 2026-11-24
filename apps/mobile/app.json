@@ -7,6 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "grieversguidance",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "#f8f7f4",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.grieversguidance.app",
