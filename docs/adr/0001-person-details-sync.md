@@ -119,4 +119,9 @@ Clients ignore unknown keys on read, so old phones keep working throughout.
 looks the same as "cleared". A device that ticked items before #1080 has a saved baseline with no
 check keys. `readBaseline` fills them with null (open), so those ticks diff as local edits, are
 queued before the first pull is merged, and a queued key keeps its local value in the merge. The
-ticks are then pushed, not wiped. The tests are in `libs/hooks/src/useFlowSync.devices.spec.ts`.
+ticks are then pushed, not wiped. A flow with no baseline at all (a lost queue record, a person
+the account's record claims, or one in `known`) is fixed the same way: `scanSessions` seeds a
+baseline with every check key open, so its ticks are queued before the pull is merged. A phone that
+upgrades from an old build re-pushes its local set ticks. Those can overwrite newer web changes for
+the same item, because a pending local tick keeps its value (the owner accepted this: losing ticks
+is worse). The tests are in `libs/hooks/src/useFlowSync.devices.spec.ts`.

@@ -73,7 +73,7 @@ function memoryStorage(initial: Record<string, string> = {}): SendFlowStorage {
 /** One device: its own storage, its own sessions, the shared server. `blockWrites` makes writes fail offline. */
 function device(server: ReturnType<typeof fakeServer>, storage: SendFlowStorage = memoryStorage()) {
   const wakes = new Set<() => void>();
-  const control = { blockWrites: false };
+  const control = { blockWrites: false, userId: USER };
   const client: FlowSyncClient = {
     listFlows: server.client.listFlows,
     createFlow: (...args) =>
@@ -85,7 +85,7 @@ function device(server: ReturnType<typeof fakeServer>, storage: SendFlowStorage 
     const sessions = useSessions(storage);
     useFlowSync({
       sessions: sessions.sessions,
-      userId: USER,
+      userId: control.userId,
       getAccessToken: async () => 'tok',
       enabled: true,
       storage,
@@ -106,6 +106,11 @@ function device(server: ReturnType<typeof fakeServer>, storage: SendFlowStorage 
     },
     api: () => view.result.current,
     wake: () => act(() => wakes.forEach((fn) => fn())),
+    /** Signs in as someone else (or back): the sync hook gets a new userId, the sessions stay. */
+    switchUser: (userId: string) => {
+      control.userId = userId;
+      view.rerender();
+    },
     unmount: view.unmount,
   };
 }
@@ -289,6 +294,66 @@ describe('the first pull after #1080 keeps ticks made before it', () => {
     expect(stored.checkCustody).toBe('done');
     expect(stored.checkEulogy).toBe('not_applicable');
     expect(d.sessions[0].checklist).toEqual(ticks);
+  });
+
+  describe('a flow with no baseline (#1080)', () => {
+    /** The server has the person with null for every check key; nobody ever wrote them. */
+    function serverWithPerson() {
+      const server = fakeServer();
+      const empty = split(toSyncedFields({ personName: 'Margaret Hayes' }));
+      server.records.set(FLOW, { facts: empty.facts, details: empty.details });
+      return server;
+    }
+    const pushedTicks = (server: ReturnType<typeof fakeServer>) =>
+      server.writes.filter((w) => w.method === 'PATCH').map((w) => w.body);
+
+    it('a flow in known with no baseline keeps and sends its ticks', async () => {
+      const server = serverWithPerson();
+      const storage = memoryStorage({
+        'gg.sessions.v1': JSON.stringify([storedSession()]),
+        [flowQueueKey(USER)]: JSON.stringify({ queue: {}, known: [FLOW], baselines: {} }),
+      });
+      const d = device(server, storage);
+      await advance(EDIT_DEBOUNCE_MS + 10);
+      expect(d.sessions[0].checklist).toEqual(ticks);
+      expect(pushedTicks(server)).toContainEqual({ checkCustody: 'done', checkEulogy: 'not_applicable' });
+    });
+
+    it('no queue record at all, while the server lists the owner\'s record, keeps and sends the ticks', async () => {
+      const server = serverWithPerson();
+      const storage = memoryStorage({ 'gg.sessions.v1': JSON.stringify([storedSession()]) });
+      const d = device(server, storage);
+      await advance(EDIT_DEBOUNCE_MS + 10);
+      expect(d.sessions[0].checklist).toEqual(ticks);
+      expect(pushedTicks(server)).toContainEqual({ checkCustody: 'done', checkEulogy: 'not_applicable' });
+    });
+
+    it('an ownerId null session that the account\'s record claims keeps and sends its ticks', async () => {
+      const server = serverWithPerson();
+      const storage = memoryStorage({
+        'gg.sessions.v1': JSON.stringify([{ ...storedSession(), ownerId: null }]),
+      });
+      const d = device(server, storage);
+      await advance(EDIT_DEBOUNCE_MS + 10);
+      expect(d.sessions[0].ownerId).toBe(USER);
+      expect(d.sessions[0].checklist).toEqual(ticks);
+      expect(pushedTicks(server)).toContainEqual({ checkCustody: 'done', checkEulogy: 'not_applicable' });
+    });
+
+    it('switching account A to B to A keeps the ticks when the server has only nulls', async () => {
+      const server = serverWithPerson();
+      const storage = memoryStorage({ 'gg.sessions.v1': JSON.stringify([storedSession()]) });
+      const d = device(server, storage);
+      await advance(EDIT_DEBOUNCE_MS + 10);
+      d.switchUser('user_other');
+      await advance(EDIT_DEBOUNCE_MS + 10);
+      d.switchUser(USER);
+      await advance(EDIT_DEBOUNCE_MS + 10);
+      await d.wake();
+      await advance(EDIT_DEBOUNCE_MS + 10);
+      expect(d.sessions[0].checklist).toEqual(ticks);
+      expect(server.records.get(FLOW)?.details.checkCustody).toBe('done');
+    });
   });
 
   it('a record from an older server with no check keys at all leaves the ticks alone', async () => {

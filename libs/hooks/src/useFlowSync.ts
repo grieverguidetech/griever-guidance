@@ -6,7 +6,7 @@ import type {
   PatchFlowResult,
   WriteFlowResult,
 } from '@griever/api-client';
-import { FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields, withServicePair } from '@griever/shared';
+import { checklistToFlat, FLOW_FACT_KEYS, isUuid, SYNCED_KEYS, toFlowDetails, toSyncedFields, withServicePair } from '@griever/shared';
 import type { FlowRecord, SyncedFields, SyncedKey } from '@griever/shared';
 import type { SendFlowStorage } from './useSendFlow.js';
 import { generateFlowId, readRemovedFlows, writeRemovedFlows } from './useSessions.js';
@@ -337,7 +337,13 @@ function scanSessions(
     const flowId = flowIdOf(state, s);
     seen.add(flowId);
     const facts = toSyncedFields(s);
-    const before = state.baselines.get(flowId);
+    // No baseline for a flow the server may already have (known, or no pull yet): seed one with
+    // every check key open, so local ticks diff as edits and are queued. Without it the pull's
+    // nulls (nobody wrote them) would clear the ticks with no write. A flow the server cannot
+    // know is created whole, as before.
+    const mayExist = state.known.has(flowId) || !state.pulled;
+    const before =
+      state.baselines.get(flowId) ?? (mayExist ? { ...facts, ...checklistToFlat(undefined) } : undefined);
     state.baselines.set(flowId, facts);
     const diff = before ? diffSynced(before, facts) : {};
     if (!before || Object.keys(diff).length > 0) dirty = true;

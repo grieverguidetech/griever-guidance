@@ -265,7 +265,7 @@ additive and optional.
   sessions are unchanged. Clearing an item is not deletion (C9).
 - At load, ids that are not in `CHECKLIST_PHASES` and states other than `done` or `not_applicable`
   are dropped. If nothing is left, the field is removed.
-- Sent and synced from #1080 (accepted on the wire since #1078; #1077), in `SYNCED_KEYS`: clients send all 37 keys on a create and only the changed ones on a patch, and merge them per item (last save wins; a pending local tick keeps its value). A device saved before #1080 has a baseline without check keys, which reads as open, so its earlier ticks are queued before the first pull is merged and are not cleared by the server's nulls. One wire key per item: `check` plus the item id in PascalCase
+- Sent and synced from #1080 (accepted on the wire since #1078; #1077), in `SYNCED_KEYS`: clients send all 37 keys on a create and only the changed ones on a patch, and merge them per item (last save wins; a pending local tick keeps its value). A device saved before #1080 has a baseline without check keys, which reads as open, so its earlier ticks are queued before the first pull is merged and are not cleared by the server's nulls. A flow with no baseline at all is seeded the same way (fixed, #1080). A phone that upgrades from an old build re-pushes its local set ticks, which can overwrite newer web changes for the same item (a pending local tick keeps its value). One wire key per item: `check` plus the item id in PascalCase
   (`pronouncement` is `checkPronouncement`, `burial-or-cremation` is `checkBurialOrCremation`), value
   `'done'`, `'not_applicable'` or null (open). 37 keys, listed by `CHECKLIST_FLOW_KEYS` in
   `libs/shared/src/checklistSync.ts`. Item ids must never be renamed: the key comes from the id, so a

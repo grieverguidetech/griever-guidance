@@ -321,7 +321,7 @@ describe('SetupScreen What you will need (#699)', () => {
     expect(screen.UNSAFE_queryAllByType(Modal).find((m) => m.props.testID === 'checklist-sheet')).toBeUndefined();
     fireEvent.press(screen.getByRole('button', { name: "What you'll need" }));
     expect(sheet().props.visible).toBe(true);
-    expect(within(screen.getByTestId('checklist-sheet')).getByText('Ticks under Gather when you can stay on this phone.')).toBeTruthy();
+    expect(within(screen.getByTestId('checklist-sheet')).getByText('Ticks under “Gather when you can” stay on this phone.')).toBeTruthy();
     expect(screen.queryByText('Not today. Just so none of it surprises you.')).toBeNull();
   });
 
