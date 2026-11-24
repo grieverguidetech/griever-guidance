@@ -94,6 +94,14 @@ export function ReadyToSendScreen({ flow, contacts, onChoosePeople, onGotIt, foc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetOpen]);
 
+  // No moment is chosen, so there is nothing to show. Leave for the hub rather than stay on a blank screen (#1073).
+  const hasTemplate = selectedTemplate !== null;
+  useEffect(() => {
+    if (!hasTemplate) {
+      onGotIt();
+    }
+  }, [hasTemplate, onGotIt]);
+
   if (!selectedTemplate) {
     return null;
   }

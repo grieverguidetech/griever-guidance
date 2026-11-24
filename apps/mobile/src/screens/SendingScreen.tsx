@@ -87,6 +87,15 @@ export function SendingScreen({ flow, contacts }: Props) {
     }
   }, []);
 
+  // No send job means there is nothing to send here. Step back to Ready to send rather than leave a blank screen (#1073).
+  const { prevStep } = flow;
+  const hasJob = sendJob !== null;
+  useEffect(() => {
+    if (!hasJob) {
+      prevStep();
+    }
+  }, [hasJob, prevStep]);
+
   if (!sendJob) {
     return null;
   }
